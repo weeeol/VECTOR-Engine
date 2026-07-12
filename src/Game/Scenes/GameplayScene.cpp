@@ -6,13 +6,14 @@
 #include "Engine/Events/EventBus.hpp"
 #include "Game/Events/GameEvents.hpp"
 #include "Engine/Core/Logger.hpp"
+#include "Engine/Core/Application.hpp"
 
 namespace Game {
 
     GameplayScene::GameplayScene(int width, int height, VECTOR::InputManager* inputManager, AIDifficulty aiDifficulty)
         : m_Width(width), m_Height(height), m_InputManager(inputManager),
           m_Score1(0), m_Score2(0), m_IsPaused(false), m_WasPausePressed(false), m_DebugMode(false), m_WasF3Pressed(false),
-          m_TrailEmitter(200), m_ExplosionEmitter(300)
+          m_TrailEmitter(200), m_ExplosionEmitter(300), m_State(GameState::Playing), m_Winner(0)
     {
         m_Player1 = std::make_unique<Paddle>(30.0f, height / 2.0f - 50.0f, SDL_SCANCODE_W, SDL_SCANCODE_S);
         m_Player2 = std::make_unique<AIPaddle>(width - 50.0f, height / 2.0f - 50.0f);
@@ -44,6 +45,10 @@ namespace Game {
             return;
         }
 
+        if (m_State == GameState::GameOver) {
+            return; // Don't update game logic if over
+        }
+
         if (isPausePressed && !m_WasPausePressed) {
             m_IsPaused = !m_IsPaused;
         }
@@ -67,12 +72,24 @@ namespace Game {
                 m_Score2++;
                 VECTOR::EventBus::Get().Publish<ScoreEvent>(2);
                 VECTOR_LOG_INFO(std::string("Player 2 Scored! Score: ") + std::to_string(m_Score1) + " - " + std::to_string(m_Score2));
-                ResetGame();
+                
+                if (m_Score2 >= WINNING_SCORE) {
+                    m_State = GameState::GameOver;
+                    m_Winner = 2;
+                } else {
+                    ResetGame();
+                }
             } else if (m_Ball->IsOutOfBoundsRight(m_Width)) {
                 m_Score1++;
                 VECTOR::EventBus::Get().Publish<ScoreEvent>(1);
                 VECTOR_LOG_INFO(std::string("Player 1 Scored! Score: ") + std::to_string(m_Score1) + " - " + std::to_string(m_Score2));
-                ResetGame();
+                
+                if (m_Score1 >= WINNING_SCORE) {
+                    m_State = GameState::GameOver;
+                    m_Winner = 1;
+                } else {
+                    ResetGame();
+                }
             }
         }
     }
@@ -89,11 +106,15 @@ namespace Game {
             renderer->DrawRect(m_Width / 2 - 2, y, 4, 15, 255, 255, 255, 100);
         }
 
-        std::string scoreText = std::to_string(m_Score1) + "   " + std::to_string(m_Score2);
-        renderer->DrawText(scoreText, m_Width / 2 - 35, 20, 255, 255, 255, 36);
+        renderer->DrawText(std::to_string(m_Score1), m_Width / 2 - 50, 20, 255, 255, 255, 48);
+        renderer->DrawText(std::to_string(m_Score2), m_Width / 2 + 20, 20, 255, 255, 255, 48);
 
-        if (m_IsPaused) {
-            renderer->DrawText("PAUSED", m_Width / 2 - 60, m_Height / 2 - 20, 255, 255, 0, 36);
+        if (m_State == GameState::GameOver) {
+            std::string winText = (m_Winner == 1) ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!";
+            renderer->DrawText(winText, m_Width / 2 - 140, m_Height / 2 - 50, 255, 215, 0, 48);
+            renderer->DrawText("Press ESC to return to Menu", m_Width / 2 - 160, m_Height / 2 + 20, 255, 255, 255, 24);
+        } else if (m_IsPaused) {
+            renderer->DrawText("PAUSED", m_Width / 2 - 60, m_Height / 2 - 24, 255, 255, 255, 48);
             renderer->DrawText("Press P to Resume | ESC for Menu", m_Width / 2 - 200, m_Height / 2 + 30, 255, 255, 255, 24);
         }
 
@@ -112,9 +133,11 @@ namespace Game {
             std::string p1Text = m_Player1->GetName() + " Y: " + std::to_string((int)m_Player1->GetPosition().y);
             std::string p2Text = m_Player2->GetName() + " Y: " + std::to_string((int)m_Player2->GetPosition().y);
             std::string ballText = m_Ball->GetName() + " X: " + std::to_string((int)m_Ball->GetPosition().x) + " Y: " + std::to_string((int)m_Ball->GetPosition().y);
+            std::string fpsText = "FPS: " + std::to_string((int)VECTOR::Application::Get().GetFPS());
             
             renderer->DrawText(p1Text, 10, 10, 0, 255, 0, 16);
             renderer->DrawText(p2Text, m_Width - 200, 10, 0, 255, 0, 16);
+            renderer->DrawText(fpsText, m_Width - 100, 30, 255, 255, 0, 16);
             renderer->DrawText(ballText, m_Width / 2 - 100, m_Height - 30, 0, 255, 255, 16);
         }
     }

@@ -1,7 +1,7 @@
 # VECTOR Engine Architecture
 
 ## Overview
-VECTOR (Velocity Engine for C++ Texturing and Object Rendering) is a custom 2D game engine built on top of the SDL2 hardware abstraction layer. It provides a rigid, modular framework for building 2D games, featuring a high-resolution fixed-timestep physics loop, dynamic rendering, and component-driven entities. The repository currently includes a fully playable implementation of Pong featuring dynamic AI and advanced collision physics.
+VECTOR (Velocity Engine for C++ Texturing and Object Rendering) is a custom 2D game engine built on top of the SDL2 hardware abstraction layer. It provides a rigid, modular framework for building 2D games, featuring a high-resolution fixed-timestep physics loop, dynamic rendering, scene management, event messaging, and component-driven entities. The repository currently includes a fully playable implementation of Pong featuring dynamic AI and advanced collision physics.
 
 ## Folder Structure
 ```text
@@ -11,18 +11,26 @@ VECTOR-Engine/
 ├── src/
 │   ├── main.cpp            # Application Entry Point
 │   ├── Engine/             # Game-Agnostic Core Engine
-│   │   ├── Core/           # App Loop, High-Res Timers, Logger
-│   │   ├── Graphics/       # SDL2 Renderer, Texture caching, Fonts
+│   │   ├── Audio/          # SDL_mixer integration (AudioManager)
+│   │   ├── Core/           # App Loop, High-Res Timers, Logger, SceneManager, ResourceManager
+│   │   ├── Events/         # EventBus for decoupled messaging
+│   │   ├── Graphics/       # SDL2 Renderer, Texture caching, Fonts, ParticleSystem
 │   │   ├── Input/          # Keyboard/Mouse state tracking
-│   │   └── Math/           # Vector math, AABB, GameObject Base
+│   │   ├── Math/           # Vector math, AABB, GameObject Base
+│   │   └── UI/             # UIManager, UIElement, UIButton
 │   └── Game/               # Game-Specific Implementation
-│       ├── Core/           # PongGame logic, Game States, Scoring
-│       └── Entities/       # Player Paddle, AI Paddle, Ball
+│       ├── Core/           # PongGame application logic
+│       ├── Entities/       # Player Paddle, AI Paddle (FSM), Ball
+│       ├── Events/         # Game-specific events (ScoreEvent, CollisionEvent)
+│       └── Scenes/         # MainMenuScene, GameplayScene
 ```
 
 ## Core Data Flow & Game Loop
 1. **Entry**: The application starts in `src/main.cpp`, which instantiates `Game::PongGame` (derived from `VECTOR::Application`) and calls `Run()`.
-2. **The Loop**: `Application::Run()` manages a high-resolution fixed-timestep loop:
-   - **Input**: Polls SDL events and updates the `InputManager`.
-   - **Physics/Logic (Fixed Step)**: Calls `Update(deltaTime)` identically across hardware. The Game overrides this to update entities (`Paddle`, `Ball`), run AI logic, and resolve `CheckCollisions()`.
-   - **Rendering (Variable Step)**: Calls `Render()`. The Game clears the screen, draws the entities via the `Renderer` subsystem, and presents the SDL buffer.
+2. **Initialization**: `PongGame::OnInit()` subscribes to engine events and pushes the initial `MainMenuScene` onto the `SceneManager` stack.
+3. **The Loop**: `Application::Run()` manages a high-resolution fixed-timestep loop:
+   - **Input**: Polls SDL events and updates the `InputManager` (keyboard state, mouse position, and clicks).
+   - **Physics/Logic (Fixed Step)**: Calls `Update(deltaTime)` identically across hardware. The `SceneManager` routes this to the active `Scene`, which updates UI elements, game entities (`Paddle`, `Ball`), particle emitters, AI state machines, and resolves collisions.
+   - **Deferred State Changes**: Scene transitions (e.g. from UI buttons) are deferred to the end of the update loop to prevent use-after-free bugs.
+   - **Rendering (Variable Step)**: Calls `Render()`. The active `Scene` clears the screen, draws the entities, UI components, and particles via the `Renderer` subsystem, and presents the SDL buffer.
+4. **Shutdown**: On exit, the `SceneManager` is cleared before `SDL_Quit()` is invoked, ensuring all textures and audio chunks are safely destroyed while SDL is still initialized.

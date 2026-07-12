@@ -23,6 +23,8 @@ namespace Game {
         float GetSpeed() const { return m_Speed; }
         void SetSpeed(float speed) { m_Speed = speed; }
         void SetVelocity(float x, float y) { m_Velocity.x = x; m_Velocity.y = y; }
+        float GetVelocityX() const { return m_Velocity.x; }
+        float GetVelocityY() const { return m_Velocity.y; }
 
     private:
         VECTOR::Vector2D m_Velocity;

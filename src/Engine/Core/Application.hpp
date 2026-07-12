@@ -17,8 +17,10 @@ namespace VECTOR {
      */
     class Application {
     public:
+        static Application& Get();
+
         Application(const std::string& title, int width, int height);
-        ~Application();
+        virtual ~Application();
 
         // Run the main game loop
         void Run();

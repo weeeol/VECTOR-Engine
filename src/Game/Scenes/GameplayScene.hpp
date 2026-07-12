@@ -13,6 +13,11 @@ namespace VECTOR {
 
 namespace Game {
 
+    enum class GameState {
+        Playing,
+        GameOver
+    };
+
     class GameplayScene : public VECTOR::Scene {
     public:
         GameplayScene(int width, int height, VECTOR::InputManager* inputManager, AIDifficulty aiDifficulty);
@@ -43,6 +48,10 @@ namespace Game {
 
         VECTOR::ParticleEmitter m_TrailEmitter;
         VECTOR::ParticleEmitter m_ExplosionEmitter;
+        
+        GameState m_State;
+        int m_Winner; // 1 for Player 1, 2 for Player 2
+        const int WINNING_SCORE = 5;
     };
 
 } // namespace Game

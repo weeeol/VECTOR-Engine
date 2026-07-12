@@ -7,9 +7,16 @@
 
 namespace VECTOR {
 
+    static Application* s_Instance = nullptr;
+
+    Application& Application::Get() {
+        return *s_Instance;
+    }
+
     Application::Application(const std::string& title, int width, int height)
         : m_Title(title), m_Width(width), m_Height(height), m_IsRunning(false), m_CurrentFPS(0.0f)
     {
+        s_Instance = this;
     }
 
     Application::~Application() {
