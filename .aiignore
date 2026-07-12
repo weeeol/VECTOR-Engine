@@ -1,0 +1,31 @@
+# Build and CMake directories
+build/
+out/
+bin/
+.cmake/
+CMakeCache.txt
+CMakeFiles/
+Makefile
+*.cmake
+
+# Assets (AI cannot read binary image/font files)
+assets/*.ttf
+assets/*.png
+assets/*.jpg
+assets/*.wav
+assets/*.mp3
+
+# IDE and OS specific
+.vscode/
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
