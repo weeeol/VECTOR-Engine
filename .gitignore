@@ -1,0 +1,31 @@
+# Build directory
+/build/
+/out/
+/bin/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.user
+*.vcxproj.filters
+
+# VS Code
+.vscode/
+
+# Ignore compiled executables
+*.exe
+*.out
+*.app
+*.dll
+*.so
+*.dylib
