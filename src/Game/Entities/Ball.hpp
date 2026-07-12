@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Engine/GameObject.hpp"
-#include "Engine/Renderer.hpp"
+#include "Engine/Math/GameObject.hpp"
+#include "Engine/Graphics/Renderer.hpp"
 
 namespace Game {
 

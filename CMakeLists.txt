@@ -9,14 +9,12 @@ find_package(SDL2 REQUIRED)
 find_package(SDL2_ttf REQUIRED)
 find_package(SDL2_image REQUIRED)
 
-# ==============================================================================
-# VECTOR ENGINE LIBRARY
-# ==============================================================================
 set(VECTOR_SOURCES
-    src/Engine/Application.cpp
-    src/Engine/Renderer.cpp
-    src/Engine/InputManager.cpp
-    src/Engine/Texture.cpp
+    src/Engine/Core/Application.cpp
+    src/Engine/Core/Logger.cpp
+    src/Engine/Graphics/Renderer.cpp
+    src/Engine/Graphics/Texture.cpp
+    src/Engine/Input/InputManager.cpp
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
@@ -27,10 +25,10 @@ target_link_libraries(VECTOR PUBLIC SDL2::SDL2main SDL2::SDL2 SDL2_ttf::SDL2_ttf
 # PONG GAME EXECUTABLE
 # ==============================================================================
 set(GAME_SOURCES
-    src/Game/PongGame.cpp
-    src/Game/Paddle.cpp
-    src/Game/AgentPaddle.cpp
-    src/Game/Ball.cpp
+    src/Game/Core/PongGame.cpp
+    src/Game/Entities/Paddle.cpp
+    src/Game/Entities/AIPaddle.cpp
+    src/Game/Entities/Ball.cpp
 )
 
 add_executable(Pong src/main.cpp ${GAME_SOURCES})

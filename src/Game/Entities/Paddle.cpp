@@ -1,10 +1,10 @@
-#include "Paddle.hpp"
+#include "Game/Entities/Paddle.hpp"
 #include <algorithm>
 
 namespace Game {
 
     Paddle::Paddle(float x, float y, SDL_Scancode upKey, SDL_Scancode downKey)
-        : VECTOR::GameObject(x, y), m_Speed(400.0f), m_Width(20.0f), m_Height(100.0f),
+        : VECTOR::GameObject(1, "Player1", x, y), m_Speed(400.0f), m_Width(20.0f), m_Height(100.0f),
           m_UpKey(upKey), m_DownKey(downKey)
     {
     }

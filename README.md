@@ -9,7 +9,7 @@
 - **High Definition**: 1280x720 window resolution.
 - **Game States**: Includes Start, Playing, and Paused menus.
 - **Text & Texture Rendering**: Uses `SDL2_ttf` for fonts and `SDL2_image` for loading sprites.
-- **Dynamic AI Opponent**: Play against a computer-controlled AI agent with 3 difficulty levels!
+- **Dynamic AI Opponent**: Play against a computer-controlled AI with 3 difficulty levels!
 
 ## Requirements
 
@@ -19,7 +19,7 @@
 
 ## Controls
 - **Player 1 (Left)**: `W` (Up) and `S` (Down)
-- **Player 2 (Right)**: Controlled by AI Agent
+- **Player 2 (Right)**: Controlled by AI
 - **Pause**: `P` or `ESC`
 - **Start / Select Difficulty**: `1` (Easy), `2` (Medium), `3` (Hard), then `ENTER` to start.
 

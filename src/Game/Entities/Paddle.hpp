@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Engine/GameObject.hpp"
-#include "Engine/Renderer.hpp"
-#include "Engine/InputManager.hpp"
+#include "Engine/Math/GameObject.hpp"
+#include "Engine/Graphics/Renderer.hpp"
+#include "Engine/Input/InputManager.hpp"
 #include <SDL.h>
 
 namespace Game {

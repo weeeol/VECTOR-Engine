@@ -1,11 +1,11 @@
-#include "Application.hpp"
-#include <iostream>
+#include "Engine/Core/Application.hpp"
+#include "Engine/Core/Logger.hpp"
 #include <SDL.h>
 
 namespace VECTOR {
 
     Application::Application(const std::string& title, int width, int height)
-        : m_Title(title), m_Width(width), m_Height(height), m_IsRunning(false)
+        : m_Title(title), m_Width(width), m_Height(height), m_IsRunning(false), m_CurrentFPS(0.0f)
     {
     }
 
@@ -14,8 +14,10 @@ namespace VECTOR {
     }
 
     bool Application::Initialize() {
+        Logger::Init();
+
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
-            std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
+            VECTOR_LOG_ERROR(std::string("SDL could not initialize! SDL_Error: ") + SDL_GetError());
             return false;
         }
 
@@ -43,6 +45,8 @@ namespace VECTOR {
 
         Uint32 previousTime = SDL_GetTicks();
         float accumulator = 0.0f;
+        Uint32 frameCount = 0;
+        Uint32 fpsTimer = SDL_GetTicks();
 
         while (m_IsRunning) {
             Uint32 currentTime = SDL_GetTicks();
@@ -65,11 +69,12 @@ namespace VECTOR {
             }
 
             Render();
+            frameCount++;
 
-            // Calculate how long rendering took and delay to cap framerate
-            Uint32 frameTicks = SDL_GetTicks() - currentTime;
-            if (frameTicks < targetFrameTime) {
-                SDL_Delay(static_cast<Uint32>(targetFrameTime - frameTicks));
+            if (currentTime - fpsTimer >= 1000) {
+                m_CurrentFPS = frameCount;
+                frameCount = 0;
+                fpsTimer = currentTime;
             }
         }
     }

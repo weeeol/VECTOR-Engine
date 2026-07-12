@@ -1,9 +1,9 @@
-#include "Ball.hpp"
+#include "Game/Entities/Ball.hpp"
 
 namespace Game {
 
     Ball::Ball(float x, float y)
-        : VECTOR::GameObject(x, y), m_Size(15.0f), m_Speed(400.0f)
+        : VECTOR::GameObject(3, "GameBall", x, y), m_Size(15.0f), m_Speed(400.0f)
     {
         m_Velocity = VECTOR::Vector2D(1.0f, 1.0f) * m_Speed;
     }

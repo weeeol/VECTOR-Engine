@@ -1,6 +1,6 @@
-#include "Renderer.hpp"
-#include "Texture.hpp"
-#include <iostream>
+#include "Engine/Graphics/Renderer.hpp"
+#include "Engine/Graphics/Texture.hpp"
+#include "Engine/Core/Logger.hpp"
 #include <SDL_ttf.h>
 #include <SDL_image.h>
 
@@ -23,7 +23,7 @@ namespace VECTOR {
         );
 
         if (!m_Window) {
-            std::cerr << "Failed to create window! SDL_Error: " << SDL_GetError() << std::endl;
+            VECTOR_LOG_ERROR(std::string("Failed to create window! SDL_Error: ") + SDL_GetError());
             return false;
         }
 
@@ -34,25 +34,31 @@ namespace VECTOR {
         );
 
         if (!m_Renderer) {
-            std::cerr << "Failed to create renderer! SDL_Error: " << SDL_GetError() << std::endl;
+            VECTOR_LOG_ERROR(std::string("Failed to create renderer! SDL_Error: ") + SDL_GetError());
             return false;
         }
 
         if (TTF_Init() == -1) {
-            std::cerr << "Failed to initialize SDL_ttf! TTF_Error: " << TTF_GetError() << std::endl;
+            VECTOR_LOG_ERROR(std::string("Failed to initialize SDL_ttf! TTF_Error: ") + TTF_GetError());
             return false;
         }
 
         int imgFlags = IMG_INIT_PNG;
         if (!(IMG_Init(imgFlags) & imgFlags)) {
-            std::cerr << "Failed to initialize SDL_image! IMG_Error: " << IMG_GetError() << std::endl;
+            VECTOR_LOG_ERROR(std::string("Failed to initialize SDL_image! IMG_Error: ") + IMG_GetError());
             return false;
         }
 
+        VECTOR_LOG_INFO("Renderer initialized successfully.");
         return true;
     }
 
     void Renderer::Shutdown() {
+        for (auto& pair : m_Fonts) {
+            if (pair.second) TTF_CloseFont(pair.second);
+        }
+        m_Fonts.clear();
+
         IMG_Quit();
         TTF_Quit();
         if (m_Renderer) {
@@ -81,14 +87,20 @@ namespace VECTOR {
     }
 
     void Renderer::DrawText(const std::string& text, int x, int y, uint8_t r, uint8_t g, uint8_t b, int fontSize) {
-        TTF_Font* font = TTF_OpenFont("assets/font.ttf", fontSize);
-        if (!font) {
-            std::cerr << "Failed to load font! TTF_Error: " << TTF_GetError() << std::endl;
-            return;
+        if (m_Fonts.find(fontSize) == m_Fonts.end()) {
+            TTF_Font* font = TTF_OpenFont("assets/font.ttf", fontSize);
+            if (!font) {
+                VECTOR_LOG_WARN(std::string("Failed to load font size ") + std::to_string(fontSize) + "! TTF_Error: " + TTF_GetError());
+                return;
+            }
+            m_Fonts[fontSize] = font;
         }
 
+        TTF_Font* font = m_Fonts[fontSize];
+
         SDL_Color color = { r, g, b, 255 };
-        SDL_Surface* surface = TTF_RenderText_Solid(font, text.c_str(), color);
+        // Use Blended instead of Solid for high-quality, anti-aliased text!
+        SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), color);
         SDL_Texture* texture = SDL_CreateTextureFromSurface(m_Renderer, surface);
 
         SDL_Rect destRect = { x, y, surface->w, surface->h };
@@ -96,7 +108,6 @@ namespace VECTOR {
 
         SDL_FreeSurface(surface);
         SDL_DestroyTexture(texture);
-        TTF_CloseFont(font);
     }
 
     void Renderer::DrawTexture(Texture* texture, int x, int y, int w, int h) {

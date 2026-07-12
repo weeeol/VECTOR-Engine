@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Paddle.hpp"
-#include "Ball.hpp"
+#include "Game/Entities/Paddle.hpp"
+#include "Game/Entities/Ball.hpp"
 
 namespace Game {
 
@@ -11,9 +11,9 @@ namespace Game {
         Hard
     };
 
-    class AgentPaddle : public Paddle {
+    class AIPaddle : public Paddle {
     public:
-        AgentPaddle(float x, float y);
+        AIPaddle(float x, float y);
 
         void SetDifficulty(AIDifficulty difficulty);
 

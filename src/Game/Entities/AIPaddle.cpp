@@ -1,17 +1,19 @@
-#include "AgentPaddle.hpp"
+#include "AIPaddle.hpp"
 #include <algorithm>
 
 namespace Game {
 
-    AgentPaddle::AgentPaddle(float x, float y)
+    AIPaddle::AIPaddle(float x, float y)
         // We pass dummy keys since it won't use the standard InputManager update
         : Paddle(x, y, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN),
-          m_ReactionDelayTimer(0.0f), m_TargetY(y), m_ReactionTime(0.1f), m_Difficulty(AIDifficulty::Medium)
+          m_ReactionDelayTimer(0.0f), m_TargetY(y), m_ReactionTime(0.2f), m_Difficulty(AIDifficulty::Medium)
     {
+        m_ID = 2;
+        m_Name = "AI_Player2";
         SetDifficulty(AIDifficulty::Medium);
     }
 
-    void AgentPaddle::SetDifficulty(AIDifficulty difficulty) {
+    void AIPaddle::SetDifficulty(AIDifficulty difficulty) {
         m_Difficulty = difficulty;
         switch (m_Difficulty) {
             case AIDifficulty::Easy:
@@ -29,7 +31,7 @@ namespace Game {
         }
     }
 
-    void AgentPaddle::UpdateAI(float deltaTime, const Ball* ball, int screenHeight) {
+    void AIPaddle::UpdateAI(float deltaTime, const Ball* ball, int screenHeight) {
         m_ReactionDelayTimer += deltaTime;
 
         // Only update our target position based on reaction time

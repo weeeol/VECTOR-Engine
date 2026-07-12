@@ -2,8 +2,8 @@
 
 #include <string>
 #include <memory>
-#include "Renderer.hpp"
-#include "InputManager.hpp"
+#include "Engine/Graphics/Renderer.hpp"
+#include "Engine/Input/InputManager.hpp"
 
 namespace VECTOR {
 
@@ -26,6 +26,8 @@ namespace VECTOR {
         // Gracefully shut down the application
         void Quit();
 
+        float GetFPS() const { return m_CurrentFPS; }
+
     private:
         // Initialize subsystems (SDL, Renderer, Window, etc.)
         bool Initialize();
@@ -42,6 +44,7 @@ namespace VECTOR {
         int m_Width;
         int m_Height;
         bool m_IsRunning;
+        float m_CurrentFPS;
 
         std::unique_ptr<Renderer> m_Renderer;
         std::unique_ptr<InputManager> m_InputManager;

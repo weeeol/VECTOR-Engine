@@ -1,4 +1,4 @@
-#include "Game/PongGame.hpp"
+#include "Game/Core/PongGame.hpp"
 
 int main(int argc, char* argv[]) {
     // We instantiate the game, which is an VECTOR::Application
