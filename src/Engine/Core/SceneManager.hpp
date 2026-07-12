@@ -41,6 +41,8 @@ namespace VECTOR {
         ~SceneManager() = default;
 
         std::vector<std::unique_ptr<Scene>> m_Scenes;
+        std::unique_ptr<Scene> m_NextScene;
+        bool m_NeedsPop = false;
     };
 
 } // namespace VECTOR

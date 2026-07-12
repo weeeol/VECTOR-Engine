@@ -2,6 +2,7 @@
 
 #include "Engine/Core/Scene.hpp"
 #include "Game/Entities/AIPaddle.hpp"
+#include "Engine/UI/UIManager.hpp"
 #include <memory>
 
 namespace VECTOR {
@@ -20,12 +21,14 @@ namespace Game {
         void Render(VECTOR::Renderer* renderer) override;
 
     private:
+        void CreateUI();
+
         int m_Width;
         int m_Height;
         VECTOR::InputManager* m_InputManager;
+        VECTOR::UIManager m_UIManager;
         
         AIDifficulty m_SelectedDifficulty;
-        bool m_WasEnterPressed;
     };
 
 } // namespace Game

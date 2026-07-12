@@ -21,8 +21,20 @@ namespace VECTOR {
         // SDL_Scancode is used (e.g., SDL_SCANCODE_W, SDL_SCANCODE_UP)
         bool IsKeyPressed(SDL_Scancode key) const;
 
+        // Mouse input
+        int GetMouseX() const { return m_MouseX; }
+        int GetMouseY() const { return m_MouseY; }
+        bool IsMouseButtonPressed(int button) const; // Use SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT, etc.
+        
+        // Check if mouse button was just pressed this frame
+        bool IsMouseButtonJustPressed(int button) const;
+
     private:
         const Uint8* m_KeyboardState;
+        Uint32 m_MouseState;
+        Uint32 m_PrevMouseState;
+        int m_MouseX;
+        int m_MouseY;
     };
 
 } // namespace VECTOR

@@ -10,22 +10,12 @@ namespace VECTOR {
     }
 
     void SceneManager::PopScene() {
-        if (!m_Scenes.empty()) {
-            m_Scenes.back()->OnExit();
-            m_Scenes.pop_back();
-        }
+        m_NeedsPop = true;
     }
 
     void SceneManager::ChangeScene(std::unique_ptr<Scene> scene) {
-        if (!m_Scenes.empty()) {
-            m_Scenes.back()->OnExit();
-            m_Scenes.pop_back();
-        }
-
-        if (scene) {
-            scene->OnEnter();
-            m_Scenes.push_back(std::move(scene));
-        }
+        m_NeedsPop = true;
+        m_NextScene = std::move(scene);
     }
 
     void SceneManager::Clear() {
@@ -36,6 +26,19 @@ namespace VECTOR {
     }
 
     void SceneManager::Update(float deltaTime) {
+        if (m_NeedsPop) {
+            if (!m_Scenes.empty()) {
+                m_Scenes.back()->OnExit();
+                m_Scenes.pop_back();
+            }
+            m_NeedsPop = false;
+        }
+
+        if (m_NextScene) {
+            m_NextScene->OnEnter();
+            m_Scenes.push_back(std::move(m_NextScene));
+        }
+
         if (!m_Scenes.empty()) {
             m_Scenes.back()->Update(deltaTime);
         }

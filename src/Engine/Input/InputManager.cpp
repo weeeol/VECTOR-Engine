@@ -2,7 +2,7 @@
 
 namespace VECTOR {
 
-    InputManager::InputManager() {
+    InputManager::InputManager() : m_MouseState(0), m_PrevMouseState(0), m_MouseX(0), m_MouseY(0) {
         // Initialize keyboard state pointer
         m_KeyboardState = SDL_GetKeyboardState(nullptr);
     }
@@ -11,9 +11,8 @@ namespace VECTOR {
     }
 
     void InputManager::Update() {
-        // SDL_PumpEvents() is called automatically by SDL_PollEvent() in the Application loop.
-        // Therefore, m_KeyboardState is kept up-to-date automatically by SDL.
-        // We just need this method in case we want to add "just pressed" or "just released" logic later.
+        m_PrevMouseState = m_MouseState;
+        m_MouseState = SDL_GetMouseState(&m_MouseX, &m_MouseY);
     }
 
     bool InputManager::IsKeyPressed(SDL_Scancode key) const {
@@ -21,6 +20,16 @@ namespace VECTOR {
             return m_KeyboardState[key] == 1;
         }
         return false;
+    }
+
+    bool InputManager::IsMouseButtonPressed(int button) const {
+        return (m_MouseState & SDL_BUTTON(button)) != 0;
+    }
+    
+    bool InputManager::IsMouseButtonJustPressed(int button) const {
+        bool isPressedNow = (m_MouseState & SDL_BUTTON(button)) != 0;
+        bool wasPressedBefore = (m_PrevMouseState & SDL_BUTTON(button)) != 0;
+        return isPressedNow && !wasPressedBefore;
     }
 
 } // namespace VECTOR

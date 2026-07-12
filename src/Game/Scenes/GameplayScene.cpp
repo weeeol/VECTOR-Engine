@@ -11,7 +11,8 @@ namespace Game {
 
     GameplayScene::GameplayScene(int width, int height, VECTOR::InputManager* inputManager, AIDifficulty aiDifficulty)
         : m_Width(width), m_Height(height), m_InputManager(inputManager),
-          m_Score1(0), m_Score2(0), m_IsPaused(false), m_WasPausePressed(false), m_DebugMode(false), m_WasF3Pressed(false)
+          m_Score1(0), m_Score2(0), m_IsPaused(false), m_WasPausePressed(false), m_DebugMode(false), m_WasF3Pressed(false),
+          m_TrailEmitter(200), m_ExplosionEmitter(300)
     {
         m_Player1 = std::make_unique<Paddle>(30.0f, height / 2.0f - 50.0f, SDL_SCANCODE_W, SDL_SCANCODE_S);
         m_Player2 = std::make_unique<AIPaddle>(width - 50.0f, height / 2.0f - 50.0f);
@@ -53,6 +54,13 @@ namespace Game {
             m_Player2->UpdateAI(deltaTime, m_Ball.get(), m_Height);
             m_Ball->Update(deltaTime, m_Width, m_Height);
 
+            // Emit trail particles from ball center
+            VECTOR::AABB ballBox = m_Ball->GetAABB();
+            m_TrailEmitter.Emit(ballBox.x + ballBox.w/2.0f, ballBox.y + ballBox.h/2.0f, 1, 255, 200, 50, 20.0f, 0.3f);
+
+            m_TrailEmitter.Update(deltaTime);
+            m_ExplosionEmitter.Update(deltaTime);
+
             CheckCollisions();
 
             if (m_Ball->IsOutOfBoundsLeft()) {
@@ -70,6 +78,9 @@ namespace Game {
     }
 
     void GameplayScene::Render(VECTOR::Renderer* renderer) {
+        m_TrailEmitter.Render(renderer);
+        m_ExplosionEmitter.Render(renderer);
+        
         m_Player1->Render(renderer);
         m_Player2->Render(renderer);
         m_Ball->Render(renderer);
@@ -135,6 +146,10 @@ namespace Game {
             } else {
                 m_Ball->SetPosition(paddleAABB.x - ballAABB.w - 1.0f, ballAABB.y);
             }
+
+            // Fire explosion particles
+            float explosionX = isLeftPaddle ? (paddleAABB.x + paddleAABB.w) : paddleAABB.x;
+            m_ExplosionEmitter.Emit(explosionX, ballCenterY, 30, 255, 100, 50, 300.0f, 0.5f);
 
             VECTOR::EventBus::Get().Publish<CollisionEvent>();
         };

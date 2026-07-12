@@ -14,9 +14,12 @@ set(VECTOR_SOURCES
     src/Engine/Core/SceneManager.cpp
     src/Engine/Graphics/Renderer.cpp
     src/Engine/Graphics/Texture.cpp
+    src/Engine/Graphics/ParticleSystem.cpp
     src/Engine/Input/InputManager.cpp
     src/Engine/Audio/AudioManager.cpp
     src/Engine/Events/EventBus.cpp
+    src/Engine/UI/UIButton.cpp
+    src/Engine/UI/UIManager.cpp
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})

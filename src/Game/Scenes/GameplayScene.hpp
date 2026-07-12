@@ -4,6 +4,7 @@
 #include "Game/Entities/Paddle.hpp"
 #include "Game/Entities/AIPaddle.hpp"
 #include "Game/Entities/Ball.hpp"
+#include "Engine/Graphics/ParticleSystem.hpp"
 #include <memory>
 
 namespace VECTOR {
@@ -39,6 +40,9 @@ namespace Game {
         bool m_WasPausePressed;
         bool m_DebugMode;
         bool m_WasF3Pressed;
+
+        VECTOR::ParticleEmitter m_TrailEmitter;
+        VECTOR::ParticleEmitter m_ExplosionEmitter;
     };
 
 } // namespace Game
