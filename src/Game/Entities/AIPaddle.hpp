@@ -16,6 +16,7 @@ namespace Game {
         AIPaddle(float x, float y);
 
         void SetDifficulty(AIDifficulty difficulty);
+        AIDifficulty GetDifficulty() const { return m_Difficulty; }
 
         // Update based on the ball's position instead of input
         void UpdateAI(float deltaTime, const Ball* ball, int screenHeight);

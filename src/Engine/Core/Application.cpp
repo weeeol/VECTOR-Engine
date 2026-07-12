@@ -1,5 +1,7 @@
 #include "Engine/Core/Application.hpp"
 #include "Engine/Core/Logger.hpp"
+#include "Engine/Core/ResourceManager.hpp"
+#include "Engine/Audio/AudioManager.hpp"
 #include <SDL.h>
 
 namespace VECTOR {
@@ -16,9 +18,15 @@ namespace VECTOR {
     bool Application::Initialize() {
         Logger::Init();
 
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0) {
             VECTOR_LOG_ERROR(std::string("SDL could not initialize! SDL_Error: ") + SDL_GetError());
             SDL_assert(false && "SDL failed to initialize");
+            return false;
+        }
+
+        ResourceManager::Get().Initialize();
+        
+        if (!AudioManager::Get().Initialize()) {
             return false;
         }
 
@@ -91,6 +99,10 @@ namespace VECTOR {
         if (m_Renderer) {
             m_Renderer->Shutdown();
         }
+        
+        AudioManager::Get().Shutdown();
+        ResourceManager::Get().Shutdown();
+        
         SDL_Quit();
     }
 

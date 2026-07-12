@@ -5,7 +5,8 @@ namespace Game {
     Ball::Ball(float x, float y)
         : VECTOR::GameObject(3, "GameBall", x, y), m_Size(15.0f), m_Speed(400.0f)
     {
-        m_Velocity = VECTOR::Vector2D(1.0f, 1.0f) * m_Speed;
+        // 0.707106f is 1 / sqrt(2), which normalizes the (1, 1) vector
+        m_Velocity = VECTOR::Vector2D(0.707106f, 0.707106f) * m_Speed;
     }
 
     void Ball::Update(float deltaTime, int screenWidth, int screenHeight) {
@@ -47,9 +48,11 @@ namespace Game {
         m_Position = VECTOR::Vector2D(x, y);
         m_Speed = 400.0f; // Reset to base speed
         
-        // Randomize initial direction slightly
-        m_Velocity.x = (m_Velocity.x > 0 ? -1.0f : 1.0f) * m_Speed;
-        m_Velocity.y = (m_Velocity.y > 0 ? -1.0f : 1.0f) * m_Speed;
+        // Randomize initial direction slightly, maintaining normalized vector length
+        float dirX = m_Velocity.x > 0 ? -0.707106f : 0.707106f;
+        float dirY = m_Velocity.y > 0 ? -0.707106f : 0.707106f;
+        m_Velocity.x = dirX * m_Speed;
+        m_Velocity.y = dirY * m_Speed;
     }
 
     bool Ball::IsOutOfBoundsLeft() const {

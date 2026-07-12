@@ -1,6 +1,7 @@
 #include "Engine/Graphics/Renderer.hpp"
 #include "Engine/Graphics/Texture.hpp"
 #include "Engine/Core/Logger.hpp"
+#include "Engine/Core/ResourceManager.hpp"
 #include <SDL_ttf.h>
 #include <SDL_image.h>
 
@@ -58,10 +59,6 @@ namespace VECTOR {
     }
 
     void Renderer::Shutdown() {
-        for (auto& pair : m_Fonts) {
-            if (pair.second) TTF_CloseFont(pair.second);
-        }
-        m_Fonts.clear();
 
         IMG_Quit();
         TTF_Quit();
@@ -91,16 +88,8 @@ namespace VECTOR {
     }
 
     void Renderer::DrawText(const std::string& text, int x, int y, uint8_t r, uint8_t g, uint8_t b, int fontSize) {
-        if (m_Fonts.find(fontSize) == m_Fonts.end()) {
-            TTF_Font* font = TTF_OpenFont("assets/font.ttf", fontSize);
-            if (!font) {
-                VECTOR_LOG_WARN(std::string("Failed to load font size ") + std::to_string(fontSize) + "! TTF_Error: " + TTF_GetError());
-                return;
-            }
-            m_Fonts[fontSize] = font;
-        }
-
-        TTF_Font* font = m_Fonts[fontSize];
+        TTF_Font* font = ResourceManager::Get().GetFont("assets/font.ttf", fontSize);
+        if (!font) return;
 
         SDL_Color color = { r, g, b, 255 };
         // Use Blended instead of Solid for high-quality, anti-aliased text!

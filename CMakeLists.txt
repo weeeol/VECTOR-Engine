@@ -4,22 +4,22 @@ project(PongGame CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find SDL2 components.
-find_package(SDL2 REQUIRED)
-find_package(SDL2_ttf REQUIRED)
-find_package(SDL2_image REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SDL2 REQUIRED sdl2 SDL2_ttf SDL2_image SDL2_mixer)
 
 set(VECTOR_SOURCES
     src/Engine/Core/Application.cpp
     src/Engine/Core/Logger.cpp
+    src/Engine/Core/ResourceManager.cpp
     src/Engine/Graphics/Renderer.cpp
     src/Engine/Graphics/Texture.cpp
     src/Engine/Input/InputManager.cpp
+    src/Engine/Audio/AudioManager.cpp
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
-target_include_directories(VECTOR PUBLIC src)
-target_link_libraries(VECTOR PUBLIC SDL2::SDL2main SDL2::SDL2 SDL2_ttf::SDL2_ttf SDL2_image::SDL2_image)
+target_include_directories(VECTOR PUBLIC src ${SDL2_INCLUDE_DIRS})
+target_link_libraries(VECTOR PUBLIC ${SDL2_LIBRARIES})
 
 # ==============================================================================
 # PONG GAME EXECUTABLE

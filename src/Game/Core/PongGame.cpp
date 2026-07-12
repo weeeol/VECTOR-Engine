@@ -1,6 +1,6 @@
 #include "PongGame.hpp"
 #include "Engine/Core/Logger.hpp"
-#include <iostream>
+#include "Engine/Audio/AudioManager.hpp"
 
 namespace Game {
 
@@ -93,9 +93,15 @@ namespace Game {
 
         if (m_State == GameState::StartMenu) {
             m_Renderer->DrawText("PONG", m_Width / 2 - 50, m_Height / 2 - 150, 255, 255, 255, 48);
-            m_Renderer->DrawText("Press 1 for EASY AI", m_Width / 2 - 150, m_Height / 2 - 40, 0, 255, 0, 24);
-            m_Renderer->DrawText("Press 2 for MEDIUM AI", m_Width / 2 - 150, m_Height / 2, 255, 255, 0, 24);
-            m_Renderer->DrawText("Press 3 for HARD AI", m_Width / 2 - 150, m_Height / 2 + 40, 255, 0, 0, 24);
+
+            AIDifficulty diff = m_Player2->GetDifficulty();
+            std::string easyPrefix = (diff == AIDifficulty::Easy) ? "> " : "  ";
+            std::string medPrefix  = (diff == AIDifficulty::Medium) ? "> " : "  ";
+            std::string hardPrefix = (diff == AIDifficulty::Hard) ? "> " : "  ";
+
+            m_Renderer->DrawText(easyPrefix + "Press 1 for EASY AI", m_Width / 2 - 170, m_Height / 2 - 40, 0, 255, 0, 24);
+            m_Renderer->DrawText(medPrefix + "Press 2 for MEDIUM AI", m_Width / 2 - 170, m_Height / 2, 255, 255, 0, 24);
+            m_Renderer->DrawText(hardPrefix + "Press 3 for HARD AI", m_Width / 2 - 170, m_Height / 2 + 40, 255, 0, 0, 24);
             
             m_Renderer->DrawText("Press ENTER to Start", m_Width / 2 - 150, m_Height / 2 + 120, 255, 255, 255, 24);
         } else {
@@ -183,6 +189,9 @@ namespace Game {
             } else {
                 m_Ball->SetPosition(paddleAABB.x - ballAABB.w - 1.0f, ballAABB.y);
             }
+
+            // Play hit sound
+            VECTOR::AudioManager::Get().PlaySound("assets/hit.wav");
         };
 
         if (ballAABB.Intersects(p1AABB)) {

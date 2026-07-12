@@ -1,7 +1,7 @@
 #include "Engine/Graphics/Texture.hpp"
 #include "Engine/Graphics/Renderer.hpp"
 #include <SDL_image.h>
-#include <iostream>
+#include "Engine/Core/Logger.hpp"
 
 namespace VECTOR {
 
@@ -10,13 +10,13 @@ namespace VECTOR {
     {
         SDL_Surface* surface = IMG_Load(filepath.c_str());
         if (!surface) {
-            std::cerr << "Failed to load image: " << filepath << ". IMG_Error: " << IMG_GetError() << std::endl;
+            VECTOR_LOG_ERROR(std::string("Failed to load image: ") + filepath + ". IMG_Error: " + IMG_GetError());
             return;
         }
 
         m_Texture = SDL_CreateTextureFromSurface(renderer->GetSDLRenderer(), surface);
         if (!m_Texture) {
-            std::cerr << "Failed to create texture from surface. SDL_Error: " << SDL_GetError() << std::endl;
+            VECTOR_LOG_ERROR(std::string("Failed to create texture from surface. SDL_Error: ") + SDL_GetError());
         } else {
             m_Width = surface->w;
             m_Height = surface->h;

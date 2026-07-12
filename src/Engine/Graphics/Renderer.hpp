@@ -48,7 +48,6 @@ namespace VECTOR {
     private:
         SDL_Window* m_Window;
         SDL_Renderer* m_Renderer;
-        std::unordered_map<int, TTF_Font*> m_Fonts;
     };
 
 } // namespace VECTOR
