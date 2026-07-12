@@ -153,13 +153,42 @@ namespace Game {
         VECTOR::AABB p1AABB = m_Player1->GetAABB();
         VECTOR::AABB p2AABB = m_Player2->GetAABB();
 
+        auto resolveCollision = [this, &ballAABB](VECTOR::AABB& paddleAABB, bool isLeftPaddle) {
+            // Calculate relative intersection Y
+            float paddleCenterY = paddleAABB.y + (paddleAABB.h / 2.0f);
+            float ballCenterY = ballAABB.y + (ballAABB.h / 2.0f);
+            float relativeIntersectY = (paddleCenterY - ballCenterY);
+            
+            // Normalize it (-1.0 to 1.0)
+            float normalizedIntersectY = (relativeIntersectY / (paddleAABB.h / 2.0f));
+            
+            // Max bounce angle (e.g., 60 degrees in radians = 1.047)
+            float maxBounceAngle = 1.047f;
+            float bounceAngle = normalizedIntersectY * maxBounceAngle;
+
+            // Increase ball speed by 5%, capped at 1000
+            float speed = m_Ball->GetSpeed();
+            speed = std::min(speed * 1.05f, 1000.0f);
+            m_Ball->SetSpeed(speed);
+
+            // Calculate new velocity
+            float dirX = isLeftPaddle ? std::cos(bounceAngle) : -std::cos(bounceAngle);
+            float dirY = -std::sin(bounceAngle); // Negative because Y goes down in SDL
+            
+            m_Ball->SetVelocity(dirX * speed, dirY * speed);
+
+            // Prevent getting stuck by pushing the ball out completely
+            if (isLeftPaddle) {
+                m_Ball->SetPosition(paddleAABB.x + paddleAABB.w + 1.0f, ballAABB.y);
+            } else {
+                m_Ball->SetPosition(paddleAABB.x - ballAABB.w - 1.0f, ballAABB.y);
+            }
+        };
+
         if (ballAABB.Intersects(p1AABB)) {
-            m_Ball->BounceX();
-            // Prevent getting stuck by pushing the ball out
-            m_Ball->SetPosition(p1AABB.x + p1AABB.w + 1.0f, ballAABB.y);
+            resolveCollision(p1AABB, true);
         } else if (ballAABB.Intersects(p2AABB)) {
-            m_Ball->BounceX();
-            m_Ball->SetPosition(p2AABB.x - ballAABB.w - 1.0f, ballAABB.y);
+            resolveCollision(p2AABB, false);
         }
     }
 

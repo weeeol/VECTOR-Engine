@@ -20,6 +20,10 @@ namespace Game {
         bool IsOutOfBoundsLeft() const;
         bool IsOutOfBoundsRight(int screenWidth) const;
 
+        float GetSpeed() const { return m_Speed; }
+        void SetSpeed(float speed) { m_Speed = speed; }
+        void SetVelocity(float x, float y) { m_Velocity.x = x; m_Velocity.y = y; }
+
     private:
         VECTOR::Vector2D m_Velocity;
         float m_Size;

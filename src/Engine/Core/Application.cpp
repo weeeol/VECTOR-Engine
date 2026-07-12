@@ -18,12 +18,14 @@ namespace VECTOR {
 
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
             VECTOR_LOG_ERROR(std::string("SDL could not initialize! SDL_Error: ") + SDL_GetError());
+            SDL_assert(false && "SDL failed to initialize");
             return false;
         }
 
         // Initialize Window and Renderer
         m_Renderer = std::make_unique<Renderer>();
         if (!m_Renderer->Initialize(m_Title, m_Width, m_Height)) {
+            SDL_assert(false && "Renderer failed to initialize");
             return false;
         }
 
@@ -43,14 +45,15 @@ namespace VECTOR {
         const float targetFPS = 60.0f;
         const float targetFrameTime = 1000.0f / targetFPS; // In milliseconds
 
-        Uint32 previousTime = SDL_GetTicks();
+        Uint64 previousTime = SDL_GetPerformanceCounter();
         float accumulator = 0.0f;
         Uint32 frameCount = 0;
         Uint32 fpsTimer = SDL_GetTicks();
 
         while (m_IsRunning) {
-            Uint32 currentTime = SDL_GetTicks();
-            float deltaTime = currentTime - previousTime;
+            Uint64 currentTime = SDL_GetPerformanceCounter();
+            // Convert to milliseconds
+            float deltaTime = (float)((currentTime - previousTime) * 1000.0 / SDL_GetPerformanceFrequency());
             previousTime = currentTime;
 
             // Prevent spiral of death if deltaTime is too large
@@ -71,10 +74,11 @@ namespace VECTOR {
             Render();
             frameCount++;
 
-            if (currentTime - fpsTimer >= 1000) {
+            Uint32 currentTicks = SDL_GetTicks();
+            if (currentTicks - fpsTimer >= 1000) {
                 m_CurrentFPS = frameCount;
                 frameCount = 0;
-                fpsTimer = currentTime;
+                fpsTimer = currentTicks;
             }
         }
     }

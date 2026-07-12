@@ -45,8 +45,9 @@ namespace Game {
 
     void Ball::Reset(float x, float y) {
         m_Position = VECTOR::Vector2D(x, y);
-        // Simple direction swap on reset for variety could be added,
-        // but for now we just keep the current speed and flip X
+        m_Speed = 400.0f; // Reset to base speed
+        
+        // Randomize initial direction slightly
         m_Velocity.x = (m_Velocity.x > 0 ? -1.0f : 1.0f) * m_Speed;
         m_Velocity.y = (m_Velocity.y > 0 ? -1.0f : 1.0f) * m_Speed;
     }

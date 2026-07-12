@@ -24,6 +24,7 @@ namespace VECTOR {
 
         if (!m_Window) {
             VECTOR_LOG_ERROR(std::string("Failed to create window! SDL_Error: ") + SDL_GetError());
+            SDL_assert(false && "Failed to create SDL_Window");
             return false;
         }
 
@@ -35,17 +36,20 @@ namespace VECTOR {
 
         if (!m_Renderer) {
             VECTOR_LOG_ERROR(std::string("Failed to create renderer! SDL_Error: ") + SDL_GetError());
+            SDL_assert(false && "Failed to create SDL_Renderer");
             return false;
         }
 
         if (TTF_Init() == -1) {
             VECTOR_LOG_ERROR(std::string("Failed to initialize SDL_ttf! TTF_Error: ") + TTF_GetError());
+            SDL_assert(false && "Failed to initialize SDL_ttf");
             return false;
         }
 
         int imgFlags = IMG_INIT_PNG;
         if (!(IMG_Init(imgFlags) & imgFlags)) {
             VECTOR_LOG_ERROR(std::string("Failed to initialize SDL_image! IMG_Error: ") + IMG_GetError());
+            SDL_assert(false && "Failed to initialize SDL_image");
             return false;
         }
 
