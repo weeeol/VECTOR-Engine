@@ -11,10 +11,12 @@ set(VECTOR_SOURCES
     src/Engine/Core/Application.cpp
     src/Engine/Core/Logger.cpp
     src/Engine/Core/ResourceManager.cpp
+    src/Engine/Core/SceneManager.cpp
     src/Engine/Graphics/Renderer.cpp
     src/Engine/Graphics/Texture.cpp
     src/Engine/Input/InputManager.cpp
     src/Engine/Audio/AudioManager.cpp
+    src/Engine/Events/EventBus.cpp
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
@@ -26,6 +28,8 @@ target_link_libraries(VECTOR PUBLIC ${SDL2_LIBRARIES})
 # ==============================================================================
 set(GAME_SOURCES
     src/Game/Core/PongGame.cpp
+    src/Game/Scenes/MainMenuScene.cpp
+    src/Game/Scenes/GameplayScene.cpp
     src/Game/Entities/Paddle.cpp
     src/Game/Entities/AIPaddle.cpp
     src/Game/Entities/Ball.cpp

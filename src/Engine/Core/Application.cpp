@@ -2,6 +2,7 @@
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Core/ResourceManager.hpp"
 #include "Engine/Audio/AudioManager.hpp"
+#include "Engine/Core/SceneManager.hpp"
 #include <SDL.h>
 
 namespace VECTOR {
@@ -41,6 +42,9 @@ namespace VECTOR {
         m_InputManager = std::make_unique<InputManager>();
 
         m_IsRunning = true;
+        
+        OnInit();
+        
         return true;
     }
 
@@ -96,6 +100,8 @@ namespace VECTOR {
     }
 
     void Application::Shutdown() {
+        SceneManager::Get().Clear();
+        
         if (m_Renderer) {
             m_Renderer->Shutdown();
         }

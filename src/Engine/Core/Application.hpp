@@ -37,6 +37,7 @@ namespace VECTOR {
         // Internal loop methods
         void ProcessInput();
     protected:
+        virtual void OnInit() {}
         virtual void Update(float deltaTime);
         virtual void Render();
 
