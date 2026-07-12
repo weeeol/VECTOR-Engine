@@ -4,8 +4,24 @@ project(PongGame CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(SDL2 REQUIRED sdl2 SDL2_ttf SDL2_image SDL2_mixer)
+# Universal SDL2 Resolution: Try find_package first (e.g. for vcpkg/Mac/Linux native), fallback to PkgConfig (MSYS2)
+find_package(SDL2 QUIET)
+find_package(SDL2_ttf QUIET)
+find_package(SDL2_image QUIET)
+find_package(SDL2_mixer QUIET)
+
+if(SDL2_FOUND AND SDL2_ttf_FOUND AND SDL2_image_FOUND AND SDL2_mixer_FOUND)
+    message(STATUS "Found SDL2 via find_package (vcpkg or system config)")
+    set(VECTOR_SDL_LIBS SDL2::SDL2main SDL2::SDL2-static SDL2_ttf::SDL2_ttf SDL2_image::SDL2_image SDL2_mixer::SDL2_mixer)
+    set(VECTOR_SDL_INCLUDES "")
+else()
+    message(STATUS "Falling back to PkgConfig for SDL2 resolution (MSYS2/MinGW)")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SDL2_PKG REQUIRED sdl2 SDL2_ttf SDL2_image SDL2_mixer)
+    set(VECTOR_SDL_LIBS ${SDL2_PKG_LIBRARIES})
+    set(VECTOR_SDL_INCLUDES ${SDL2_PKG_INCLUDE_DIRS})
+    link_directories(${SDL2_PKG_LIBRARY_DIRS})
+endif()
 
 set(VECTOR_SOURCES
     src/Engine/Core/Application.cpp
@@ -23,8 +39,8 @@ set(VECTOR_SOURCES
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
-target_include_directories(VECTOR PUBLIC src ${SDL2_INCLUDE_DIRS})
-target_link_libraries(VECTOR PUBLIC ${SDL2_LIBRARIES})
+target_include_directories(VECTOR PUBLIC src ${VECTOR_SDL_INCLUDES})
+target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS})
 
 # ==============================================================================
 # PONG GAME EXECUTABLE

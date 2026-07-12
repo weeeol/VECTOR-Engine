@@ -25,17 +25,26 @@
 
 ## Building
 
-If using MSYS2 (UCRT64), ensure you have the dependencies installed:
+This engine uses a **universal CMake configuration**. It first attempts to find SDL2 using standard `find_package` (ideal for `vcpkg` or macOS/Linux package managers), and gracefully falls back to `pkg-config` (ideal for MSYS2 on Windows).
+
+### Option 1: Vcpkg (Universal / MSVC / Cross-Platform)
+If you are using MSVC or a standard CMake environment, it is highly recommended to use [vcpkg](https://vcpkg.io/):
 ```bash
-pacman -S mingw-w64-ucrt-x86_64-SDL2
-pacman -S mingw-w64-ucrt-x86_64-SDL2_ttf
-pacman -S mingw-w64-ucrt-x86_64-SDL2_image
+vcpkg install sdl2 sdl2-ttf sdl2-image sdl2-mixer
+mkdir build && cd build
+cmake -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake ..
+cmake --build .
 ```
 
-Then configure and build via CMake using PowerShell:
+### Option 2: MSYS2 / MinGW (Windows)
+If using MSYS2 (UCRT64), install the dependencies:
 ```bash
-mkdir build
-cd build
+pacman -S mingw-w64-ucrt-x86_64-SDL2 mingw-w64-ucrt-x86_64-SDL2_ttf mingw-w64-ucrt-x86_64-SDL2_image mingw-w64-ucrt-x86_64-SDL2_mixer
+```
+
+Then configure and build via CMake:
+```bash
+mkdir build && cd build
 cmake -G "MinGW Makefiles" -DCMAKE_PREFIX_PATH="C:/msys64/ucrt64" ..
 cmake --build .
 ```
