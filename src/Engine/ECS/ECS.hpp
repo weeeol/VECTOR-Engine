@@ -121,15 +121,13 @@ namespace VECTOR {
             return GetComponentArray<T>()->HasData(entity);
         }
 
-        template<typename... Components>
-        std::vector<Entity> View() {
-            std::vector<Entity> result;
+        template<typename... Components, typename Func>
+        void View(Func func) {
             for (Entity entity : m_ActiveEntities) {
                 if ((HasComponent<Components>(entity) && ...)) {
-                    result.push_back(entity);
+                    func(entity);
                 }
             }
-            return result;
         }
 
     private:

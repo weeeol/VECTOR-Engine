@@ -50,6 +50,7 @@ set(GAME_SOURCES
     src/Game/Core/PongGame.cpp
     src/Game/Scenes/MainMenuScene.cpp
     src/Game/Scenes/GameplayScene.cpp
+    src/Game/Systems/GameSystems.cpp
 )
 
 add_executable(Pong src/main.cpp ${GAME_SOURCES})

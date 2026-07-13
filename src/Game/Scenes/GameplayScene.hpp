@@ -3,8 +3,10 @@
 #include "Engine/Core/Scene.hpp"
 #include "Engine/ECS/ECS.hpp"
 #include "Game/Core/GameComponents.hpp"
+#include "Game/Systems/GameSystems.hpp"
 #include "Engine/Graphics/ParticleSystem.hpp"
 #include <memory>
+#include <vector>
 
 namespace VECTOR {
     class InputManager;
@@ -38,6 +40,9 @@ namespace Game {
         VECTOR::Entity m_Player1;
         VECTOR::Entity m_Player2;
         VECTOR::Entity m_Ball;
+
+        std::vector<std::unique_ptr<VECTOR::System>> m_Systems;
+        BallMechanicsSystem* m_BallSystem = nullptr;
 
         int m_Score1;
         int m_Score2;
