@@ -7,6 +7,8 @@
 #include "Engine/Graphics/ParticleSystem.hpp"
 #include "Engine/UI/UIManager.hpp"
 #include "Engine/Physics/Box2DPhysicsSystem.hpp"
+#include "Engine/Graphics/Texture.hpp"
+#include "Engine/Graphics/Animator.hpp"
 #include <box2d/box2d.h>
 #include <memory>
 #include <vector>
@@ -59,5 +61,8 @@ namespace Game {
         GameState m_State;
         int m_Winner; // 1 for Player 1, 2 for Player 2
         const int WINNING_SCORE = 5;
+
+        std::shared_ptr<VECTOR::Texture> m_BallTexture;
+        std::shared_ptr<VECTOR::Animator> m_BallAnimator;
     };
 }

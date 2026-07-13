@@ -14,6 +14,9 @@ namespace VECTOR {
             return;
         }
 
+        // Enable transparency for pure black (0, 0, 0)
+        SDL_SetColorKey(surface, SDL_TRUE, SDL_MapRGB(surface->format, 0, 0, 0));
+
         m_Texture = SDL_CreateTextureFromSurface(renderer->GetSDLRenderer(), surface);
         if (!m_Texture) {
             VECTOR_LOG_ERROR(std::string("Failed to create texture from surface. SDL_Error: ") + SDL_GetError());

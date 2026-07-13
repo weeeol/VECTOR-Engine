@@ -19,4 +19,8 @@ namespace VECTOR {
         float width, height;
         uint8_t r, g, b, a;
     };
+
+    struct SpriteComponent {
+        class Animator* animator;
+    };
 }

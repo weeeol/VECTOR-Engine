@@ -10,6 +10,7 @@
 #include "Engine/ECS/Components.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include "Engine/UI/UISlider.hpp"
+#include "Engine/UI/UIButton.hpp"
 #include <cmath>
 #include <algorithm>
 #include <iostream>
@@ -27,6 +28,7 @@ namespace Game {
         m_Registry.RegisterComponent<PlayerInputComponent>();
         m_Registry.RegisterComponent<AIComponent>();
         m_Registry.RegisterComponent<BallComponent>();
+        m_Registry.RegisterComponent<VECTOR::SpriteComponent>();
 
         auto physSys = std::make_unique<VECTOR::Box2DPhysicsSystem>();
         m_PhysicsSystem = physSys.get();
@@ -70,12 +72,24 @@ namespace Game {
         b2BodyId ballBody = CreateBox(width / 2.0f + 7.5f, height / 2.0f + 7.5f, 15.0f, 15.0f, b2_dynamicBody, 1.0f, 0.0f, 1.05f, false, (void*)1);
         m_Registry.AddComponent(m_Ball, VECTOR::RigidBodyComponent{ballBody});
 
+        m_BallTexture = std::make_shared<VECTOR::Texture>(VECTOR::Application::Get().GetRenderer(), "s:/Projects/VECTOR-Engine/assets/ball_spritesheet.bmp");
+        m_BallAnimator = std::make_shared<VECTOR::Animator>(m_BallTexture.get(), 32, 32, 4, 0.4f); // Slower animation
+        m_BallAnimator->Play();
+        m_Registry.AddComponent(m_Ball, VECTOR::SpriteComponent{m_BallAnimator.get()});
+
         m_Systems.push_back(std::make_unique<AISystem>(m_Ball, m_Height));
 
         auto volumeSlider = std::make_shared<VECTOR::UISlider>(20, 50, 200, 20, 0.5f, [](float val) {
             VECTOR::AudioManager::Get().SetMusicVolume(val);
         });
         m_PauseMenuUI.AddElement(volumeSlider);
+        
+        auto mainMenuButton = std::make_shared<VECTOR::UIButton>(width / 2 - 100, height / 2 + 50, 200, 50, "Main Menu", [this]() {
+            auto menuScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager);
+            VECTOR::SceneManager::Get().ChangeScene(std::move(menuScene));
+        });
+        m_PauseMenuUI.AddElement(mainMenuButton);
+
         VECTOR::AudioManager::Get().SetMusicVolume(0.5f);
     }
 
@@ -110,18 +124,11 @@ namespace Game {
     }
 
     void GameplayScene::Update(float deltaTime) {
-        bool isPausePressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_P);
-        bool isEscPressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_ESCAPE);
+        bool isPausePressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_P) || m_InputManager->IsKeyPressed(SDL_SCANCODE_ESCAPE);
         bool isF3Pressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_F3);
 
         if (isF3Pressed && !m_WasF3Pressed) m_DebugMode = !m_DebugMode;
         m_WasF3Pressed = isF3Pressed;
-
-        if (isEscPressed) {
-            auto menuScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager);
-            VECTOR::SceneManager::Get().ChangeScene(std::move(menuScene));
-            return;
-        }
 
         if (m_State == GameState::GameOver) return;
 
@@ -173,6 +180,7 @@ namespace Game {
             
             m_TrailEmitter.Update(deltaTime);
             m_ExplosionEmitter.Update(deltaTime);
+            m_BallAnimator->Update(deltaTime);
 
             if (m_BallSystem->WasLeftScored()) {
                 m_Score1++;
@@ -204,7 +212,17 @@ namespace Game {
         m_Registry.View<VECTOR::TransformComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
             auto& transform = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
             auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
-            renderer->DrawRect((int)transform.position.x, (int)transform.position.y, (int)r.width, (int)r.height, r.r, r.g, r.b, r.a);
+            if (m_Registry.HasComponent<VECTOR::SpriteComponent>(entity)) {
+                auto& sprite = m_Registry.GetComponent<VECTOR::SpriteComponent>(entity);
+                // Draw sprite scaled up so it is easier to see, centered on the physical box
+                int drawWidth = 48; // Draw it 3x larger than the 15x15 hitbox
+                int drawHeight = 48;
+                int drawX = (int)transform.position.x - (drawWidth - (int)r.width) / 2;
+                int drawY = (int)transform.position.y - (drawHeight - (int)r.height) / 2;
+                sprite.animator->Render(renderer, drawX, drawY, drawWidth, drawHeight);
+            } else {
+                renderer->DrawRect((int)transform.position.x, (int)transform.position.y, (int)r.width, (int)r.height, r.r, r.g, r.b, r.a);
+            }
         });
 
         for (int y = 0; y < m_Height; y += 30) renderer->DrawRect(m_Width / 2 - 2, y, 4, 15, 255, 255, 255, 100);
@@ -216,6 +234,7 @@ namespace Game {
             renderer->DrawText(winText, m_Width / 2 - 140, m_Height / 2 - 50, 255, 215, 0, 48);
         } else if (m_IsPaused) {
             renderer->DrawText("PAUSED", m_Width / 2 - 60, m_Height / 2 - 24, 255, 255, 255, 48);
+            renderer->DrawText("Volume", 20, 20, 255, 255, 255, 24);
             m_PauseMenuUI.Render(renderer);
         }
     }

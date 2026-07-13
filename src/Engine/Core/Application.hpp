@@ -29,6 +29,7 @@ namespace VECTOR {
         void Quit();
 
         float GetFPS() const { return m_CurrentFPS; }
+        Renderer* GetRenderer() const { return m_Renderer.get(); }
 
     private:
         // Initialize subsystems (SDL, Renderer, Window, etc.)
