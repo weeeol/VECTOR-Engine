@@ -6,6 +6,8 @@
 #include "Game/Systems/GameSystems.hpp"
 #include "Engine/Graphics/ParticleSystem.hpp"
 #include "Engine/UI/UIManager.hpp"
+#include "Engine/Physics/Box2DPhysicsSystem.hpp"
+#include <box2d/box2d.h>
 #include <memory>
 #include <vector>
 
@@ -14,11 +16,7 @@ namespace VECTOR {
 }
 
 namespace Game {
-
-    enum class GameState {
-        Playing,
-        GameOver
-    };
+    enum class GameState { Playing, GameOver };
 
     class GameplayScene : public VECTOR::Scene {
     public:
@@ -30,8 +28,8 @@ namespace Game {
         void Render(VECTOR::Renderer* renderer) override;
 
     private:
-        void CheckCollisions();
         void ResetGame();
+        b2BodyId CreateBox(float x, float y, float width, float height, b2BodyType type, float density, float friction, float restitution, bool isSensor, void* userData);
 
         int m_Width;
         int m_Height;
@@ -44,6 +42,7 @@ namespace Game {
 
         std::vector<std::unique_ptr<VECTOR::System>> m_Systems;
         BallMechanicsSystem* m_BallSystem = nullptr;
+        VECTOR::Box2DPhysicsSystem* m_PhysicsSystem = nullptr;
         
         VECTOR::UIManager m_PauseMenuUI;
 
@@ -61,5 +60,4 @@ namespace Game {
         int m_Winner; // 1 for Player 1, 2 for Player 2
         const int WINNING_SCORE = 5;
     };
-
-} // namespace Game
+}

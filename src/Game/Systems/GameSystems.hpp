@@ -1,7 +1,9 @@
 #pragma once
+
 #include "Engine/ECS/System.hpp"
 #include "Engine/Input/InputManager.hpp"
 #include "Engine/Graphics/ParticleSystem.hpp"
+#include "Game/Core/GameComponents.hpp"
 
 namespace Game {
 
@@ -23,11 +25,6 @@ namespace Game {
         int m_ScreenHeight;
     };
 
-    class PhysicsSystem : public VECTOR::System {
-    public:
-        void Update(VECTOR::Registry& registry, float deltaTime) override;
-    };
-
     class BallMechanicsSystem : public VECTOR::System {
     public:
         BallMechanicsSystem(int screenWidth, int screenHeight, VECTOR::ParticleEmitter* explosionEmitter);
@@ -36,12 +33,16 @@ namespace Game {
         bool WasLeftScored() const { return m_LeftScored; }
         bool WasRightScored() const { return m_RightScored; }
         void ResetScoreFlags() { m_LeftScored = false; m_RightScored = false; }
+
+        void SetLeftScored() { m_LeftScored = true; }
+        void SetRightScored() { m_RightScored = true; }
+
     private:
         int m_ScreenWidth;
         int m_ScreenHeight;
-        VECTOR::ParticleEmitter* m_ExplosionEmitter;
         bool m_LeftScored = false;
         bool m_RightScored = false;
+        VECTOR::ParticleEmitter* m_ExplosionEmitter;
     };
 
-} // namespace Game
+}

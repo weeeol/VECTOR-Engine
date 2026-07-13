@@ -1,22 +1,22 @@
 #pragma once
-#include "Engine/Math/Math.hpp"
-#include <cstdint>
+#include <box2d/box2d.h>
+#include <stdint.h>
 
 namespace VECTOR {
+    struct Vector2D {
+        float x, y;
+    };
+
     struct TransformComponent {
         Vector2D position;
     };
 
-    struct VelocityComponent {
-        Vector2D velocity;
+    struct RigidBodyComponent {
+        b2BodyId bodyId;
     };
 
     struct RenderComponent {
         float width, height;
         uint8_t r, g, b, a;
-    };
-
-    struct ColliderComponent {
-        float width, height;
     };
 }

@@ -23,6 +23,8 @@ else()
     link_directories(${SDL2_PKG_LIBRARY_DIRS})
 endif()
 
+find_package(box2d CONFIG REQUIRED)
+
 set(VECTOR_SOURCES
     src/Engine/Core/Application.cpp
     src/Engine/Core/Logger.cpp
@@ -35,6 +37,7 @@ set(VECTOR_SOURCES
     src/Engine/Input/InputManager.cpp
     src/Engine/Audio/AudioManager.cpp
     src/Engine/Events/EventBus.cpp
+    src/Engine/Physics/Box2DPhysicsSystem.cpp
     src/Engine/UI/UIButton.cpp
     src/Engine/UI/UIManager.cpp
     src/Engine/UI/UISlider.cpp
@@ -42,7 +45,7 @@ set(VECTOR_SOURCES
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
 target_include_directories(VECTOR PUBLIC src ${VECTOR_SDL_INCLUDES})
-target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS})
+target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} box2d::box2d)
 
 # ==============================================================================
 # PONG GAME EXECUTABLE
