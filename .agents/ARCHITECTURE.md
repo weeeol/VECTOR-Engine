@@ -1,7 +1,7 @@
 # VECTOR Engine Architecture
 
 ## Overview
-VECTOR (Velocity Engine for C++ Texturing and Object Rendering) is a custom 2D game engine built on top of the SDL2 hardware abstraction layer. It provides a rigid, modular framework for building 2D games, featuring a high-resolution fixed-timestep physics loop, dynamic rendering, scene management, event messaging, and component-driven entities. The repository currently includes a fully playable implementation of Pong featuring dynamic AI and advanced collision physics.
+VECTOR (Velocity Engine for C++ Texturing and Object Rendering) is a custom 2D game engine built on top of the SDL2 hardware abstraction layer and Box2D (v3). It provides a rigid, modular framework for building 2D games, featuring a high-resolution fixed-timestep physics loop, dynamic rendering, scene management, event messaging, and component-driven entities. The repository currently includes a fully playable implementation of Pong featuring dynamic AI and advanced rigid body collision physics.
 
 ## Folder Structure
 ```text
