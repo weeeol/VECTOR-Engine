@@ -8,249 +8,261 @@
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Core/Application.hpp"
 #include "Engine/ECS/Components.hpp"
-#include "Engine/Audio/AudioManager.hpp"
-#include "Engine/UI/UISlider.hpp"
 #include "Engine/UI/UIButton.hpp"
-#include <cmath>
-#include <algorithm>
-#include <iostream>
+#include <glm/gtc/matrix_transform.hpp>
+#include <GL/glew.h>
 
 namespace Game {
 
     GameplayScene::GameplayScene(int width, int height, VECTOR::InputManager* inputManager, AIDifficulty aiDifficulty)
-        : m_Width(width), m_Height(height), m_InputManager(inputManager),
-          m_Score1(0), m_Score2(0), m_IsPaused(false), m_WasPausePressed(false), m_DebugMode(false), m_WasF3Pressed(false),
-          m_TrailEmitter(200), m_ExplosionEmitter(300), m_State(GameState::Playing), m_Winner(0)
+        : m_Width(width), m_Height(height), m_InputManager(inputManager), m_IsPaused(false), m_WasPausePressed(false)
     {
         m_Registry.RegisterComponent<VECTOR::TransformComponent>();
         m_Registry.RegisterComponent<VECTOR::RigidBodyComponent>();
         m_Registry.RegisterComponent<VECTOR::RenderComponent>();
-        m_Registry.RegisterComponent<PlayerInputComponent>();
-        m_Registry.RegisterComponent<AIComponent>();
-        m_Registry.RegisterComponent<BallComponent>();
-        m_Registry.RegisterComponent<VECTOR::SpriteComponent>();
+        m_Registry.RegisterComponent<VECTOR::MeshComponent>();
+        m_Registry.RegisterComponent<VECTOR::CameraComponent>();
+        m_Registry.RegisterComponent<AIComponent>(); // Reusing AIComponent for enemies
 
-        auto physSys = std::make_unique<VECTOR::Box2DPhysicsSystem>();
+        auto physSys = std::make_unique<VECTOR::BulletPhysicsSystem>();
         m_PhysicsSystem = physSys.get();
         m_Systems.push_back(std::move(physSys));
 
-        auto ballSys = std::make_unique<BallMechanicsSystem>(m_Width, m_Height, &m_ExplosionEmitter);
-        m_BallSystem = ballSys.get();
-        m_Systems.push_back(std::move(ballSys));
-        
-        m_Systems.push_back(std::make_unique<PlayerInputSystem>(m_InputManager, m_Height));
+        m_Systems.push_back(std::make_unique<CameraSystem>(m_InputManager));
+        m_Systems.push_back(std::make_unique<ShootingSystem>(m_InputManager, m_PhysicsSystem));
 
-        // Create Walls
-        CreateBox(width/2.0f, -10.0f, width, 20.0f, b2_staticBody, 0.0f, 0.0f, 1.0f, false, (void*)0); // Top
-        CreateBox(width/2.0f, height + 10.0f, width, 20.0f, b2_staticBody, 0.0f, 0.0f, 1.0f, false, (void*)0); // Bottom
+        m_CubeVAO = CreateCubeMesh();
 
-        // Create Goals
-        CreateBox(-10.0f, height/2.0f, 20.0f, height, b2_staticBody, 0.0f, 0.0f, 0.0f, true, (void*)2); // Left Goal
-        CreateBox(width + 10.0f, height/2.0f, 20.0f, height, b2_staticBody, 0.0f, 0.0f, 0.0f, true, (void*)3); // Right Goal
-
-        // Player 1
-        m_Player1 = m_Registry.CreateEntity();
-        m_Registry.AddComponent(m_Player1, VECTOR::TransformComponent{{30.0f, height / 2.0f - 50.0f}});
-        m_Registry.AddComponent(m_Player1, VECTOR::RenderComponent{20.0f, 100.0f, 255, 255, 255, 255});
-        m_Registry.AddComponent(m_Player1, PlayerInputComponent{SDL_SCANCODE_W, SDL_SCANCODE_S});
-        b2BodyId p1Body = CreateBox(30.0f + 10.0f, height / 2.0f, 20.0f, 100.0f, b2_kinematicBody, 1.0f, 0.0f, 1.0f, false, (void*)4);
-        m_Registry.AddComponent(m_Player1, VECTOR::RigidBodyComponent{p1Body});
-
-        // Player 2
-        m_Player2 = m_Registry.CreateEntity();
-        m_Registry.AddComponent(m_Player2, VECTOR::TransformComponent{{width - 50.0f, height / 2.0f - 50.0f}});
-        m_Registry.AddComponent(m_Player2, VECTOR::RenderComponent{20.0f, 100.0f, 255, 255, 255, 255});
-        m_Registry.AddComponent(m_Player2, AIComponent{aiDifficulty, AIState::Idle, 0.0f, 0.2f, height / 2.0f});
-        b2BodyId p2Body = CreateBox(width - 50.0f + 10.0f, height / 2.0f, 20.0f, 100.0f, b2_kinematicBody, 1.0f, 0.0f, 1.0f, false, (void*)4);
-        m_Registry.AddComponent(m_Player2, VECTOR::RigidBodyComponent{p2Body});
-        
-        // Ball
-        m_Ball = m_Registry.CreateEntity();
-        m_Registry.AddComponent(m_Ball, VECTOR::TransformComponent{{width / 2.0f, height / 2.0f}});
-        m_Registry.AddComponent(m_Ball, VECTOR::RenderComponent{15.0f, 15.0f, 255, 255, 255, 255});
-        m_Registry.AddComponent(m_Ball, BallComponent{true});
-        b2BodyId ballBody = CreateBox(width / 2.0f + 7.5f, height / 2.0f + 7.5f, 15.0f, 15.0f, b2_dynamicBody, 1.0f, 0.0f, 1.05f, false, (void*)1);
-        m_Registry.AddComponent(m_Ball, VECTOR::RigidBodyComponent{ballBody});
-
-        m_BallTexture = std::make_shared<VECTOR::Texture>(VECTOR::Application::Get().GetRenderer(), "s:/Projects/VECTOR-Engine/assets/ball_spritesheet.bmp");
-        m_BallAnimator = std::make_shared<VECTOR::Animator>(m_BallTexture.get(), 32, 32, 4, 0.4f); // Slower animation
-        m_BallAnimator->Play();
-        m_Registry.AddComponent(m_Ball, VECTOR::SpriteComponent{m_BallAnimator.get()});
-
-        m_Systems.push_back(std::make_unique<AISystem>(m_Ball, m_Height));
-
-        auto volumeSlider = std::make_shared<VECTOR::UISlider>(20, 50, 200, 20, 0.5f, [](float val) {
-            VECTOR::AudioManager::Get().SetMusicVolume(val);
-        });
-        m_PauseMenuUI.AddElement(volumeSlider);
-        
+        // Pause Menu
         auto mainMenuButton = std::make_shared<VECTOR::UIButton>(width / 2 - 100, height / 2 + 50, 200, 50, "Main Menu", [this]() {
             auto menuScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager);
             VECTOR::SceneManager::Get().ChangeScene(std::move(menuScene));
         });
         m_PauseMenuUI.AddElement(mainMenuButton);
 
-        VECTOR::AudioManager::Get().SetMusicVolume(0.5f);
+        GenerateArena();
+
+        m_InputManager->SetRelativeMouseMode(true);
     }
 
-    GameplayScene::~GameplayScene() {}
+    GameplayScene::~GameplayScene() {
+        m_InputManager->SetRelativeMouseMode(false);
+    }
 
-    b2BodyId GameplayScene::CreateBox(float x, float y, float width, float height, b2BodyType type, float density, float friction, float restitution, bool isSensor, void* userData) {
-        b2BodyDef bodyDef = b2DefaultBodyDef();
-        bodyDef.type = type;
-        bodyDef.position = (b2Vec2){x / VECTOR::PIXELS_PER_METER, y / VECTOR::PIXELS_PER_METER};
-        bodyDef.userData = userData;
-        bodyDef.fixedRotation = true;
-        bodyDef.isBullet = (type == b2_dynamicBody);
-        b2BodyId bodyId = b2CreateBody(m_PhysicsSystem->GetWorld(), &bodyDef);
+    void GameplayScene::GenerateArena() {
+        // Player Camera
+        m_Player = m_Registry.CreateEntity();
+        m_Registry.AddComponent(m_Player, VECTOR::TransformComponent{glm::vec3(0.0f, 2.0f, 5.0f)});
+        m_Registry.AddComponent(m_Player, VECTOR::CameraComponent{});
 
-        b2Polygon box = b2MakeBox((width / 2.0f) / VECTOR::PIXELS_PER_METER, (height / 2.0f) / VECTOR::PIXELS_PER_METER);
+        btCollisionShape* playerShape = new btCapsuleShape(0.5f, 1.0f);
+        btTransform playerStartTransform;
+        playerStartTransform.setIdentity();
+        playerStartTransform.setOrigin(btVector3(0.0f, 2.0f, 5.0f));
 
-        b2ShapeDef shapeDef = b2DefaultShapeDef();
-        shapeDef.density = density;
-        shapeDef.material.friction = friction;
-        shapeDef.material.restitution = restitution;
-        shapeDef.isSensor = isSensor;
-        shapeDef.enableContactEvents = true; // Enables events when it touches other bodies
-        shapeDef.enableSensorEvents = true;
+        btScalar playerMass(50.0f);
+        btVector3 playerLocalInertia(0, 0, 0);
+        playerShape->calculateLocalInertia(playerMass, playerLocalInertia);
 
-        b2CreatePolygonShape(bodyId, &shapeDef, &box);
-        return bodyId;
+        btDefaultMotionState* playerMotionState = new btDefaultMotionState(playerStartTransform);
+        btRigidBody::btRigidBodyConstructionInfo playerRbInfo(playerMass, playerMotionState, playerShape, playerLocalInertia);
+        btRigidBody* playerBody = new btRigidBody(playerRbInfo);
+        
+        // Prevent player from falling over
+        playerBody->setAngularFactor(btVector3(0, 0, 0));
+        
+        m_PhysicsSystem->GetWorld()->addRigidBody(playerBody);
+        m_Registry.AddComponent(m_Player, VECTOR::RigidBodyComponent{playerBody});
+
+        // Floor
+        CreateCube(glm::vec3(0, -1, 0), glm::vec3(50, 1, 50), 0.0f, glm::vec3(0.3f, 0.3f, 0.3f));
+
+        // Targets (Static)
+        CreateCube(glm::vec3(0, 1, -10), glm::vec3(2, 2, 2), 5.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+        CreateCube(glm::vec3(5, 1, -10), glm::vec3(2, 2, 2), 5.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+        CreateCube(glm::vec3(-5, 1, -10), glm::vec3(2, 2, 2), 5.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+
+        // Enemies (Moving targets)
+        CreateCube(glm::vec3(10, 1, -15), glm::vec3(1.5f, 1.5f, 1.5f), 2.0f, glm::vec3(1.0f, 0.5f, 0.0f), true);
+        CreateCube(glm::vec3(-10, 1, -15), glm::vec3(1.5f, 1.5f, 1.5f), 2.0f, glm::vec3(1.0f, 0.5f, 0.0f), true);
+    }
+
+    void GameplayScene::CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const glm::vec3& color, bool isEnemy) {
+        VECTOR::Entity entity = m_Registry.CreateEntity();
+        VECTOR::TransformComponent t;
+        t.position = position;
+        t.scale = scale;
+        m_Registry.AddComponent(entity, t);
+
+        VECTOR::RenderComponent r;
+        r.r = color.r * 255;
+        r.g = color.g * 255;
+        r.b = color.b * 255;
+        r.a = 255;
+        m_Registry.AddComponent(entity, r);
+
+        VECTOR::MeshComponent m;
+        m.VAO = m_CubeVAO;
+        m.indexCount = m_CubeIndexCount;
+        m_Registry.AddComponent(entity, m);
+
+        btCollisionShape* colShape = new btBoxShape(btVector3(scale.x/2.0f, scale.y/2.0f, scale.z/2.0f));
+        btTransform startTransform;
+        startTransform.setIdentity();
+        startTransform.setOrigin(btVector3(position.x, position.y, position.z));
+
+        btVector3 localInertia(0, 0, 0);
+        if (mass > 0.0f) colShape->calculateLocalInertia(mass, localInertia);
+
+        btDefaultMotionState* myMotionState = new btDefaultMotionState(startTransform);
+        btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, myMotionState, colShape, localInertia);
+        btRigidBody* body = new btRigidBody(rbInfo);
+        
+        m_PhysicsSystem->GetWorld()->addRigidBody(body);
+        m_Registry.AddComponent(entity, VECTOR::RigidBodyComponent{body});
+
+        if (isEnemy) {
+            m_Registry.AddComponent(entity, AIComponent{AIDifficulty::Medium, AIState::Tracking, 0.0f, 0.2f, 0.0f});
+        }
+    }
+
+    unsigned int GameplayScene::CreateCubeMesh() {
+        float vertices[] = {
+            // positions          // normals
+            -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+             0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+             0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+            -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+
+            -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+             0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+             0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+
+            -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+            -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+            -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+            -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+
+             0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+             0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+             0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+             0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+
+            -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+             0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+             0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+
+            -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+             0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+             0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f
+        };
+
+        unsigned int indices[] = {
+            0, 1, 2, 2, 3, 0,
+            4, 5, 6, 6, 7, 4,
+            8, 9, 10, 10, 11, 8,
+            12, 13, 14, 14, 15, 12,
+            16, 17, 18, 18, 19, 16,
+            20, 21, 22, 22, 23, 20
+        };
+
+        unsigned int VAO, VBO, EBO;
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+        glGenBuffers(1, &EBO);
+
+        glBindVertexArray(VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+
+        glBindVertexArray(0);
+        m_CubeIndexCount = 36;
+        return VAO;
     }
 
     void GameplayScene::OnEnter() {
-        ResetGame();
-        m_WasPausePressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_P);
     }
 
     void GameplayScene::Update(float deltaTime) {
-        bool isPausePressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_P) || m_InputManager->IsKeyPressed(SDL_SCANCODE_ESCAPE);
-        bool isF3Pressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_F3);
+        bool isPausePressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_ESCAPE);
 
-        if (isF3Pressed && !m_WasF3Pressed) m_DebugMode = !m_DebugMode;
-        m_WasF3Pressed = isF3Pressed;
-
-        if (m_State == GameState::GameOver) return;
-
-        if (isPausePressed && !m_WasPausePressed) m_IsPaused = !m_IsPaused;
+        if (isPausePressed && !m_WasPausePressed) {
+            m_IsPaused = !m_IsPaused;
+            m_InputManager->SetRelativeMouseMode(!m_IsPaused);
+        }
         m_WasPausePressed = isPausePressed;
 
         if (m_IsPaused) {
             m_PauseMenuUI.Update(m_InputManager, deltaTime);
         } else {
-            for (auto& system : m_Systems) system->Update(m_Registry, deltaTime);
-            
-            // Check Box2D 3 Contact Events
-            b2ContactEvents contactEvents = b2World_GetContactEvents(m_PhysicsSystem->GetWorld());
-            for (int i = 0; i < contactEvents.beginCount; ++i) {
-                b2ContactBeginTouchEvent* event = &contactEvents.beginEvents[i];
-                b2BodyId bodyA = b2Shape_GetBody(event->shapeIdA);
-                b2BodyId bodyB = b2Shape_GetBody(event->shapeIdB);
-                
-                intptr_t dataA = (intptr_t)b2Body_GetUserData(bodyA);
-                intptr_t dataB = (intptr_t)b2Body_GetUserData(bodyB);
-                
-                if ((dataA == 1 && dataB == 4) || (dataA == 4 && dataB == 1)) {
-                    b2BodyId ballBody = (dataA == 1) ? bodyA : bodyB;
-                    b2Vec2 pos = b2Body_GetPosition(ballBody);
-                    m_ExplosionEmitter.Emit(pos.x * VECTOR::PIXELS_PER_METER, pos.y * VECTOR::PIXELS_PER_METER, 30, 255, 100, 50, 300.0f, 0.5f);
-                    VECTOR::EventBus::Get().Publish<CollisionEvent>();
-                }
-            }
-            
-            // Check Box2D 3 Sensor Events
-            b2SensorEvents sensorEvents = b2World_GetSensorEvents(m_PhysicsSystem->GetWorld());
-            for (int i = 0; i < sensorEvents.beginCount; ++i) {
-                b2SensorBeginTouchEvent* event = &sensorEvents.beginEvents[i];
-                b2BodyId visitorBody = b2Shape_GetBody(event->visitorShapeId);
-                b2BodyId sensorBody = b2Shape_GetBody(event->sensorShapeId);
-                
-                intptr_t dataVisitor = (intptr_t)b2Body_GetUserData(visitorBody);
-                intptr_t dataSensor = (intptr_t)b2Body_GetUserData(sensorBody);
-                
-                if (dataVisitor == 1) { // Ball entered sensor
-                    if (dataSensor == 2) m_BallSystem->SetRightScored();
-                    if (dataSensor == 3) m_BallSystem->SetLeftScored();
-                }
+            for (auto& system : m_Systems) {
+                system->Update(m_Registry, deltaTime);
             }
 
-            auto& ballRB = m_Registry.GetComponent<VECTOR::RigidBodyComponent>(m_Ball);
-            b2Vec2 pos = b2Body_GetPosition(ballRB.bodyId);
-            m_TrailEmitter.Emit(pos.x * VECTOR::PIXELS_PER_METER, pos.y * VECTOR::PIXELS_PER_METER, 1, 255, 200, 50, 20.0f, 0.3f);
-            
-            m_TrailEmitter.Update(deltaTime);
-            m_ExplosionEmitter.Update(deltaTime);
-            m_BallAnimator->Update(deltaTime);
-
-            if (m_BallSystem->WasLeftScored()) {
-                m_Score1++;
-                VECTOR::EventBus::Get().Publish<ScoreEvent>(1);
-                if (m_Score1 >= WINNING_SCORE) { m_State = GameState::GameOver; m_Winner = 1; } 
-                else ResetGame();
-                m_BallSystem->ResetScoreFlags();
-            } else if (m_BallSystem->WasRightScored()) {
-                m_Score2++;
-                VECTOR::EventBus::Get().Publish<ScoreEvent>(2);
-                if (m_Score2 >= WINNING_SCORE) { m_State = GameState::GameOver; m_Winner = 2; } 
-                else ResetGame();
-                m_BallSystem->ResetScoreFlags();
-            }
-            
-            m_Registry.View<VECTOR::TransformComponent, VECTOR::RigidBodyComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
+            // Simple Enemy AI
+            auto& camT = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Player);
+            m_Registry.View<VECTOR::TransformComponent, VECTOR::RigidBodyComponent, AIComponent>([&](VECTOR::Entity entity) {
                 auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
-                auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
-                t.position.x -= r.width / 2.0f;
-                t.position.y -= r.height / 2.0f;
+                auto& rb = m_Registry.GetComponent<VECTOR::RigidBodyComponent>(entity);
+                
+                glm::vec3 dir = camT.position - t.position;
+                dir.y = 0; // Don't fly
+                if (glm::length(dir) > 0.0f) {
+                    dir = glm::normalize(dir);
+                    btVector3 vel = rb.body->getLinearVelocity();
+                    vel.setX(dir.x * 3.0f);
+                    vel.setZ(dir.z * 3.0f);
+                    rb.body->setLinearVelocity(vel);
+                }
             });
         }
     }
 
     void GameplayScene::Render(VECTOR::Renderer* renderer) {
-        m_TrailEmitter.Render(renderer);
-        m_ExplosionEmitter.Render(renderer);
+        renderer->Clear(135, 206, 235); // Sky blue
+
+        auto& camT = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Player);
+        auto& camC = m_Registry.GetComponent<VECTOR::CameraComponent>(m_Player);
+
+        glm::mat4 view = glm::lookAt(camT.position, camT.position + camC.front, camC.up);
+        glm::mat4 projection = glm::perspective(glm::radians(camC.fov), (float)m_Width / (float)m_Height, 0.1f, 100.0f);
         
-        m_Registry.View<VECTOR::TransformComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
-            auto& transform = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+        renderer->SetViewProjection(view, projection);
+
+        m_Registry.View<VECTOR::TransformComponent, VECTOR::MeshComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
+            auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+            auto& m = m_Registry.GetComponent<VECTOR::MeshComponent>(entity);
             auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
-            if (m_Registry.HasComponent<VECTOR::SpriteComponent>(entity)) {
-                auto& sprite = m_Registry.GetComponent<VECTOR::SpriteComponent>(entity);
-                // Draw sprite scaled up so it is easier to see, centered on the physical box
-                int drawWidth = 48; // Draw it 3x larger than the 15x15 hitbox
-                int drawHeight = 48;
-                int drawX = (int)transform.position.x - (drawWidth - (int)r.width) / 2;
-                int drawY = (int)transform.position.y - (drawHeight - (int)r.height) / 2;
-                sprite.animator->Render(renderer, drawX, drawY, drawWidth, drawHeight);
-            } else {
-                renderer->DrawRect((int)transform.position.x, (int)transform.position.y, (int)r.width, (int)r.height, r.r, r.g, r.b, r.a);
-            }
+
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, t.position);
+            model = model * glm::mat4_cast(t.rotation);
+            model = glm::scale(model, t.scale);
+
+            glm::vec3 color(r.r / 255.0f, r.g / 255.0f, r.b / 255.0f);
+            
+            renderer->DrawMesh(m.VAO, m.indexCount, model, color);
         });
 
-        for (int y = 0; y < m_Height; y += 30) renderer->DrawRect(m_Width / 2 - 2, y, 4, 15, 255, 255, 255, 100);
-        renderer->DrawText(std::to_string(m_Score1), m_Width / 2 - 50, 20, 255, 255, 255, 48);
-        renderer->DrawText(std::to_string(m_Score2), m_Width / 2 + 20, 20, 255, 255, 255, 48);
+        // Crosshair
+        renderer->DrawRect(m_Width / 2 - 2, m_Height / 2 - 2, 4, 4, 255, 255, 255, 200);
 
-        if (m_State == GameState::GameOver) {
-            std::string winText = (m_Winner == 1) ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!";
-            renderer->DrawText(winText, m_Width / 2 - 140, m_Height / 2 - 50, 255, 215, 0, 48);
-        } else if (m_IsPaused) {
-            renderer->DrawText("PAUSED", m_Width / 2 - 60, m_Height / 2 - 24, 255, 255, 255, 48);
-            renderer->DrawText("Volume", 20, 20, 255, 255, 255, 24);
+        if (m_IsPaused) {
+            renderer->DrawRect(0, 0, m_Width, m_Height, 0, 0, 0, 150); // Dark overlay
+            renderer->DrawText("PAUSED", m_Width / 2 - 80, m_Height / 2 - 50, 255, 255, 255, 48);
             m_PauseMenuUI.Render(renderer);
         }
-    }
-
-    void GameplayScene::ResetGame() {
-        auto& p1RB = m_Registry.GetComponent<VECTOR::RigidBodyComponent>(m_Player1);
-        auto& p2RB = m_Registry.GetComponent<VECTOR::RigidBodyComponent>(m_Player2);
-        auto& bRB = m_Registry.GetComponent<VECTOR::RigidBodyComponent>(m_Ball);
-
-        b2Body_SetTransform(p1RB.bodyId, (b2Vec2){(30.0f + 10.0f) / VECTOR::PIXELS_PER_METER, (m_Height / 2.0f) / VECTOR::PIXELS_PER_METER}, b2Rot_identity);
-        b2Body_SetTransform(p2RB.bodyId, (b2Vec2){(m_Width - 50.0f + 10.0f) / VECTOR::PIXELS_PER_METER, (m_Height / 2.0f) / VECTOR::PIXELS_PER_METER}, b2Rot_identity);
-        b2Body_SetTransform(bRB.bodyId, (b2Vec2){(m_Width / 2.0f + 7.5f) / VECTOR::PIXELS_PER_METER, (m_Height / 2.0f + 7.5f) / VECTOR::PIXELS_PER_METER}, b2Rot_identity);
-        
-        float dirX = (rand() % 2 == 0) ? -1.0f : 1.0f;
-        float dirY = (rand() % 2 == 0) ? -1.0f : 1.0f;
-        b2Body_SetLinearVelocity(bRB.bodyId, (b2Vec2){dirX * 8.0f, dirY * 8.0f});
     }
 
 }

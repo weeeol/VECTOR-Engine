@@ -1,18 +1,22 @@
 #pragma once
-#include <box2d/box2d.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <stdint.h>
 
-namespace VECTOR {
-    struct Vector2D {
-        float x, y;
-    };
+class btRigidBody;
 
+namespace VECTOR {
     struct TransformComponent {
-        Vector2D position;
+        glm::vec3 position;
+        glm::quat rotation;
+        glm::vec3 scale;
+        
+        TransformComponent() : position(0.0f), rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)), scale(1.0f) {}
+        TransformComponent(const glm::vec3& p) : position(p), rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)), scale(1.0f) {}
     };
 
     struct RigidBodyComponent {
-        b2BodyId bodyId;
+        ::btRigidBody* body;
     };
 
     struct RenderComponent {
@@ -20,7 +24,21 @@ namespace VECTOR {
         uint8_t r, g, b, a;
     };
 
-    struct SpriteComponent {
-        class Animator* animator;
+    struct MeshComponent {
+        unsigned int VAO;
+        unsigned int VBO;
+        unsigned int EBO;
+        int indexCount;
+    };
+
+    struct CameraComponent {
+        glm::vec3 front;
+        glm::vec3 up;
+        glm::vec3 right;
+        float yaw;
+        float pitch;
+        float fov;
+        
+        CameraComponent() : front(0,0,-1), up(0,1,0), right(1,0,0), yaw(-90.0f), pitch(0.0f), fov(45.0f) {}
     };
 }

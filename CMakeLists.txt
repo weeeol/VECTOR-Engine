@@ -23,29 +23,29 @@ else()
     link_directories(${SDL2_PKG_LIBRARY_DIRS})
 endif()
 
-find_package(box2d CONFIG REQUIRED)
-
+find_package(OpenGL REQUIRED)
+find_package(GLEW REQUIRED)
+find_package(glm CONFIG REQUIRED)
+find_package(Bullet CONFIG REQUIRED)
 set(VECTOR_SOURCES
     src/Engine/Core/Application.cpp
     src/Engine/Core/Logger.cpp
     src/Engine/Core/ResourceManager.cpp
     src/Engine/Core/SceneManager.cpp
     src/Engine/Graphics/Renderer.cpp
-    src/Engine/Graphics/Texture.cpp
-    src/Engine/Graphics/Animator.cpp
-    src/Engine/Graphics/ParticleSystem.cpp
     src/Engine/Input/InputManager.cpp
     src/Engine/Audio/AudioManager.cpp
     src/Engine/Events/EventBus.cpp
-    src/Engine/Physics/Box2DPhysicsSystem.cpp
+    src/Engine/Physics/BulletPhysicsSystem.cpp
     src/Engine/UI/UIButton.cpp
     src/Engine/UI/UIManager.cpp
     src/Engine/UI/UISlider.cpp
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
-target_include_directories(VECTOR PUBLIC src ${VECTOR_SDL_INCLUDES})
-target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} box2d::box2d)
+target_include_directories(VECTOR PUBLIC src ${VECTOR_SDL_INCLUDES} ${BULLET_ROOT_DIR}/${BULLET_INCLUDE_DIRS})
+target_link_directories(VECTOR PUBLIC ${BULLET_ROOT_DIR}/${BULLET_LIBRARY_DIRS})
+target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES})
 
 # ==============================================================================
 # PONG GAME EXECUTABLE
@@ -55,6 +55,8 @@ set(GAME_SOURCES
     src/Game/Scenes/MainMenuScene.cpp
     src/Game/Scenes/GameplayScene.cpp
     src/Game/Systems/GameSystems.cpp
+    src/Game/Systems/CameraSystem.cpp
+    src/Game/Systems/ShootingSystem.cpp
 )
 
 add_executable(Pong src/main.cpp ${GAME_SOURCES})

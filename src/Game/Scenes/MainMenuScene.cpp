@@ -56,8 +56,8 @@ namespace Game {
     }
 
     void MainMenuScene::Render(VECTOR::Renderer* renderer) {
-        renderer->DrawText("PONG", m_Width / 2 - 50, m_Height / 2 - 150, 255, 255, 255, 48);
-        renderer->DrawText("Select Difficulty", m_Width / 2 - 90, m_Height / 2 - 70, 200, 200, 200, 24);
+        renderer->DrawText("FPS", m_Width / 2 - 40, m_Height / 2 - 150, 255, 255, 255, 48);
+        renderer->DrawText("Select Difficulty", m_Width / 2 - 100, m_Height / 2 - 70, 200, 200, 200, 24);
 
         m_UIManager.Render(renderer);
     }

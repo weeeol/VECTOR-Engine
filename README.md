@@ -1,38 +1,39 @@
-# VECTOR Engine and Pong
+# VECTOR Engine: FPS Prototype
 
-**VECTOR** (Velocity Engine for C++ Texturing and Object Rendering) is a custom hardware-accelerated 2D C++ game engine built from scratch using SDL2. It is compiled as a standalone static library (`libVECTOR.a`) and includes a fully functional Pong game that demonstrates the engine's capabilities.
+**VECTOR** (Velocity Engine for C++ Texturing and Object Rendering) is a custom hardware-accelerated 3D C++ game engine built from scratch. Originally a 2D Pong Engine, it has been completely pivoted into a **3D First-Person Shooter (FPS)** prototype using OpenGL and Bullet Physics!
 
 ## Features
 - **Data-Oriented ECS**: A custom Entity-Component System core framework, maximizing cache locality and decoupling logic from data.
-- **Audio & BGM Support**: Robust audio manager supporting `SDL_mixer` sound effects and endless `.mp3`/`.wav`/`.ogg` background music.
-- **Sprite Animations**: Core `Animator` subsystem for slicing and animating spritesheets.
-- **Physics Engine**: Integrated Box2D v3 for rigid body simulation, collision events, and continuous collision detection (CCD).
-- **Fixed Time-Step**: Physics run at a constant rate regardless of frame rate.
-- **High Definition**: 1280x720 window resolution.
-- **Game States**: Includes Start, Playing, and Paused menus.
-- **Dynamic AI Opponent**: Play against a computer-controlled AI with 3 difficulty levels!
+- **3D Graphics Pipeline**: Raw OpenGL 3.3 Core Profile rendering with simple shaders for 3D meshes.
+- **Physics Simulation**: Integrated Bullet3 for 3D rigid body dynamics, gravity, and continuous collision detection. Includes physics-based projectile shooting.
+- **First-Person Camera**: Mouse-look and WASD movement systems that apply forces directly to the player's physical RigidBody.
+- **OpenGL 2D UI Overlay**: Custom orthographic rendering layer built on top of the 3D pipeline for menus, crosshairs, and text using `SDL2_ttf`.
+- **Audio & BGM Support**: Robust audio manager supporting `SDL2_mixer` sound effects and endless background music.
+- **AI Entities**: Simple enemy AI system that tracks the player in 3D space.
 
 ## Requirements
 
 * C++17 or C++20 compatible compiler
 * CMake 3.10+
-* SDL2, SDL2_ttf, SDL2_image, and SDL2_mixer development libraries
-* Box2D (v3.0+)
+* OpenGL 3.3+ Compatible GPU
+* GLEW and GLM
+* SDL2, SDL2_ttf, and SDL2_mixer development libraries
+* Bullet Physics (Bullet3)
 
 ## Controls
-- **Player 1 (Left)**: `W` (Up) and `S` (Down)
-- **Player 2 (Right)**: Controlled by AI
-- **Pause**: `P` or `ESC`
-- **Start / Select Difficulty**: `1` (Easy), `2` (Medium), `3` (Hard), then `ENTER` to start.
+- **Movement**: `W`, `A`, `S`, `D`
+- **Look**: Mouse Movement
+- **Shoot**: Left Mouse Click
+- **Pause**: `ESC`
 
 ## Building
 
-This engine uses a **universal CMake configuration**. It first attempts to find SDL2 using standard `find_package` (ideal for `vcpkg` or macOS/Linux package managers), and gracefully falls back to `pkg-config` (ideal for MSYS2 on Windows).
+This engine uses a **universal CMake configuration**. 
 
 ### Option 1: Vcpkg (Universal / MSVC / Cross-Platform)
 If you are using MSVC or a standard CMake environment, it is highly recommended to use [vcpkg](https://vcpkg.io/):
 ```bash
-vcpkg install sdl2 sdl2-ttf sdl2-image sdl2-mixer box2d
+vcpkg install sdl2 sdl2-ttf sdl2-mixer bullet3 glew glm
 mkdir build && cd build
 cmake -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake ..
 cmake --build .
@@ -41,7 +42,7 @@ cmake --build .
 ### Option 2: MSYS2 / MinGW (Windows)
 If using MSYS2 (UCRT64), install the dependencies:
 ```bash
-pacman -S mingw-w64-ucrt-x86_64-SDL2 mingw-w64-ucrt-x86_64-SDL2_ttf mingw-w64-ucrt-x86_64-SDL2_image mingw-w64-ucrt-x86_64-SDL2_mixer mingw-w64-ucrt-x86_64-box2d
+pacman -S mingw-w64-ucrt-x86_64-SDL2 mingw-w64-ucrt-x86_64-SDL2_ttf mingw-w64-ucrt-x86_64-SDL2_mixer mingw-w64-ucrt-x86_64-bullet mingw-w64-ucrt-x86_64-glew mingw-w64-ucrt-x86_64-glm
 ```
 
 Then configure and build via CMake:

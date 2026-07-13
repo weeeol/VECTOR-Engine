@@ -3,7 +3,8 @@
 ## Tech Stack
 - **Language**: C++17 / C++20
 - **Build System**: CMake (3.10+)
-- **Graphics/Hardware API**: SDL2, SDL2_image, SDL2_ttf
+- **Graphics/Hardware API**: OpenGL 3.3 Core, SDL2, SDL2_ttf
+- **Physics**: Bullet3
 - **Architecture**: Object-Oriented, Fixed-Timestep Game Loop
 
 ## Coding Conventions

@@ -24,6 +24,10 @@ namespace VECTOR {
         // Mouse input
         int GetMouseX() const { return m_MouseX; }
         int GetMouseY() const { return m_MouseY; }
+        int GetMouseDeltaX() const { return m_MouseDeltaX; }
+        int GetMouseDeltaY() const { return m_MouseDeltaY; }
+        
+        void SetRelativeMouseMode(bool enable);
         bool IsMouseButtonPressed(int button) const; // Use SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT, etc.
         
         // Check if mouse button was just pressed this frame
@@ -35,6 +39,8 @@ namespace VECTOR {
         Uint32 m_PrevMouseState;
         int m_MouseX;
         int m_MouseY;
+        int m_MouseDeltaX;
+        int m_MouseDeltaY;
     };
 
 } // namespace VECTOR

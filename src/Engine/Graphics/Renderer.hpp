@@ -5,49 +5,51 @@
 #include <SDL_ttf.h>
 #include <unordered_map>
 
+#include <GL/glew.h>
+#include <SDL_opengl.h>
+#include <glm/glm.hpp>
+
 namespace VECTOR {
 
-    /**
-     * @class Renderer
-     * @brief Wraps SDL_Window and SDL_Renderer.
-     * 
-     * Hides the SDL-specific graphics calls from the game logic.
-     */
     class Renderer {
     public:
         Renderer();
         ~Renderer();
 
-        // Prevent copying
         Renderer(const Renderer&) = delete;
         Renderer& operator=(const Renderer&) = delete;
 
-        // Initialize the window and renderer
         bool Initialize(const std::string& title, int width, int height);
-        
-        // Clean up resources
         void Shutdown();
 
-        // Clear the screen with a specific color (RGBA 0-255)
         void Clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
-        
-        // Present the rendered buffer to the screen
         void Present();
 
-        // Draw a filled rectangle
+        void SetViewProjection(const glm::mat4& view, const glm::mat4& projection);
+        void DrawMesh(unsigned int VAO, int indexCount, const glm::mat4& model, const glm::vec3& color);
+        
+        // 2D API
         void DrawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
-
-        // Draw text
         void DrawText(const std::string& text, int x, int y, uint8_t r, uint8_t g, uint8_t b, int fontSize = 24);
 
-        // Draw texture
-        void DrawTexture(class Texture* texture, int x, int y, int w = -1, int h = -1);
-
-        SDL_Renderer* GetSDLRenderer() const { return m_Renderer; }
+        SDL_Window* GetWindow() const { return m_Window; }
 
     private:
         SDL_Window* m_Window;
-        SDL_Renderer* m_Renderer;
+        SDL_GLContext m_GLContext;
+        
+        unsigned int m_ShaderProgram;
+        glm::mat4 m_ViewMatrix;
+        glm::mat4 m_ProjectionMatrix;
+        
+        // 2D Rendering
+        unsigned int m_2DShaderProgram;
+        unsigned int m_QuadVAO, m_QuadVBO;
+        int m_Width, m_Height;
+        std::unordered_map<int, void*> m_Fonts; // Store TTF_Font* as void* to avoid exposing SDL_ttf here
+        
+        unsigned int CompileShader(unsigned int type, const std::string& source);
+        unsigned int CreateShaderProgram(const std::string& vertexSrc, const std::string& fragmentSrc);
     };
 
 } // namespace VECTOR

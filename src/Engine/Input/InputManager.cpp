@@ -2,7 +2,7 @@
 
 namespace VECTOR {
 
-    InputManager::InputManager() : m_MouseState(0), m_PrevMouseState(0), m_MouseX(0), m_MouseY(0) {
+    InputManager::InputManager() : m_MouseState(0), m_PrevMouseState(0), m_MouseX(0), m_MouseY(0), m_MouseDeltaX(0), m_MouseDeltaY(0) {
         // Initialize keyboard state pointer
         m_KeyboardState = SDL_GetKeyboardState(nullptr);
     }
@@ -13,6 +13,11 @@ namespace VECTOR {
     void InputManager::Update() {
         m_PrevMouseState = m_MouseState;
         m_MouseState = SDL_GetMouseState(&m_MouseX, &m_MouseY);
+        SDL_GetRelativeMouseState(&m_MouseDeltaX, &m_MouseDeltaY);
+    }
+
+    void InputManager::SetRelativeMouseMode(bool enable) {
+        SDL_SetRelativeMouseMode(enable ? SDL_TRUE : SDL_FALSE);
     }
 
     bool InputManager::IsKeyPressed(SDL_Scancode key) const {
