@@ -44,7 +44,7 @@ set(VECTOR_SOURCES
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
-target_include_directories(VECTOR PUBLIC src ${VECTOR_SDL_INCLUDES})
+target_include_directories(VECTOR PUBLIC include ${VECTOR_SDL_INCLUDES})
 target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} box2d::box2d)
 
 # ==============================================================================

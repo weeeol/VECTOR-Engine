@@ -1,4 +1,4 @@
-#include "PongGame.hpp"
+#include "Game/Core/PongGame.hpp"
 #include "Game/Scenes/MainMenuScene.hpp"
 #include "Engine/Core/SceneManager.hpp"
 #include "Engine/Events/EventBus.hpp"
