@@ -50,6 +50,8 @@ namespace Game {
             auto& ai = registry.GetComponent<AIComponent>(entity);
             if (!b2Body_IsValid(rigidBody.bodyId)) return;
             
+            b2Vec2 paddlePos = b2Body_GetPosition(rigidBody.bodyId);
+            
             if (ballVel.x < 0.0f) {
                 ai.state = AIState::Idle;
             } else {
@@ -63,19 +65,35 @@ namespace Game {
                         ai.targetY = (m_ScreenHeight / 2.0f);
                         break;
                     case AIState::Tracking:
-                        ai.targetY = ballPos.y * VECTOR::PIXELS_PER_METER;
-                        if (ai.difficulty == AIDifficulty::Easy) ai.targetY += (rand() % 60) - 30;
-                        else if (ai.difficulty == AIDifficulty::Medium) ai.targetY += (rand() % 30) - 15;
+                    case AIState::Predicting: {
+                        if (ballVel.x > 0.001f) {
+                            float timeToIntercept = (paddlePos.x - ballPos.x) / ballVel.x;
+                            float predictedY = ballPos.y + ballVel.y * timeToIntercept;
+                            float predictedYPixels = predictedY * VECTOR::PIXELS_PER_METER;
+                            
+                            // Reflect off top and bottom walls (approximate)
+                            while (predictedYPixels < 0 || predictedYPixels > m_ScreenHeight) {
+                                if (predictedYPixels < 0) {
+                                    predictedYPixels = -predictedYPixels;
+                                } else if (predictedYPixels > m_ScreenHeight) {
+                                    predictedYPixels = 2 * m_ScreenHeight - predictedYPixels;
+                                }
+                            }
+                            ai.targetY = predictedYPixels;
+                            
+                            // Add difficulty-based error offsets
+                            if (ai.difficulty == AIDifficulty::Easy) ai.targetY += (rand() % 120) - 60;
+                            else if (ai.difficulty == AIDifficulty::Medium) ai.targetY += (rand() % 60) - 30;
+                        } else {
+                            ai.targetY = ballPos.y * VECTOR::PIXELS_PER_METER;
+                        }
                         break;
-                    case AIState::Predicting:
-                        ai.targetY = ballPos.y * VECTOR::PIXELS_PER_METER;
-                        break;
+                    }
                 }
                 ai.reactionDelayTimer = 0.0f;
             }
 
             float aiSpeed = 8.0f;
-            b2Vec2 paddlePos = b2Body_GetPosition(rigidBody.bodyId);
             float paddleCenterY = paddlePos.y * VECTOR::PIXELS_PER_METER;
             float paddleHalfHeight = 50.0f;
             
