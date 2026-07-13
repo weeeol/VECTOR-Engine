@@ -12,7 +12,7 @@ find_package(SDL2_mixer QUIET)
 
 if(SDL2_FOUND AND SDL2_ttf_FOUND AND SDL2_image_FOUND AND SDL2_mixer_FOUND)
     message(STATUS "Found SDL2 via find_package (vcpkg or system config)")
-    set(VECTOR_SDL_LIBS SDL2::SDL2main SDL2::SDL2-static SDL2_ttf::SDL2_ttf SDL2_image::SDL2_image SDL2_mixer::SDL2_mixer)
+    set(VECTOR_SDL_LIBS SDL2::SDL2main SDL2::SDL2 SDL2_ttf::SDL2_ttf SDL2_image::SDL2_image SDL2_mixer::SDL2_mixer)
     set(VECTOR_SDL_INCLUDES "")
 else()
     message(STATUS "Falling back to PkgConfig for SDL2 resolution (MSYS2/MinGW)")
