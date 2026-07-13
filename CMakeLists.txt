@@ -30,6 +30,7 @@ set(VECTOR_SOURCES
     src/Engine/Core/SceneManager.cpp
     src/Engine/Graphics/Renderer.cpp
     src/Engine/Graphics/Texture.cpp
+    src/Engine/Graphics/Animator.cpp
     src/Engine/Graphics/ParticleSystem.cpp
     src/Engine/Input/InputManager.cpp
     src/Engine/Audio/AudioManager.cpp
@@ -49,9 +50,6 @@ set(GAME_SOURCES
     src/Game/Core/PongGame.cpp
     src/Game/Scenes/MainMenuScene.cpp
     src/Game/Scenes/GameplayScene.cpp
-    src/Game/Entities/Paddle.cpp
-    src/Game/Entities/AIPaddle.cpp
-    src/Game/Entities/Ball.cpp
 )
 
 add_executable(Pong src/main.cpp ${GAME_SOURCES})

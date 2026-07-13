@@ -19,6 +19,8 @@ namespace Game {
         auto initialScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager.get());
         VECTOR::SceneManager::Get().PushScene(std::move(initialScene));
 
+        VECTOR::AudioManager::Get().PlayMusic("assets/bgm.wav");
+
         SetupEventSubscriptions();
     }
 

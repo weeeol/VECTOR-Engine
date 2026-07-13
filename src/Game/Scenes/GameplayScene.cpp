@@ -7,6 +7,9 @@
 #include "Game/Events/GameEvents.hpp"
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Core/Application.hpp"
+#include "Engine/ECS/Components.hpp"
+#include <cmath>
+#include <algorithm>
 
 namespace Game {
 
@@ -15,10 +18,34 @@ namespace Game {
           m_Score1(0), m_Score2(0), m_IsPaused(false), m_WasPausePressed(false), m_DebugMode(false), m_WasF3Pressed(false),
           m_TrailEmitter(200), m_ExplosionEmitter(300), m_State(GameState::Playing), m_Winner(0)
     {
-        m_Player1 = std::make_unique<Paddle>(30.0f, height / 2.0f - 50.0f, SDL_SCANCODE_W, SDL_SCANCODE_S);
-        m_Player2 = std::make_unique<AIPaddle>(width - 50.0f, height / 2.0f - 50.0f);
-        m_Player2->SetDifficulty(aiDifficulty);
-        m_Ball = std::make_unique<Ball>(width / 2.0f, height / 2.0f);
+        m_Registry.RegisterComponent<VECTOR::TransformComponent>();
+        m_Registry.RegisterComponent<VECTOR::VelocityComponent>();
+        m_Registry.RegisterComponent<VECTOR::RenderComponent>();
+        m_Registry.RegisterComponent<VECTOR::ColliderComponent>();
+        m_Registry.RegisterComponent<PlayerInputComponent>();
+        m_Registry.RegisterComponent<AIComponent>();
+        m_Registry.RegisterComponent<BallComponent>();
+
+        m_Player1 = m_Registry.CreateEntity();
+        m_Registry.AddComponent(m_Player1, VECTOR::TransformComponent{{30.0f, height / 2.0f - 50.0f}});
+        m_Registry.AddComponent(m_Player1, VECTOR::VelocityComponent{{0.0f, 0.0f}});
+        m_Registry.AddComponent(m_Player1, VECTOR::RenderComponent{20.0f, 100.0f, 255, 255, 255, 255});
+        m_Registry.AddComponent(m_Player1, VECTOR::ColliderComponent{20.0f, 100.0f});
+        m_Registry.AddComponent(m_Player1, PlayerInputComponent{SDL_SCANCODE_W, SDL_SCANCODE_S});
+
+        m_Player2 = m_Registry.CreateEntity();
+        m_Registry.AddComponent(m_Player2, VECTOR::TransformComponent{{width - 50.0f, height / 2.0f - 50.0f}});
+        m_Registry.AddComponent(m_Player2, VECTOR::VelocityComponent{{0.0f, 0.0f}});
+        m_Registry.AddComponent(m_Player2, VECTOR::RenderComponent{20.0f, 100.0f, 255, 255, 255, 255});
+        m_Registry.AddComponent(m_Player2, VECTOR::ColliderComponent{20.0f, 100.0f});
+        m_Registry.AddComponent(m_Player2, AIComponent{aiDifficulty, AIState::Idle, 0.0f, 0.2f, height / 2.0f});
+
+        m_Ball = m_Registry.CreateEntity();
+        m_Registry.AddComponent(m_Ball, VECTOR::TransformComponent{{width / 2.0f, height / 2.0f}});
+        m_Registry.AddComponent(m_Ball, VECTOR::VelocityComponent{{400.0f * 0.707106f, 400.0f * 0.707106f}}); // Init speed
+        m_Registry.AddComponent(m_Ball, VECTOR::RenderComponent{15.0f, 15.0f, 255, 255, 255, 255});
+        m_Registry.AddComponent(m_Ball, VECTOR::ColliderComponent{15.0f, 15.0f});
+        m_Registry.AddComponent(m_Ball, BallComponent{true});
     }
 
     GameplayScene::~GameplayScene() {}
@@ -55,20 +82,108 @@ namespace Game {
         m_WasPausePressed = isPausePressed;
 
         if (!m_IsPaused) {
-            m_Player1->Update(deltaTime, m_InputManager, m_Height);
-            m_Player2->UpdateAI(deltaTime, m_Ball.get(), m_Height);
-            m_Ball->Update(deltaTime, m_Width, m_Height);
+            // === SYSTEM: Player Input ===
+            auto players = m_Registry.View<VECTOR::TransformComponent, PlayerInputComponent>();
+            for (auto entity : players) {
+                auto& transform = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+                auto& input = m_Registry.GetComponent<PlayerInputComponent>(entity);
+                float speed = 500.0f;
+                if (m_InputManager->IsKeyPressed(input.upKey)) {
+                    transform.position.y -= speed * deltaTime;
+                }
+                if (m_InputManager->IsKeyPressed(input.downKey)) {
+                    transform.position.y += speed * deltaTime;
+                }
+                // Clamp
+                if (transform.position.y < 0.0f) transform.position.y = 0.0f;
+                if (transform.position.y + 100.0f > m_Height) transform.position.y = m_Height - 100.0f;
+            }
 
-            // Emit trail particles from ball center
-            VECTOR::AABB ballBox = m_Ball->GetAABB();
-            m_TrailEmitter.Emit(ballBox.x + ballBox.w/2.0f, ballBox.y + ballBox.h/2.0f, 1, 255, 200, 50, 20.0f, 0.3f);
+            // === SYSTEM: AI ===
+            auto ais = m_Registry.View<VECTOR::TransformComponent, AIComponent>();
+            for (auto entity : ais) {
+                auto& transform = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+                auto& ai = m_Registry.GetComponent<AIComponent>(entity);
+                
+                auto& ballTrans = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Ball);
+                auto& ballVel = m_Registry.GetComponent<VECTOR::VelocityComponent>(m_Ball);
 
+                if (ballVel.velocity.x < 0.0f) {
+                    ai.state = AIState::Idle;
+                } else {
+                    ai.state = (ai.difficulty == AIDifficulty::Hard) ? AIState::Predicting : AIState::Tracking;
+                }
+
+                ai.reactionDelayTimer += deltaTime;
+                if (ai.reactionDelayTimer >= ai.reactionTime) {
+                    switch (ai.state) {
+                        case AIState::Idle:
+                            ai.targetY = (m_Height / 2.0f);
+                            break;
+                        case AIState::Tracking:
+                            ai.targetY = ballTrans.position.y + 7.5f; // center of ball
+                            if (ai.difficulty == AIDifficulty::Easy) ai.targetY += (rand() % 60) - 30;
+                            else if (ai.difficulty == AIDifficulty::Medium) ai.targetY += (rand() % 30) - 15;
+                            break;
+                        case AIState::Predicting:
+                            {
+                                float timeToReach = (transform.position.x - (ballTrans.position.x + 15.0f)) / ballVel.velocity.x;
+                                if (timeToReach < 0.0f) timeToReach = 0.0f;
+                                float expectedY = ballTrans.position.y + (ballVel.velocity.y * timeToReach);
+                                int maxBounces = 10;
+                                while (maxBounces > 0 && (expectedY < 0.0f || expectedY + 15.0f > m_Height)) {
+                                    if (expectedY < 0.0f) expectedY = -expectedY;
+                                    else if (expectedY + 15.0f > m_Height) expectedY = 2.0f * (m_Height - 15.0f) - expectedY;
+                                    maxBounces--;
+                                }
+                                ai.targetY = expectedY + 7.5f;
+                            }
+                            break;
+                    }
+                    ai.reactionDelayTimer = 0.0f;
+                }
+
+                float aiSpeed = 400.0f;
+                float paddleCenterY = transform.position.y + 50.0f;
+                if (paddleCenterY < ai.targetY - 5.0f) transform.position.y += aiSpeed * deltaTime;
+                else if (paddleCenterY > ai.targetY + 5.0f) transform.position.y -= aiSpeed * deltaTime;
+
+                if (transform.position.y < 0.0f) transform.position.y = 0.0f;
+                if (transform.position.y + 100.0f > m_Height) transform.position.y = m_Height - 100.0f;
+            }
+
+            // === SYSTEM: Physics Movement ===
+            auto movables = m_Registry.View<VECTOR::TransformComponent, VECTOR::VelocityComponent>();
+            for (auto entity : movables) {
+                auto& transform = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+                auto& vel = m_Registry.GetComponent<VECTOR::VelocityComponent>(entity);
+                transform.position.x += vel.velocity.x * deltaTime;
+                transform.position.y += vel.velocity.y * deltaTime;
+            }
+
+            // === SYSTEM: Ball Mechanics ===
+            auto& ballTrans = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Ball);
+            auto& ballVel = m_Registry.GetComponent<VECTOR::VelocityComponent>(m_Ball);
+            auto& ballCol = m_Registry.GetComponent<VECTOR::ColliderComponent>(m_Ball);
+
+            // Bounce Y
+            if (ballTrans.position.y < 0.0f) {
+                ballTrans.position.y = 0.0f;
+                ballVel.velocity.y = -ballVel.velocity.y;
+            } else if (ballTrans.position.y + ballCol.height > m_Height) {
+                ballTrans.position.y = m_Height - ballCol.height;
+                ballVel.velocity.y = -ballVel.velocity.y;
+            }
+
+            // Trail particles
+            m_TrailEmitter.Emit(ballTrans.position.x + ballCol.width/2.0f, ballTrans.position.y + ballCol.height/2.0f, 1, 255, 200, 50, 20.0f, 0.3f);
             m_TrailEmitter.Update(deltaTime);
             m_ExplosionEmitter.Update(deltaTime);
 
             CheckCollisions();
 
-            if (m_Ball->IsOutOfBoundsLeft()) {
+            // Score logic
+            if (ballTrans.position.x < 0.0f) {
                 m_Score2++;
                 VECTOR::EventBus::Get().Publish<ScoreEvent>(2);
                 VECTOR_LOG_INFO(std::string("Player 2 Scored! Score: ") + std::to_string(m_Score1) + " - " + std::to_string(m_Score2));
@@ -79,7 +194,7 @@ namespace Game {
                 } else {
                     ResetGame();
                 }
-            } else if (m_Ball->IsOutOfBoundsRight(m_Width)) {
+            } else if (ballTrans.position.x + ballCol.width > m_Width) {
                 m_Score1++;
                 VECTOR::EventBus::Get().Publish<ScoreEvent>(1);
                 VECTOR_LOG_INFO(std::string("Player 1 Scored! Score: ") + std::to_string(m_Score1) + " - " + std::to_string(m_Score2));
@@ -98,9 +213,13 @@ namespace Game {
         m_TrailEmitter.Render(renderer);
         m_ExplosionEmitter.Render(renderer);
         
-        m_Player1->Render(renderer);
-        m_Player2->Render(renderer);
-        m_Ball->Render(renderer);
+        // === SYSTEM: Render ===
+        auto renderables = m_Registry.View<VECTOR::TransformComponent, VECTOR::RenderComponent>();
+        for (auto entity : renderables) {
+            auto& transform = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+            auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
+            renderer->DrawRect((int)transform.position.x, (int)transform.position.y, (int)r.width, (int)r.height, r.r, r.g, r.b, r.a);
+        }
 
         for (int y = 0; y < m_Height; y += 30) {
             renderer->DrawRect(m_Width / 2 - 2, y, 4, 15, 255, 255, 255, 100);
@@ -119,20 +238,23 @@ namespace Game {
         }
 
         if (m_DebugMode) {
-            auto drawAABB = [renderer](VECTOR::AABB aabb) {
-                renderer->DrawRect(aabb.x, aabb.y, aabb.w, 1, 0, 255, 0); 
-                renderer->DrawRect(aabb.x, aabb.y + aabb.h, aabb.w, 1, 0, 255, 0); 
-                renderer->DrawRect(aabb.x, aabb.y, 1, aabb.h, 0, 255, 0); 
-                renderer->DrawRect(aabb.x + aabb.w, aabb.y, 1, aabb.h, 0, 255, 0); 
-            };
+            auto colliders = m_Registry.View<VECTOR::TransformComponent, VECTOR::ColliderComponent>();
+            for (auto entity : colliders) {
+                auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+                auto& c = m_Registry.GetComponent<VECTOR::ColliderComponent>(entity);
+                renderer->DrawRect((int)t.position.x, (int)t.position.y, (int)c.width, 1, 0, 255, 0); 
+                renderer->DrawRect((int)t.position.x, (int)t.position.y + (int)c.height, (int)c.width, 1, 0, 255, 0); 
+                renderer->DrawRect((int)t.position.x, (int)t.position.y, 1, (int)c.height, 0, 255, 0); 
+                renderer->DrawRect((int)t.position.x + (int)c.width, (int)t.position.y, 1, (int)c.height, 0, 255, 0); 
+            }
 
-            drawAABB(m_Player1->GetAABB());
-            drawAABB(m_Player2->GetAABB());
-            drawAABB(m_Ball->GetAABB());
+            auto& p1T = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Player1);
+            auto& p2T = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Player2);
+            auto& bT = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Ball);
 
-            std::string p1Text = m_Player1->GetName() + " Y: " + std::to_string((int)m_Player1->GetPosition().y);
-            std::string p2Text = m_Player2->GetName() + " Y: " + std::to_string((int)m_Player2->GetPosition().y);
-            std::string ballText = m_Ball->GetName() + " X: " + std::to_string((int)m_Ball->GetPosition().x) + " Y: " + std::to_string((int)m_Ball->GetPosition().y);
+            std::string p1Text = "P1 Y: " + std::to_string((int)p1T.position.y);
+            std::string p2Text = "P2 Y: " + std::to_string((int)p2T.position.y);
+            std::string ballText = "Ball X: " + std::to_string((int)bT.position.x) + " Y: " + std::to_string((int)bT.position.y);
             std::string fpsText = "FPS: " + std::to_string((int)VECTOR::Application::Get().GetFPS());
             
             renderer->DrawText(p1Text, 10, 10, 0, 255, 0, 16);
@@ -143,51 +265,73 @@ namespace Game {
     }
 
     void GameplayScene::CheckCollisions() {
-        VECTOR::AABB ballAABB = m_Ball->GetAABB();
-        VECTOR::AABB p1AABB = m_Player1->GetAABB();
-        VECTOR::AABB p2AABB = m_Player2->GetAABB();
+        auto& ballTrans = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Ball);
+        auto& ballCol = m_Registry.GetComponent<VECTOR::ColliderComponent>(m_Ball);
+        auto& ballVel = m_Registry.GetComponent<VECTOR::VelocityComponent>(m_Ball);
 
-        auto resolveCollision = [this, &ballAABB](VECTOR::AABB& paddleAABB, bool isLeftPaddle) {
-            float paddleCenterY = paddleAABB.y + (paddleAABB.h / 2.0f);
-            float ballCenterY = ballAABB.y + (ballAABB.h / 2.0f);
+        auto checkIntersect = [&](VECTOR::TransformComponent& t1, VECTOR::ColliderComponent& c1, VECTOR::TransformComponent& t2, VECTOR::ColliderComponent& c2) {
+            return t1.position.x < t2.position.x + c2.width &&
+                   t1.position.x + c1.width > t2.position.x &&
+                   t1.position.y < t2.position.y + c2.height &&
+                   t1.position.y + c1.height > t2.position.y;
+        };
+
+        auto resolveCollision = [&](VECTOR::Entity paddleEntity, bool isLeftPaddle) {
+            auto& paddleTrans = m_Registry.GetComponent<VECTOR::TransformComponent>(paddleEntity);
+            auto& paddleCol = m_Registry.GetComponent<VECTOR::ColliderComponent>(paddleEntity);
+
+            float paddleCenterY = paddleTrans.position.y + (paddleCol.height / 2.0f);
+            float ballCenterY = ballTrans.position.y + (ballCol.height / 2.0f);
             float relativeIntersectY = (paddleCenterY - ballCenterY);
-            float normalizedIntersectY = (relativeIntersectY / (paddleAABB.h / 2.0f));
+            float normalizedIntersectY = (relativeIntersectY / (paddleCol.height / 2.0f));
             float maxBounceAngle = 1.047f;
             float bounceAngle = normalizedIntersectY * maxBounceAngle;
 
-            float speed = m_Ball->GetSpeed();
-            speed = std::min(speed * 1.05f, 1000.0f);
-            m_Ball->SetSpeed(speed);
+            float currentSpeed = std::sqrt(ballVel.velocity.x * ballVel.velocity.x + ballVel.velocity.y * ballVel.velocity.y);
+            currentSpeed = std::min(currentSpeed * 1.05f, 1000.0f);
 
             float dirX = isLeftPaddle ? std::cos(bounceAngle) : -std::cos(bounceAngle);
             float dirY = -std::sin(bounceAngle);
             
-            m_Ball->SetVelocity(dirX * speed, dirY * speed);
+            ballVel.velocity.x = dirX * currentSpeed;
+            ballVel.velocity.y = dirY * currentSpeed;
 
             if (isLeftPaddle) {
-                m_Ball->SetPosition(paddleAABB.x + paddleAABB.w + 1.0f, ballAABB.y);
+                ballTrans.position.x = paddleTrans.position.x + paddleCol.width + 1.0f;
             } else {
-                m_Ball->SetPosition(paddleAABB.x - ballAABB.w - 1.0f, ballAABB.y);
+                ballTrans.position.x = paddleTrans.position.x - ballCol.width - 1.0f;
             }
 
-            // Fire explosion particles
-            float explosionX = isLeftPaddle ? (paddleAABB.x + paddleAABB.w) : paddleAABB.x;
+            float explosionX = isLeftPaddle ? (paddleTrans.position.x + paddleCol.width) : paddleTrans.position.x;
             m_ExplosionEmitter.Emit(explosionX, ballCenterY, 30, 255, 100, 50, 300.0f, 0.5f);
 
             VECTOR::EventBus::Get().Publish<CollisionEvent>();
         };
 
-        if (ballAABB.Intersects(p1AABB)) {
-            resolveCollision(p1AABB, true);
-        } else if (ballAABB.Intersects(p2AABB)) {
-            resolveCollision(p2AABB, false);
+        auto& p1Trans = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Player1);
+        auto& p1Col = m_Registry.GetComponent<VECTOR::ColliderComponent>(m_Player1);
+        if (checkIntersect(ballTrans, ballCol, p1Trans, p1Col)) {
+            resolveCollision(m_Player1, true);
+        } else {
+            auto& p2Trans = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Player2);
+            auto& p2Col = m_Registry.GetComponent<VECTOR::ColliderComponent>(m_Player2);
+            if (checkIntersect(ballTrans, ballCol, p2Trans, p2Col)) {
+                resolveCollision(m_Player2, false);
+            }
         }
     }
 
     void GameplayScene::ResetGame() {
-        m_Player1->Reset(30.0f, m_Height / 2.0f - 50.0f);
-        m_Player2->Reset(m_Width - 50.0f, m_Height / 2.0f - 50.0f);
-        m_Ball->Reset(m_Width / 2.0f, m_Height / 2.0f);
+        m_Registry.GetComponent<VECTOR::TransformComponent>(m_Player1).position = VECTOR::Vector2D(30.0f, m_Height / 2.0f - 50.0f);
+        m_Registry.GetComponent<VECTOR::TransformComponent>(m_Player2).position = VECTOR::Vector2D(m_Width - 50.0f, m_Height / 2.0f - 50.0f);
+        
+        auto& ballTrans = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Ball);
+        auto& ballVel = m_Registry.GetComponent<VECTOR::VelocityComponent>(m_Ball);
+        ballTrans.position = VECTOR::Vector2D(m_Width / 2.0f, m_Height / 2.0f);
+        
+        float dirX = ballVel.velocity.x > 0 ? -0.707106f : 0.707106f;
+        float dirY = ballVel.velocity.y > 0 ? -0.707106f : 0.707106f;
+        ballVel.velocity = VECTOR::Vector2D(dirX * 400.0f, dirY * 400.0f);
     }
 
 } // namespace Game

@@ -1,9 +1,8 @@
 #pragma once
 
 #include "Engine/Core/Scene.hpp"
-#include "Game/Entities/Paddle.hpp"
-#include "Game/Entities/AIPaddle.hpp"
-#include "Game/Entities/Ball.hpp"
+#include "Engine/ECS/ECS.hpp"
+#include "Game/Core/GameComponents.hpp"
 #include "Engine/Graphics/ParticleSystem.hpp"
 #include <memory>
 
@@ -35,9 +34,10 @@ namespace Game {
         int m_Height;
         VECTOR::InputManager* m_InputManager;
 
-        std::unique_ptr<Paddle> m_Player1;
-        std::unique_ptr<AIPaddle> m_Player2;
-        std::unique_ptr<Ball> m_Ball;
+        VECTOR::Registry m_Registry;
+        VECTOR::Entity m_Player1;
+        VECTOR::Entity m_Player2;
+        VECTOR::Entity m_Ball;
 
         int m_Score1;
         int m_Score2;

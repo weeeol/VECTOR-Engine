@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Engine/Core/Scene.hpp"
-#include "Game/Entities/AIPaddle.hpp"
+#include "Game/Core/GameComponents.hpp"
 #include "Engine/UI/UIManager.hpp"
 #include <memory>
 
