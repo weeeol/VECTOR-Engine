@@ -28,7 +28,6 @@ namespace Game {
     private:
         void GenerateArena();
         void CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const glm::vec3& color, bool isEnemy = false);
-        unsigned int CreateCubeMesh();
 
         int m_Width;
         int m_Height;
@@ -45,7 +44,6 @@ namespace Game {
         bool m_IsPaused;
         bool m_WasPausePressed;
         
-        unsigned int m_CubeVAO, m_CubeVBO, m_CubeEBO;
-        int m_CubeIndexCount;
+        std::shared_ptr<VECTOR::Mesh> m_CubeMesh;
     };
 }

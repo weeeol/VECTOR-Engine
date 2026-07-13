@@ -20,15 +20,16 @@ namespace VECTOR {
     };
 
     struct RenderComponent {
-        float width, height;
-        uint8_t r, g, b, a;
+        std::shared_ptr<class Shader> shader;
+        std::shared_ptr<class Texture2D> texture;
+        glm::vec4 color;
+
+        RenderComponent() : color(1.0f) {}
+        RenderComponent(const glm::vec4& c) : color(c) {}
     };
 
     struct MeshComponent {
-        unsigned int VAO;
-        unsigned int VBO;
-        unsigned int EBO;
-        int indexCount;
+        std::shared_ptr<class Mesh> mesh;
     };
 
     struct CameraComponent {

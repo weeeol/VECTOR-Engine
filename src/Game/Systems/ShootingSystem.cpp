@@ -1,11 +1,13 @@
 #include "ShootingSystem.hpp"
 #include "Engine/ECS/Components.hpp"
+#include "Engine/Graphics/Mesh.hpp"
 #include <iostream>
 
 namespace Game {
 
     ShootingSystem::ShootingSystem(VECTOR::InputManager* inputManager, VECTOR::BulletPhysicsSystem* physicsSys) 
         : m_InputManager(inputManager), m_PhysicsSystem(physicsSys) {
+        m_BulletMesh = VECTOR::Mesh::CreateCube();
     }
 
     ShootingSystem::~ShootingSystem() {
@@ -32,10 +34,16 @@ namespace Game {
 
             // Spawn bullet
             VECTOR::Entity bullet = registry.CreateEntity();
-            registry.AddComponent(bullet, VECTOR::TransformComponent{camT.position + camC.front * 2.0f});
+            VECTOR::TransformComponent t{camT.position + camC.front * 2.0f};
+            t.scale = glm::vec3(0.5f);
+            registry.AddComponent(bullet, t);
             
             // Bullet visual size 0.5
-            registry.AddComponent(bullet, VECTOR::RenderComponent{0.5f, 0.5f, 255, 255, 0, 255});
+            registry.AddComponent(bullet, VECTOR::RenderComponent{glm::vec4(1.0f, 1.0f, 0.0f, 1.0f)}); // Yellow
+            
+            VECTOR::MeshComponent m;
+            m.mesh = m_BulletMesh;
+            registry.AddComponent(bullet, m);
             
             // Physical sphere
             btCollisionShape* colShape = new btSphereShape(btScalar(0.5));

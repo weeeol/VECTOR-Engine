@@ -33,6 +33,9 @@ set(VECTOR_SOURCES
     src/Engine/Core/ResourceManager.cpp
     src/Engine/Core/SceneManager.cpp
     src/Engine/Graphics/Renderer.cpp
+    src/Engine/Graphics/Shader.cpp
+    src/Engine/Graphics/Mesh.cpp
+    src/Engine/Graphics/Texture2D.cpp
     src/Engine/Input/InputManager.cpp
     src/Engine/Audio/AudioManager.cpp
     src/Engine/Events/EventBus.cpp

@@ -90,7 +90,7 @@ namespace VECTOR {
         }
     )";
 
-    Renderer::Renderer() : m_Window(nullptr), m_GLContext(nullptr), m_ShaderProgram(0), m_2DShaderProgram(0) {}
+    Renderer::Renderer() : m_Window(nullptr), m_GLContext(nullptr) {}
 
     Renderer::~Renderer() {
         Shutdown();
@@ -139,8 +139,8 @@ namespace VECTOR {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        m_ShaderProgram = CreateShaderProgram(vertexShaderSource, fragmentShaderSource);
-        m_2DShaderProgram = CreateShaderProgram(vertexShader2DSource, fragmentShader2DSource);
+        m_DefaultShader = Shader::CreateFromSource(vertexShaderSource, fragmentShaderSource);
+        m_2DShader = Shader::CreateFromSource(vertexShader2DSource, fragmentShader2DSource);
 
         // Setup Quad for 2D rendering
         float vertices[] = {
@@ -175,8 +175,8 @@ namespace VECTOR {
     void Renderer::Shutdown() {
         if (m_QuadVAO) glDeleteVertexArrays(1, &m_QuadVAO);
         if (m_QuadVBO) glDeleteBuffers(1, &m_QuadVBO);
-        if (m_ShaderProgram) glDeleteProgram(m_ShaderProgram);
-        if (m_2DShaderProgram) glDeleteProgram(m_2DShaderProgram);
+        m_DefaultShader.reset();
+        m_2DShader.reset();
 
         TTF_Quit();
 
@@ -204,44 +204,51 @@ namespace VECTOR {
         m_ProjectionMatrix = projection;
     }
 
-    void Renderer::DrawMesh(unsigned int VAO, int indexCount, const glm::mat4& model, const glm::vec3& color) {
-        glUseProgram(m_ShaderProgram);
+    void Renderer::DrawMesh(const Mesh* mesh, const Shader* shader, const Texture2D* texture, const glm::mat4& model, const glm::vec4& color) {
+        const Shader* activeShader = shader ? shader : m_DefaultShader.get();
+        activeShader->Bind();
 
-        unsigned int modelLoc = glGetUniformLocation(m_ShaderProgram, "model");
-        unsigned int viewLoc  = glGetUniformLocation(m_ShaderProgram, "view");
-        unsigned int projLoc  = glGetUniformLocation(m_ShaderProgram, "projection");
-        unsigned int colorLoc = glGetUniformLocation(m_ShaderProgram, "objectColor");
+        activeShader->SetMat4("model", model);
+        activeShader->SetMat4("view", m_ViewMatrix);
+        activeShader->SetMat4("projection", m_ProjectionMatrix);
         
-        unsigned int lightPosLoc = glGetUniformLocation(m_ShaderProgram, "lightPos");
-        unsigned int lightColLoc = glGetUniformLocation(m_ShaderProgram, "lightColor");
-
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(m_ViewMatrix));
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(m_ProjectionMatrix));
-        glUniform3fv(colorLoc, 1, glm::value_ptr(color));
+        // Convert vec4 to vec3 for now since our shader uses objectColor vec3
+        activeShader->SetVec3("objectColor", glm::vec3(color));
         
-        glUniform3f(lightPosLoc, 0.0f, 10.0f, 10.0f);
-        glUniform3f(lightColLoc, 1.0f, 1.0f, 1.0f);
+        activeShader->SetVec3("lightPos", glm::vec3(0.0f, 10.0f, 10.0f));
+        activeShader->SetVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
+        if (texture) {
+            // Need to bind texture
+            texture->Bind(0);
+            // Assuming shader has "diffuseTexture" uniform
+            // activeShader->SetInt("diffuseTexture", 0);
+        }
+
+        if (mesh) {
+            mesh->Draw();
+        }
+
+        if (texture) {
+            texture->Unbind();
+        }
+        activeShader->Unbind();
     }
 
     void Renderer::DrawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-        glUseProgram(m_2DShaderProgram);
+        m_2DShader->Bind();
         glDisable(GL_DEPTH_TEST);
 
         glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
-        glUniformMatrix4fv(glGetUniformLocation(m_2DShaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+        m_2DShader->SetMat4("projection", projection);
 
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(x, y, 0.0f));
         model = glm::scale(model, glm::vec3(w, h, 1.0f));
-        glUniformMatrix4fv(glGetUniformLocation(m_2DShaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        m_2DShader->SetMat4("model", model);
 
-        glUniform4f(glGetUniformLocation(m_2DShaderProgram, "spriteColor"), r/255.0f, g/255.0f, b/255.0f, a/255.0f);
-        glUniform1i(glGetUniformLocation(m_2DShaderProgram, "useTexture"), 0);
+        m_2DShader->SetVec4("spriteColor", glm::vec4(r/255.0f, g/255.0f, b/255.0f, a/255.0f));
+        m_2DShader->SetInt("useTexture", 0);
 
         glBindVertexArray(m_QuadVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -285,23 +292,23 @@ namespace VECTOR {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        glUseProgram(m_2DShaderProgram);
+        m_2DShader->Bind();
         glDisable(GL_DEPTH_TEST);
 
         glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
-        glUniformMatrix4fv(glGetUniformLocation(m_2DShaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+        m_2DShader->SetMat4("projection", projection);
 
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(x, y, 0.0f));
         model = glm::scale(model, glm::vec3(surface->w, surface->h, 1.0f));
-        glUniformMatrix4fv(glGetUniformLocation(m_2DShaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        m_2DShader->SetMat4("model", model);
 
-        glUniform4f(glGetUniformLocation(m_2DShaderProgram, "spriteColor"), 1.0f, 1.0f, 1.0f, 1.0f);
-        glUniform1i(glGetUniformLocation(m_2DShaderProgram, "useTexture"), 1);
+        m_2DShader->SetVec4("spriteColor", glm::vec4(1.0f));
+        m_2DShader->SetInt("useTexture", 1);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
-        glUniform1i(glGetUniformLocation(m_2DShaderProgram, "text"), 0);
+        m_2DShader->SetInt("text", 0);
 
         glBindVertexArray(m_QuadVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -311,43 +318,6 @@ namespace VECTOR {
         glBindTexture(GL_TEXTURE_2D, 0);
         glDeleteTextures(1, &texture);
         SDL_FreeSurface(surface);
-    }
-
-    unsigned int Renderer::CompileShader(unsigned int type, const std::string& source) {
-        unsigned int id = glCreateShader(type);
-        const char* src = source.c_str();
-        glShaderSource(id, 1, &src, nullptr);
-        glCompileShader(id);
-
-        int result;
-        glGetShaderiv(id, GL_COMPILE_STATUS, &result);
-        if (result == GL_FALSE) {
-            int length;
-            glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
-            char* message = (char*)alloca(length * sizeof(char));
-            glGetShaderInfoLog(id, length, &length, message);
-            VECTOR_LOG_ERROR(std::string("Failed to compile shader! ") + message);
-            glDeleteShader(id);
-            return 0;
-        }
-
-        return id;
-    }
-
-    unsigned int Renderer::CreateShaderProgram(const std::string& vertexSrc, const std::string& fragmentSrc) {
-        unsigned int program = glCreateProgram();
-        unsigned int vs = CompileShader(GL_VERTEX_SHADER, vertexSrc);
-        unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, fragmentSrc);
-
-        glAttachShader(program, vs);
-        glAttachShader(program, fs);
-        glLinkProgram(program);
-        glValidateProgram(program);
-
-        glDeleteShader(vs);
-        glDeleteShader(fs);
-
-        return program;
     }
 
 } // namespace VECTOR

@@ -8,6 +8,10 @@
 #include <GL/glew.h>
 #include <SDL_opengl.h>
 #include <glm/glm.hpp>
+#include <memory>
+#include "Shader.hpp"
+#include "Mesh.hpp"
+#include "Texture2D.hpp"
 
 namespace VECTOR {
 
@@ -26,7 +30,7 @@ namespace VECTOR {
         void Present();
 
         void SetViewProjection(const glm::mat4& view, const glm::mat4& projection);
-        void DrawMesh(unsigned int VAO, int indexCount, const glm::mat4& model, const glm::vec3& color);
+        void DrawMesh(const class Mesh* mesh, const class Shader* shader, const class Texture2D* texture, const glm::mat4& model, const glm::vec4& color);
         
         // 2D API
         void DrawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
@@ -37,19 +41,15 @@ namespace VECTOR {
     private:
         SDL_Window* m_Window;
         SDL_GLContext m_GLContext;
-        
-        unsigned int m_ShaderProgram;
+        std::shared_ptr<Shader> m_DefaultShader;
         glm::mat4 m_ViewMatrix;
         glm::mat4 m_ProjectionMatrix;
         
         // 2D Rendering
-        unsigned int m_2DShaderProgram;
+        std::shared_ptr<Shader> m_2DShader;
         unsigned int m_QuadVAO, m_QuadVBO;
         int m_Width, m_Height;
         std::unordered_map<int, void*> m_Fonts; // Store TTF_Font* as void* to avoid exposing SDL_ttf here
-        
-        unsigned int CompileShader(unsigned int type, const std::string& source);
-        unsigned int CreateShaderProgram(const std::string& vertexSrc, const std::string& fragmentSrc);
     };
 
 } // namespace VECTOR
