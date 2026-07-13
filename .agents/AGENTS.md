@@ -3,7 +3,7 @@
 ## Tech Stack
 - **Language**: C++17 / C++20
 - **Build System**: CMake (3.10+)
-- **Graphics/Hardware API**: OpenGL 3.3 Core, SDL2, SDL2_ttf
+- **Graphics/Hardware API**: OpenGL 3.3 Core, SDL2, SDL2_ttf, SDL2_image
 - **Physics**: Bullet3
 - **Architecture**: Object-Oriented, Fixed-Timestep Game Loop
 
@@ -26,4 +26,5 @@
 ## Explicit "DO NOT" Instructions
 - **Do not mix domains**: Engine logic (`src/Engine/`) must never `#include` or depend on Game logic (`src/Game/`). The Engine must remain completely game-agnostic.
 - **Do not load resources every frame**: Any texture, font, or audio file must be loaded once during initialization and cached (e.g., the `m_Fonts` map in `Renderer.cpp`).
+- **Do not use raw OpenGL calls in game logic**: Always use `VECTOR::Mesh`, `VECTOR::Shader`, and `VECTOR::Texture2D` instead of manually generating VAOs/VBOs in scenes.
 - **Do not use `SDL_GetTicks()` for physics**: Always use the high-resolution `SDL_GetPerformanceCounter()` for `deltaTime` calculations to prevent micro-stuttering.

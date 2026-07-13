@@ -4,7 +4,7 @@
 
 ## Features
 - **Data-Oriented ECS**: A custom Entity-Component System core framework, maximizing cache locality and decoupling logic from data.
-- **3D Graphics Pipeline**: Raw OpenGL 3.3 Core Profile rendering with simple shaders for 3D meshes.
+- **3D Graphics Pipeline**: Fully abstracted modular OpenGL 3.3 Core Profile pipeline featuring custom `Shader`, `Mesh`, and `Texture2D` architecture.
 - **Physics Simulation**: Integrated Bullet3 for 3D rigid body dynamics, gravity, and continuous collision detection. Includes physics-based projectile shooting.
 - **First-Person Camera**: Mouse-look and WASD movement systems that apply forces directly to the player's physical RigidBody.
 - **OpenGL 2D UI Overlay**: Custom orthographic rendering layer built on top of the 3D pipeline for menus, crosshairs, and text using `SDL2_ttf`.
@@ -17,7 +17,7 @@
 * CMake 3.10+
 * OpenGL 3.3+ Compatible GPU
 * GLEW and GLM
-* SDL2, SDL2_ttf, and SDL2_mixer development libraries
+* SDL2, SDL2_ttf, SDL2_image, and SDL2_mixer development libraries
 * Bullet Physics (Bullet3)
 
 ## Controls
@@ -33,7 +33,7 @@ This engine uses a **universal CMake configuration**.
 ### Option 1: Vcpkg (Universal / MSVC / Cross-Platform)
 If you are using MSVC or a standard CMake environment, it is highly recommended to use [vcpkg](https://vcpkg.io/):
 ```bash
-vcpkg install sdl2 sdl2-ttf sdl2-mixer bullet3 glew glm
+vcpkg install sdl2 sdl2-ttf sdl2-image sdl2-mixer bullet3 glew glm
 mkdir build && cd build
 cmake -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake ..
 cmake --build .
@@ -42,7 +42,7 @@ cmake --build .
 ### Option 2: MSYS2 / MinGW (Windows)
 If using MSYS2 (UCRT64), install the dependencies:
 ```bash
-pacman -S mingw-w64-ucrt-x86_64-SDL2 mingw-w64-ucrt-x86_64-SDL2_ttf mingw-w64-ucrt-x86_64-SDL2_mixer mingw-w64-ucrt-x86_64-bullet mingw-w64-ucrt-x86_64-glew mingw-w64-ucrt-x86_64-glm
+pacman -S mingw-w64-ucrt-x86_64-SDL2 mingw-w64-ucrt-x86_64-SDL2_ttf mingw-w64-ucrt-x86_64-SDL2_image mingw-w64-ucrt-x86_64-SDL2_mixer mingw-w64-ucrt-x86_64-bullet mingw-w64-ucrt-x86_64-glew mingw-w64-ucrt-x86_64-glm
 ```
 
 Then configure and build via CMake:
