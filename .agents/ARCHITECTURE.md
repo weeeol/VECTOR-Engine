@@ -6,31 +6,31 @@ VECTOR (Velocity Engine for C++ Texturing and Object Rendering) is a custom 2D g
 ## Folder Structure
 ```text
 VECTOR-Engine/
-├── assets/                 # Binary assets (fonts, sprites)
+├── assets/                 # Binary assets (fonts, sprites, audio)
 ├── build/                  # CMake build artifacts [IGNORED]
 ├── src/
 │   ├── main.cpp            # Application Entry Point
 │   ├── Engine/             # Game-Agnostic Core Engine
-│   │   ├── Audio/          # SDL_mixer integration (AudioManager)
+│   │   ├── Audio/          # SDL_mixer integration (AudioManager, BGM)
 │   │   ├── Core/           # App Loop, High-Res Timers, Logger, SceneManager, ResourceManager
+│   │   ├── ECS/            # Custom Entity-Component System (Registry, Components)
 │   │   ├── Events/         # EventBus for decoupled messaging
-│   │   ├── Graphics/       # SDL2 Renderer, Texture caching, Fonts, ParticleSystem
+│   │   ├── Graphics/       # Renderer, Texture caching, Fonts, ParticleSystem, Animator
 │   │   ├── Input/          # Keyboard/Mouse state tracking
-│   │   ├── Math/           # Vector math, AABB, GameObject Base
+│   │   ├── Math/           # Vector math, AABB
 │   │   └── UI/             # UIManager, UIElement, UIButton
 │   └── Game/               # Game-Specific Implementation
-│       ├── Core/           # PongGame application logic
-│       ├── Entities/       # Player Paddle, AI Paddle (FSM), Ball
+│       ├── Core/           # PongGame application logic, GameComponents (Data)
 │       ├── Events/         # Game-specific events (ScoreEvent, CollisionEvent)
-│       └── Scenes/         # MainMenuScene, GameplayScene
+│       └── Scenes/         # MainMenuScene, GameplayScene (ECS Systems)
 ```
 
 ## Core Data Flow & Game Loop
 1. **Entry**: The application starts in `src/main.cpp`, which instantiates `Game::PongGame` (derived from `VECTOR::Application`) and calls `Run()`.
-2. **Initialization**: `PongGame::OnInit()` subscribes to engine events and pushes the initial `MainMenuScene` onto the `SceneManager` stack.
+2. **Initialization**: `PongGame::OnInit()` subscribes to engine events, starts the BGM, and pushes the initial `MainMenuScene` onto the `SceneManager` stack.
 3. **The Loop**: `Application::Run()` manages a high-resolution fixed-timestep loop:
    - **Input**: Polls SDL events and updates the `InputManager` (keyboard state, mouse position, and clicks).
-   - **Physics/Logic (Fixed Step)**: Calls `Update(deltaTime)` identically across hardware. The `SceneManager` routes this to the active `Scene`, which updates UI elements, game entities (`Paddle`, `Ball`), particle emitters, AI state machines, and resolves collisions.
+   - **Physics/Logic (Fixed Step)**: Calls `Update(deltaTime)` identically across hardware. The `SceneManager` routes this to the active `Scene`. `GameplayScene` uses an **ECS Registry** to iterate over entities and manipulate components via purely Data-Oriented Systems (Input System, AI System, Physics System).
    - **Deferred State Changes**: Scene transitions (e.g. from UI buttons) are deferred to the end of the update loop to prevent use-after-free bugs.
-   - **Rendering (Variable Step)**: Calls `Render()`. The active `Scene` clears the screen, draws the entities, UI components, and particles via the `Renderer` subsystem, and presents the SDL buffer.
+   - **Rendering (Variable Step)**: Calls `Render()`. The active `Scene` iterates over entities with `RenderComponent` and `TransformComponent` and delegates drawing to the `Renderer`.
 4. **Shutdown**: On exit, the `SceneManager` is cleared before `SDL_Quit()` is invoked, ensuring all textures and audio chunks are safely destroyed while SDL is still initialized.

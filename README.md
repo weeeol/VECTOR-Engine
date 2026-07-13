@@ -3,12 +3,12 @@
 **VECTOR** (Velocity Engine for C++ Texturing and Object Rendering) is a custom hardware-accelerated 2D C++ game engine built from scratch using SDL2. It is compiled as a standalone static library (`libVECTOR.a`) and includes a fully functional Pong game that demonstrates the engine's capabilities.
 
 ## Features
-- **Strict Architecture**: Complete separation between the `VECTOR` engine library and the `Game` components.
-- **Object System**: Formalized `VECTOR::GameObject` base class for game entities.
+- **Data-Oriented ECS**: A custom Entity-Component System core framework, maximizing cache locality and decoupling logic from data.
+- **Audio & BGM Support**: Robust audio manager supporting `SDL_mixer` sound effects and endless `.mp3`/`.wav`/`.ogg` background music.
+- **Sprite Animations**: Core `Animator` subsystem for slicing and animating spritesheets.
 - **Fixed Time-Step**: Physics run at a constant rate regardless of frame rate.
 - **High Definition**: 1280x720 window resolution.
 - **Game States**: Includes Start, Playing, and Paused menus.
-- **Text & Texture Rendering**: Uses `SDL2_ttf` for fonts and `SDL2_image` for loading sprites.
 - **Dynamic AI Opponent**: Play against a computer-controlled AI with 3 difficulty levels!
 
 ## Requirements
