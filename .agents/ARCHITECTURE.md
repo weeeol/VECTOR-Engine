@@ -8,22 +8,39 @@ VECTOR (Velocity Engine for C++ Texturing and Object Rendering) is a custom 2D g
 VECTOR-Engine/
 ├── assets/                 # Binary assets (fonts, sprites, audio)
 ├── build/                  # CMake build artifacts [IGNORED]
-├── src/
-│   ├── main.cpp            # Application Entry Point
-│   ├── Engine/             # Game-Agnostic Core Engine
-│   │   ├── Audio/          # SDL_mixer integration (AudioManager, BGM)
-│   │   ├── Core/           # App Loop, High-Res Timers, Logger, SceneManager, ResourceManager
-│   │   ├── ECS/            # Custom Entity-Component System (Registry, Components)
-│   │   ├── Events/         # EventBus for decoupled messaging
-│   │   ├── Graphics/       # Renderer, Texture caching, Fonts, ParticleSystem, Animator
-│   │   ├── Input/          # Keyboard/Mouse state tracking
-│   │   ├── Math/           # Vector math, AABB
-│   │   └── UI/             # UIManager, UIElement, UIButton
-│   └── Game/               # Game-Specific Implementation
-│       ├── Core/           # PongGame application logic, GameComponents (Data)
-│       ├── Events/         # Game-specific events (ScoreEvent, CollisionEvent)
-│       ├── Scenes/         # MainMenuScene, GameplayScene
-│       └── Systems/        # Modular ECS Systems (PlayerInput, AI, Physics, BallMechanics)
+├── include/            # C++ Header files
+│   ├── Engine/         # Game-Agnostic Core Engine Headers
+│   │   ├── Audio/      
+│   │   ├── Core/       
+│   │   ├── ECS/        
+│   │   ├── Events/     
+│   │   ├── Graphics/   
+│   │   ├── Input/      
+│   │   ├── Math/       
+│   │   ├── Physics/    
+│   │   └── UI/         
+│   └── Game/           # Game-Specific Headers
+│       ├── Core/       
+│       ├── Events/     
+│       ├── Scenes/     
+│       └── Systems/    
+├── src/                # C++ Source files
+│   ├── main.cpp        # Application Entry Point
+│   ├── Engine/         # Engine Implementation
+│   │   ├── Audio/      # SDL_mixer integration (AudioManager, BGM)
+│   │   ├── Core/       # App Loop, High-Res Timers, Logger, SceneManager, ResourceManager
+│   │   ├── ECS/        # Custom Entity-Component System (Registry, Components)
+│   │   ├── Events/     # EventBus for decoupled messaging
+│   │   ├── Graphics/   # Renderer, Texture caching, Fonts, ParticleSystem, Animator
+│   │   ├── Input/      # Keyboard/Mouse state tracking
+│   │   ├── Math/       # Vector math
+│   │   ├── Physics/    # Box2D physics integration
+│   │   └── UI/         # UIManager, UIElement, UIButton
+│   └── Game/           # Game-Specific Implementation
+│       ├── Core/       # PongGame application logic, GameComponents (Data)
+│       ├── Events/     # Game-specific events (ScoreEvent, CollisionEvent)
+│       ├── Scenes/     # MainMenuScene, GameplayScene
+│       └── Systems/    # Modular ECS Systems (PlayerInput, AI, Physics, BallMechanics)
 ```
 
 ## Core Data Flow & Game Loop
