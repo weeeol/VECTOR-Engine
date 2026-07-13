@@ -5,6 +5,7 @@
 #include "Game/Core/GameComponents.hpp"
 #include "Game/Systems/GameSystems.hpp"
 #include "Engine/Graphics/ParticleSystem.hpp"
+#include "Engine/UI/UIManager.hpp"
 #include <memory>
 #include <vector>
 
@@ -43,6 +44,8 @@ namespace Game {
 
         std::vector<std::unique_ptr<VECTOR::System>> m_Systems;
         BallMechanicsSystem* m_BallSystem = nullptr;
+        
+        VECTOR::UIManager m_PauseMenuUI;
 
         int m_Score1;
         int m_Score2;

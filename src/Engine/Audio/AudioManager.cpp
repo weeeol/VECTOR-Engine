@@ -56,4 +56,10 @@ namespace VECTOR {
         Mix_HaltMusic();
     }
 
+    void AudioManager::SetMusicVolume(float volume) {
+        if (volume < 0.0f) volume = 0.0f;
+        if (volume > 1.0f) volume = 1.0f;
+        Mix_VolumeMusic((int)(volume * MIX_MAX_VOLUME));
+    }
+
 } // namespace VECTOR

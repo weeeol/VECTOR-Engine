@@ -8,6 +8,8 @@
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Core/Application.hpp"
 #include "Engine/ECS/Components.hpp"
+#include "Engine/Audio/AudioManager.hpp"
+#include "Engine/UI/UISlider.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -55,6 +57,14 @@ namespace Game {
         auto ballSys = std::make_unique<BallMechanicsSystem>(m_Width, m_Height, &m_ExplosionEmitter);
         m_BallSystem = ballSys.get();
         m_Systems.push_back(std::move(ballSys));
+
+        // Initialize Pause Menu UI
+        auto volumeSlider = std::make_shared<VECTOR::UISlider>(20, 50, 200, 20, 0.5f, [](float val) {
+            VECTOR::AudioManager::Get().SetMusicVolume(val);
+        });
+        m_PauseMenuUI.AddElement(volumeSlider);
+        // Set initial volume
+        VECTOR::AudioManager::Get().SetMusicVolume(0.5f);
     }
 
     GameplayScene::~GameplayScene() {}
@@ -90,7 +100,9 @@ namespace Game {
         }
         m_WasPausePressed = isPausePressed;
 
-        if (!m_IsPaused) {
+        if (m_IsPaused) {
+            m_PauseMenuUI.Update(m_InputManager, deltaTime);
+        } else {
             // Run all ECS Systems
             for (auto& system : m_Systems) {
                 system->Update(m_Registry, deltaTime);
@@ -157,6 +169,9 @@ namespace Game {
         } else if (m_IsPaused) {
             renderer->DrawText("PAUSED", m_Width / 2 - 60, m_Height / 2 - 24, 255, 255, 255, 48);
             renderer->DrawText("Press P to Resume | ESC for Menu", m_Width / 2 - 200, m_Height / 2 + 30, 255, 255, 255, 24);
+            
+            renderer->DrawText("Music Volume", 20, 20, 200, 200, 200, 18);
+            m_PauseMenuUI.Render(renderer);
         }
 
         if (m_DebugMode) {

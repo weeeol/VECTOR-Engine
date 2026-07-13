@@ -37,6 +37,7 @@ set(VECTOR_SOURCES
     src/Engine/Events/EventBus.cpp
     src/Engine/UI/UIButton.cpp
     src/Engine/UI/UIManager.cpp
+    src/Engine/UI/UISlider.cpp
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
@@ -58,9 +59,10 @@ add_executable(Pong src/main.cpp ${GAME_SOURCES})
 # Link the Pong game to the VECTOR engine
 target_link_libraries(Pong PRIVATE VECTOR)
 
-# Copy assets folder to the build directory so the executable can find the font and images
-add_custom_command(TARGET Pong POST_BUILD
+# Copy assets folder to the build directory unconditionally so it syncs new files (like bgm.wav)
+add_custom_target(CopyAssets ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/assets"
-        "$<TARGET_FILE_DIR:Pong>/assets"
+        "${CMAKE_CURRENT_BINARY_DIR}/assets"
 )
+add_dependencies(Pong CopyAssets)
