@@ -22,7 +22,8 @@ VECTOR-Engine/
 │   └── Game/               # Game-Specific Implementation
 │       ├── Core/           # PongGame application logic, GameComponents (Data)
 │       ├── Events/         # Game-specific events (ScoreEvent, CollisionEvent)
-│       └── Scenes/         # MainMenuScene, GameplayScene (ECS Systems)
+│       ├── Scenes/         # MainMenuScene, GameplayScene
+│       └── Systems/        # Modular ECS Systems (PlayerInput, AI, Physics, BallMechanics)
 ```
 
 ## Core Data Flow & Game Loop
@@ -30,7 +31,7 @@ VECTOR-Engine/
 2. **Initialization**: `PongGame::OnInit()` subscribes to engine events, starts the BGM, and pushes the initial `MainMenuScene` onto the `SceneManager` stack.
 3. **The Loop**: `Application::Run()` manages a high-resolution fixed-timestep loop:
    - **Input**: Polls SDL events and updates the `InputManager` (keyboard state, mouse position, and clicks).
-   - **Physics/Logic (Fixed Step)**: Calls `Update(deltaTime)` identically across hardware. The `SceneManager` routes this to the active `Scene`. `GameplayScene` uses an **ECS Registry** to iterate over entities and manipulate components via purely Data-Oriented Systems (Input System, AI System, Physics System).
+   - **Physics/Logic (Fixed Step)**: Calls `Update(deltaTime)` identically across hardware. The `SceneManager` routes this to the active `Scene`. The `GameplayScene` owns a list of decoupled `VECTOR::System` objects (`AISystem`, `PhysicsSystem`, etc.) and invokes them. Systems query the **ECS Registry** using a zero-allocation lambda-based `View()` iterator.
    - **Deferred State Changes**: Scene transitions (e.g. from UI buttons) are deferred to the end of the update loop to prevent use-after-free bugs.
    - **Rendering (Variable Step)**: Calls `Render()`. The active `Scene` iterates over entities with `RenderComponent` and `TransformComponent` and delegates drawing to the `Renderer`.
 4. **Shutdown**: On exit, the `SceneManager` is cleared before `SDL_Quit()` is invoked, ensuring all textures and audio chunks are safely destroyed while SDL is still initialized.
