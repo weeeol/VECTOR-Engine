@@ -5,6 +5,9 @@
 ## Features
 - **Data-Oriented ECS**: A custom Entity-Component System core framework, maximizing cache locality and decoupling logic from data.
 - **3D Graphics Pipeline**: Fully abstracted modular OpenGL 3.3 Core Profile pipeline featuring custom `Shader`, `Mesh`, and `Texture2D` architecture.
+- **Physical Volumetric Lighting**: Advanced fragment shaders that perform True 3D Volumetric Raymarching directly against the shadow map to calculate real atmospheric scattering, rays, and fog.
+- **Shadow Mapping**: Multi-pass rendering pipeline with a dedicated depth pre-pass and PCF (Percentage-Closer Filtering) soft shadows.
+- **Asset Management & Shader Cache**: A centralized `ResourceManager` handling on-the-fly shader compilation, caching, and font loading. Core engine shaders are abstracted completely into an `assets/engine/shaders` library.
 - **Physics Simulation**: Integrated Bullet3 for 3D rigid body dynamics, gravity, and continuous collision detection. Includes physics-based projectile shooting.
 - **First-Person Camera**: Mouse-look and WASD movement systems that apply forces directly to the player's physical RigidBody.
 - **OpenGL 2D UI Overlay**: Custom orthographic rendering layer built on top of the 3D pipeline for menus, crosshairs, and text using `SDL2_ttf`.
