@@ -2,8 +2,8 @@
 
 #include "Engine/Core/Scene.hpp"
 #include "Engine/ECS/ECS.hpp"
-#include "Engine/UI/UIManager.hpp"
 #include "Engine/Physics/BulletPhysicsSystem.hpp"
+#include "Engine/UI/UISystem.hpp"
 #include "Game/Systems/GameSystems.hpp"
 #include "Game/Systems/CameraSystem.hpp"
 #include "Game/Systems/ShootingSystem.hpp"
@@ -39,10 +39,14 @@ namespace Game {
         std::vector<std::unique_ptr<VECTOR::System>> m_Systems;
         VECTOR::BulletPhysicsSystem* m_PhysicsSystem = nullptr;
 
-        VECTOR::UIManager m_PauseMenuUI;
+        VECTOR::Registry m_UIRegistry;
+        std::unique_ptr<VECTOR::UISystem> m_UISystem;
 
         bool m_IsPaused;
         bool m_WasPausePressed;
+        
+        bool m_DebugMode = false;
+        bool m_WasF3Pressed = false;
         
         std::shared_ptr<VECTOR::Mesh> m_CubeMesh;
     };

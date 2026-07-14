@@ -240,6 +240,103 @@ namespace VECTOR {
         activeShader->Unbind();
     }
 
+    void Renderer::BeginUI() {
+        m_2DShader->Bind();
+        glDisable(GL_DEPTH_TEST);
+
+        glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
+        m_2DShader->SetMat4("projection", projection);
+        
+        glBindVertexArray(m_QuadVAO);
+    }
+
+    void Renderer::DrawUIRect(int x, int y, int w, int h, const glm::vec4& color) {
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(x, y, 0.0f));
+        model = glm::scale(model, glm::vec3(w, h, 1.0f));
+        m_2DShader->SetMat4("model", model);
+
+        m_2DShader->SetVec4("spriteColor", color);
+        m_2DShader->SetInt("useTexture", 0);
+
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    }
+
+    void Renderer::DrawUIText(const std::string& text, int x, int y, const glm::vec4& renderColor, int fontSize) {
+        if (text.empty()) return;
+
+        // Use cached texture or create it
+        // We round colors to int for the cache key to avoid precision issues
+        int r = (int)(renderColor.r * 255);
+        int g = (int)(renderColor.g * 255);
+        int b = (int)(renderColor.b * 255);
+
+        std::string cacheKey = text + "_" + std::to_string(r) + "_" + std::to_string(g) + "_" + std::to_string(b) + "_" + std::to_string(fontSize);
+        
+        TextTexture textTex;
+        if (m_TextTextureCache.find(cacheKey) == m_TextTextureCache.end()) {
+            TTF_Font* font = ResourceManager::Get().GetFont("assets/font.ttf", fontSize);
+            if (!font) return;
+
+            SDL_Color color = {(uint8_t)r, (uint8_t)g, (uint8_t)b, 255};
+            SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), color);
+            if (!surface) return;
+
+            unsigned int texture;
+            glGenTextures(1, &texture);
+            glBindTexture(GL_TEXTURE_2D, texture);
+
+            int mode = GL_RGB;
+            int format = GL_RGB;
+            if (surface->format->BytesPerPixel == 4) {
+                mode = GL_RGBA;
+                if (surface->format->Rmask == 0x00ff0000) {
+                    format = GL_BGRA;
+                } else {
+                    format = GL_RGBA;
+                }
+            }
+
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, surface->pitch / surface->format->BytesPerPixel);
+            glTexImage2D(GL_TEXTURE_2D, 0, mode, surface->w, surface->h, 0, format, GL_UNSIGNED_BYTE, surface->pixels);
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0); 
+            
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            
+            textTex.id = texture;
+            textTex.w = surface->w;
+            textTex.h = surface->h;
+            
+            m_TextTextureCache[cacheKey] = textTex;
+            SDL_FreeSurface(surface);
+        } else {
+            textTex = m_TextTextureCache[cacheKey];
+        }
+
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(x, y, 0.0f));
+        model = glm::scale(model, glm::vec3(textTex.w, textTex.h, 1.0f));
+        m_2DShader->SetMat4("model", model);
+
+        // For blended text, spriteColor is usually 1.0f, the color is baked in texture
+        m_2DShader->SetVec4("spriteColor", glm::vec4(1.0f));
+        m_2DShader->SetInt("useTexture", 1);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, textTex.id);
+        m_2DShader->SetInt("text", 0);
+
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    void Renderer::EndUI() {
+        glBindVertexArray(0);
+        glEnable(GL_DEPTH_TEST);
+    }
+
     void Renderer::DrawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
         m_2DShader->Bind();
         glDisable(GL_DEPTH_TEST);

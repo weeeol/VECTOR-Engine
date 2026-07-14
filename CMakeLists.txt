@@ -40,9 +40,7 @@ set(VECTOR_SOURCES
     src/Engine/Audio/AudioManager.cpp
     src/Engine/Events/EventBus.cpp
     src/Engine/Physics/BulletPhysicsSystem.cpp
-    src/Engine/UI/UIButton.cpp
-    src/Engine/UI/UIManager.cpp
-    src/Engine/UI/UISlider.cpp
+    src/Engine/UI/UISystem.cpp
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})

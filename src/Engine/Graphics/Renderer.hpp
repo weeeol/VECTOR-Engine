@@ -32,7 +32,12 @@ namespace VECTOR {
         void SetViewProjection(const glm::mat4& view, const glm::mat4& projection);
         void DrawMesh(const class Mesh* mesh, const class Shader* shader, const class Texture2D* texture, const glm::mat4& model, const glm::vec4& color);
         
-        // 2D API
+        void BeginUI();
+        void DrawUIRect(int x, int y, int w, int h, const glm::vec4& color);
+        void DrawUIText(const std::string& text, int x, int y, const glm::vec4& color, int fontSize = 24);
+        void EndUI();
+
+        // Legacy 2D API (Will be removed later)
         void DrawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
         void DrawText(const std::string& text, int x, int y, uint8_t r, uint8_t g, uint8_t b, int fontSize = 24);
 
