@@ -61,6 +61,7 @@ namespace Game {
             if (registry.HasComponent<VECTOR::RigidBodyComponent>(entity)) {
                 auto& rb = registry.GetComponent<VECTOR::RigidBodyComponent>(entity);
                 if (rb.body) {
+                    rb.body->activate(true);
                     btVector3 vel = rb.body->getLinearVelocity();
                     vel.setX(moveDir.x * velocityMag);
                     vel.setZ(moveDir.z * velocityMag);

@@ -20,11 +20,15 @@ namespace VECTOR {
         // Check AABB collision with mouse
         m_IsHovered = (mx >= m_X && mx <= m_X + m_Width && my >= m_Y && my <= m_Y + m_Height);
 
-        if (m_IsHovered && input->IsMouseButtonJustPressed(SDL_BUTTON_LEFT)) {
+        bool isPressedNow = input->IsMouseButtonPressed(SDL_BUTTON_LEFT);
+
+        if (m_IsHovered && isPressedNow && !m_WasPressed) {
             if (m_OnClick) {
                 m_OnClick();
             }
         }
+        
+        m_WasPressed = isPressedNow;
     }
 
     void UIButton::Render(Renderer* renderer) {

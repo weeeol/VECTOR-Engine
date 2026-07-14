@@ -178,6 +178,11 @@ namespace VECTOR {
         m_DefaultShader.reset();
         m_2DShader.reset();
 
+        for (auto& pair : m_TextTextureCache) {
+            glDeleteTextures(1, &pair.second.id);
+        }
+        m_TextTextureCache.clear();
+
         TTF_Quit();
 
         if (m_GLContext) {
@@ -260,37 +265,54 @@ namespace VECTOR {
     void Renderer::DrawText(const std::string& text, int x, int y, uint8_t r, uint8_t g, uint8_t b, int fontSize) {
         if (text.empty()) return;
 
-        TTF_Font* font = ResourceManager::Get().GetFont("assets/font.ttf", fontSize);
-        if (!font) return;
+        std::string cacheKey = text + "_" + std::to_string(r) + "_" + std::to_string(g) + "_" + std::to_string(b) + "_" + std::to_string(fontSize);
+        
+        TextTexture textTex;
 
-        SDL_Color color = {r, g, b, 255};
-        SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), color);
-        if (!surface) return;
+        if (m_TextTextureCache.find(cacheKey) == m_TextTextureCache.end()) {
+            TTF_Font* font = ResourceManager::Get().GetFont("assets/font.ttf", fontSize);
+            if (!font) return;
 
-        unsigned int texture;
-        glGenTextures(1, &texture);
-        glBindTexture(GL_TEXTURE_2D, texture);
+            SDL_Color color = {r, g, b, 255};
+            SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), color);
+            if (!surface) return;
 
-        int mode = GL_RGB;
-        int format = GL_RGB;
-        if (surface->format->BytesPerPixel == 4) {
-            mode = GL_RGBA;
-            if (surface->format->Rmask == 0x00ff0000) {
-                format = GL_BGRA;
-            } else {
-                format = GL_RGBA;
+            unsigned int texture;
+            glGenTextures(1, &texture);
+            glBindTexture(GL_TEXTURE_2D, texture);
+
+            int mode = GL_RGB;
+            int format = GL_RGB;
+            if (surface->format->BytesPerPixel == 4) {
+                mode = GL_RGBA;
+                if (surface->format->Rmask == 0x00ff0000) {
+                    format = GL_BGRA;
+                } else {
+                    format = GL_RGBA;
+                }
             }
+
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, surface->pitch / surface->format->BytesPerPixel);
+
+            glTexImage2D(GL_TEXTURE_2D, 0, mode, surface->w, surface->h, 0, format, GL_UNSIGNED_BYTE, surface->pixels);
+            
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0); // reset
+            
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            
+            textTex.id = texture;
+            textTex.w = surface->w;
+            textTex.h = surface->h;
+            
+            m_TextTextureCache[cacheKey] = textTex;
+            
+            glBindTexture(GL_TEXTURE_2D, 0);
+            SDL_FreeSurface(surface);
+        } else {
+            textTex = m_TextTextureCache[cacheKey];
         }
-
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, surface->pitch / surface->format->BytesPerPixel);
-
-        glTexImage2D(GL_TEXTURE_2D, 0, mode, surface->w, surface->h, 0, format, GL_UNSIGNED_BYTE, surface->pixels);
-        
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0); // reset
-        
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         m_2DShader->Bind();
         glDisable(GL_DEPTH_TEST);
@@ -300,14 +322,14 @@ namespace VECTOR {
 
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(x, y, 0.0f));
-        model = glm::scale(model, glm::vec3(surface->w, surface->h, 1.0f));
+        model = glm::scale(model, glm::vec3(textTex.w, textTex.h, 1.0f));
         m_2DShader->SetMat4("model", model);
 
         m_2DShader->SetVec4("spriteColor", glm::vec4(1.0f));
         m_2DShader->SetInt("useTexture", 1);
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
+        glBindTexture(GL_TEXTURE_2D, textTex.id);
         m_2DShader->SetInt("text", 0);
 
         glBindVertexArray(m_QuadVAO);
@@ -316,8 +338,6 @@ namespace VECTOR {
 
         glEnable(GL_DEPTH_TEST);
         glBindTexture(GL_TEXTURE_2D, 0);
-        glDeleteTextures(1, &texture);
-        SDL_FreeSurface(surface);
     }
 
 } // namespace VECTOR

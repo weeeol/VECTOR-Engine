@@ -14,6 +14,8 @@
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/Shader.hpp"
 #include "Engine/Graphics/Texture2D.hpp"
+#include "Engine/UI/UISlider.hpp"
+#include "Engine/Audio/AudioManager.hpp"
 
 namespace Game {
 
@@ -42,6 +44,11 @@ namespace Game {
             VECTOR::SceneManager::Get().ChangeScene(std::move(menuScene));
         });
         m_PauseMenuUI.AddElement(mainMenuButton);
+
+        auto volSlider = std::make_shared<VECTOR::UISlider>(width - 250, 50, 200, 20, 0.5f, [](float val) {
+            VECTOR::AudioManager::Get().SetMusicVolume(val);
+        });
+        m_PauseMenuUI.AddElement(volSlider);
 
         GenerateArena();
 
@@ -84,10 +91,6 @@ namespace Game {
         CreateCube(glm::vec3(0, 1, -10), glm::vec3(2, 2, 2), 5.0f, glm::vec3(0.0f, 0.0f, 1.0f));
         CreateCube(glm::vec3(5, 1, -10), glm::vec3(2, 2, 2), 5.0f, glm::vec3(0.0f, 1.0f, 0.0f));
         CreateCube(glm::vec3(-5, 1, -10), glm::vec3(2, 2, 2), 5.0f, glm::vec3(1.0f, 0.0f, 0.0f));
-
-        // Enemies (Moving targets)
-        CreateCube(glm::vec3(10, 1, -15), glm::vec3(1.5f, 1.5f, 1.5f), 2.0f, glm::vec3(1.0f, 0.5f, 0.0f), true);
-        CreateCube(glm::vec3(-10, 1, -15), glm::vec3(1.5f, 1.5f, 1.5f), 2.0f, glm::vec3(1.0f, 0.5f, 0.0f), true);
     }
 
     void GameplayScene::CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const glm::vec3& color, bool isEnemy) {
@@ -145,23 +148,6 @@ namespace Game {
             for (auto& system : m_Systems) {
                 system->Update(m_Registry, deltaTime);
             }
-
-            // Simple Enemy AI
-            auto& camT = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Player);
-            m_Registry.View<VECTOR::TransformComponent, VECTOR::RigidBodyComponent, AIComponent>([&](VECTOR::Entity entity) {
-                auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
-                auto& rb = m_Registry.GetComponent<VECTOR::RigidBodyComponent>(entity);
-                
-                glm::vec3 dir = camT.position - t.position;
-                dir.y = 0; // Don't fly
-                if (glm::length(dir) > 0.0f) {
-                    dir = glm::normalize(dir);
-                    btVector3 vel = rb.body->getLinearVelocity();
-                    vel.setX(dir.x * 3.0f);
-                    vel.setZ(dir.z * 3.0f);
-                    rb.body->setLinearVelocity(vel);
-                }
-            });
         }
     }
 
@@ -197,6 +183,7 @@ namespace Game {
         if (m_IsPaused) {
             renderer->DrawRect(0, 0, m_Width, m_Height, 0, 0, 0, 150); // Dark overlay
             renderer->DrawText("PAUSED", m_Width / 2 - 80, m_Height / 2 - 50, 255, 255, 255, 48);
+            renderer->DrawText("Volume", m_Width - 250, 30, 200, 200, 200, 18);
             m_PauseMenuUI.Render(renderer);
         }
     }

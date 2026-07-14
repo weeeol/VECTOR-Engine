@@ -27,6 +27,7 @@ namespace VECTOR {
         std::string m_Text;
         std::function<void()> m_OnClick;
         bool m_IsHovered;
+        bool m_WasPressed = false;
 
         SDL_Color m_NormalColor = { 50, 50, 50, 255 };
         SDL_Color m_HoverColor = { 100, 100, 100, 255 };

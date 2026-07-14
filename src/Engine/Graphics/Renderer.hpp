@@ -49,7 +49,11 @@ namespace VECTOR {
         std::shared_ptr<Shader> m_2DShader;
         unsigned int m_QuadVAO, m_QuadVBO;
         int m_Width, m_Height;
-        std::unordered_map<int, void*> m_Fonts; // Store TTF_Font* as void* to avoid exposing SDL_ttf here
+        struct TextTexture {
+            unsigned int id;
+            int w, h;
+        };
+        std::unordered_map<std::string, TextTexture> m_TextTextureCache;
     };
 
 } // namespace VECTOR

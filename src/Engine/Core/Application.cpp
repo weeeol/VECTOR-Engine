@@ -84,11 +84,8 @@ namespace VECTOR {
 
             ProcessInput();
 
-            // Fixed time-step update loop
-            while (accumulator >= targetFrameTime) {
-                Update(targetFrameTime / 1000.0f); // Convert back to seconds for logic
-                accumulator -= targetFrameTime;
-            }
+            // Allow Bullet and logic to use actual frame time
+            Update(deltaTime / 1000.0f);
 
             Render();
             frameCount++;
