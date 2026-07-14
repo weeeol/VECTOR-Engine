@@ -8,4 +8,3 @@ Develop a flexible, high-performance 3D First-Person Shooter (FPS) prototype fea
 - **Build System**: CMake (3.10+)
 - **Graphics/Hardware API**: OpenGL 3.3 Core, SDL2, SDL2_ttf, SDL2_image
 - **Physics**: Bullet3 (Bullet Physics)
-- **Architecture**: Data-Oriented Entity-Component System (ECS) with variable-timestep loops
