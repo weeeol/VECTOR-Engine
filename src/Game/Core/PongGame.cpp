@@ -4,6 +4,7 @@
 #include "Engine/Events/EventBus.hpp"
 #include "Game/Events/GameEvents.hpp"
 #include "Engine/Audio/AudioManager.hpp"
+#include "Engine/Core/Logger.hpp"
 
 namespace Game {
 
@@ -15,9 +16,12 @@ namespace Game {
     PongGame::~PongGame() {}
 
     void PongGame::OnInit() {
+        VECTOR_LOG_INFO("PongGame::OnInit() started");
         // Push initial scene
         auto initialScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager.get());
+        VECTOR_LOG_INFO("Pushing MainMenuScene");
         VECTOR::SceneManager::Get().PushScene(std::move(initialScene));
+        VECTOR_LOG_INFO("MainMenuScene Pushed");
 
         VECTOR::AudioManager::Get().PlayMusic("assets/bgm.wav");
 

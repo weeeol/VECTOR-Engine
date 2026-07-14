@@ -3,6 +3,7 @@
 #include "Engine/Core/Scene.hpp"
 #include "Game/Core/GameComponents.hpp"
 #include "Engine/UI/UIManager.hpp"
+#include "Engine/Graphics/ParticleSystem.hpp"
 #include <memory>
 
 namespace VECTOR {
@@ -27,7 +28,7 @@ namespace Game {
         int m_Height;
         VECTOR::InputManager* m_InputManager;
         VECTOR::UIManager m_UIManager;
-        
+        VECTOR::ParticleEmitter m_ParticleEmitter;
         AIDifficulty m_SelectedDifficulty;
     };
 

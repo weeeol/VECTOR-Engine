@@ -4,17 +4,21 @@
 #include "Engine/Input/InputManager.hpp"
 #include "Engine/Graphics/Renderer.hpp"
 #include "Engine/UI/UIButton.hpp"
+#include "Engine/Core/Logger.hpp"
 
 namespace Game {
 
     MainMenuScene::MainMenuScene(int width, int height, VECTOR::InputManager* inputManager)
         : m_Width(width), m_Height(height), m_InputManager(inputManager), 
+          m_ParticleEmitter(300),
           m_SelectedDifficulty(AIDifficulty::Medium)
     {
     }
 
     void MainMenuScene::OnEnter() {
+        VECTOR_LOG_INFO("MainMenuScene::OnEnter() started");
         CreateUI();
+        VECTOR_LOG_INFO("MainMenuScene::OnEnter() finished");
     }
 
     void MainMenuScene::CreateUI() {
@@ -52,10 +56,16 @@ namespace Game {
     }
 
     void MainMenuScene::Update(float deltaTime) {
+        if (rand() % 100 < 30) { 
+            m_ParticleEmitter.Emit(rand() % m_Width, rand() % m_Height, 1, 150, 150, 255, 30.0f, 3.0f);
+        }
+        m_ParticleEmitter.Update(deltaTime);
         m_UIManager.Update(m_InputManager, deltaTime);
     }
 
     void MainMenuScene::Render(VECTOR::Renderer* renderer) {
+        m_ParticleEmitter.Render(renderer);
+
         renderer->DrawText("PONG", m_Width / 2 - 50, m_Height / 2 - 150, 255, 255, 255, 48);
         renderer->DrawText("Select Difficulty", m_Width / 2 - 90, m_Height / 2 - 70, 200, 200, 200, 24);
 

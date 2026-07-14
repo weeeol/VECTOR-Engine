@@ -79,12 +79,12 @@ namespace Game {
 
         m_Systems.push_back(std::make_unique<AISystem>(m_Ball, m_Height));
 
-        auto volumeSlider = std::make_shared<VECTOR::UISlider>(20, 50, 200, 20, 0.5f, [](float val) {
+        auto volumeSlider = std::make_shared<VECTOR::UISlider>(width / 2 - 100, height / 2 + 20, 200, 20, 0.5f, [](float val) {
             VECTOR::AudioManager::Get().SetMusicVolume(val);
         });
         m_PauseMenuUI.AddElement(volumeSlider);
         
-        auto mainMenuButton = std::make_shared<VECTOR::UIButton>(width / 2 - 100, height / 2 + 50, 200, 50, "Main Menu", [this]() {
+        auto mainMenuButton = std::make_shared<VECTOR::UIButton>(width / 2 - 100, height / 2 + 60, 200, 40, "Main Menu", [this]() {
             auto menuScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager);
             VECTOR::SceneManager::Get().ChangeScene(std::move(menuScene));
         });
@@ -233,8 +233,14 @@ namespace Game {
             std::string winText = (m_Winner == 1) ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!";
             renderer->DrawText(winText, m_Width / 2 - 140, m_Height / 2 - 50, 255, 215, 0, 48);
         } else if (m_IsPaused) {
-            renderer->DrawText("PAUSED", m_Width / 2 - 60, m_Height / 2 - 24, 255, 255, 255, 48);
-            renderer->DrawText("Volume", 20, 20, 255, 255, 255, 24);
+            renderer->DrawRect(0, 0, m_Width, m_Height, 0, 0, 0, 200); // Translucent overlay
+            
+            // Draw a panel for the pause menu
+            renderer->DrawRect(m_Width / 2 - 150, m_Height / 2 - 100, 300, 250, 40, 40, 50, 230); // Panel
+            
+            renderer->DrawText("PAUSED", m_Width / 2 - 60, m_Height / 2 - 80, 255, 255, 255, 48);
+            renderer->DrawText("Volume", m_Width / 2 - 40, m_Height / 2 - 10, 200, 200, 200, 24);
+            
             m_PauseMenuUI.Render(renderer);
         }
     }
