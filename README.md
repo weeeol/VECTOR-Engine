@@ -9,7 +9,6 @@
 - **First-Person Camera**: Mouse-look and WASD movement systems that apply forces directly to the player's physical RigidBody.
 - **OpenGL 2D UI Overlay**: Custom orthographic rendering layer built on top of the 3D pipeline for menus, crosshairs, and text using `SDL2_ttf`.
 - **Audio & BGM Support**: Robust audio manager supporting `SDL2_mixer` sound effects and endless background music.
-- **AI Entities**: Simple enemy AI system that tracks the player in 3D space.
 
 ## Requirements
 
