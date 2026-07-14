@@ -54,4 +54,7 @@ namespace VECTOR {
         std::unique_ptr<InputManager> m_InputManager;
     };
 
+    // To be defined by the client application
+    extern Application* CreateApplication();
+
 } // namespace VECTOR

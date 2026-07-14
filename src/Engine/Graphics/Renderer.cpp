@@ -37,19 +37,44 @@ namespace VECTOR {
         uniform vec3 objectColor;
         uniform vec3 lightPos;
         uniform vec3 lightColor;
+        uniform vec3 viewPos;
         
         void main() {
+            vec3 norm = normalize(Normal);
+            vec3 viewDir = normalize(viewPos - FragPos);
+
+            // Directional Light (Sun)
+            vec3 sunDir = normalize(vec3(-0.2, 1.0, 0.3));
+            vec3 sunColor = vec3(0.9, 0.9, 0.8);
+            
             // Ambient
             float ambientStrength = 0.3;
-            vec3 ambient = ambientStrength * lightColor;
+            vec3 ambient = ambientStrength * sunColor;
             
-            // Diffuse
-            vec3 norm = normalize(Normal);
+            // Diffuse (Sun)
+            float diffSun = max(dot(norm, sunDir), 0.0);
+            vec3 diffuseSun = diffSun * sunColor;
+
+            // Specular (Sun)
+            float specularStrength = 0.5;
+            vec3 halfwayDir = normalize(sunDir + viewDir);  
+            float specSun = pow(max(dot(norm, halfwayDir), 0.0), 32.0);
+            vec3 specularSun = specularStrength * specSun * sunColor;
+            
+            // Point Light
             vec3 lightDir = normalize(lightPos - FragPos);
             float diff = max(dot(norm, lightDir), 0.0);
             vec3 diffuse = diff * lightColor;
             
-            vec3 result = (ambient + diffuse) * objectColor;
+            float distance = length(lightPos - FragPos);
+            float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * (distance * distance));
+            diffuse *= attenuation;
+
+            vec3 halfwayDirPt = normalize(lightDir + viewDir);  
+            float specPt = pow(max(dot(norm, halfwayDirPt), 0.0), 32.0);
+            vec3 specularPt = specularStrength * specPt * lightColor * attenuation;
+
+            vec3 result = (ambient + diffuseSun + specularSun + diffuse + specularPt) * objectColor;
             FragColor = vec4(result, 1.0);
         }
     )";
@@ -204,7 +229,8 @@ namespace VECTOR {
         SDL_GL_SwapWindow(m_Window);
     }
 
-    void Renderer::SetViewProjection(const glm::mat4& view, const glm::mat4& projection) {
+    void Renderer::SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) {
+        m_ViewPos = viewPos;
         m_ViewMatrix = view;
         m_ProjectionMatrix = projection;
     }
@@ -221,7 +247,8 @@ namespace VECTOR {
         activeShader->SetVec3("objectColor", glm::vec3(color));
         
         activeShader->SetVec3("lightPos", glm::vec3(0.0f, 10.0f, 10.0f));
-        activeShader->SetVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+        activeShader->SetVec3("lightColor", glm::vec3(1.0f, 0.8f, 0.6f)); // Warm point light
+        activeShader->SetVec3("viewPos", m_ViewPos);
 
         if (texture) {
             // Need to bind texture
@@ -275,6 +302,13 @@ namespace VECTOR {
         
         TextTexture textTex;
         if (m_TextTextureCache.find(cacheKey) == m_TextTextureCache.end()) {
+            if (m_TextTextureCache.size() > 128) {
+                for (auto& pair : m_TextTextureCache) {
+                    glDeleteTextures(1, &pair.second.id);
+                }
+                m_TextTextureCache.clear();
+            }
+            
             TTF_Font* font = ResourceManager::Get().GetFont("assets/font.ttf", fontSize);
             if (!font) return;
 
@@ -367,6 +401,13 @@ namespace VECTOR {
         TextTexture textTex;
 
         if (m_TextTextureCache.find(cacheKey) == m_TextTextureCache.end()) {
+            if (m_TextTextureCache.size() > 128) {
+                for (auto& pair : m_TextTextureCache) {
+                    glDeleteTextures(1, &pair.second.id);
+                }
+                m_TextTextureCache.clear();
+            }
+
             TTF_Font* font = ResourceManager::Get().GetFont("assets/font.ttf", fontSize);
             if (!font) return;
 

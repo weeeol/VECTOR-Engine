@@ -1,11 +1,12 @@
-#include "Game/Core/PongGame.hpp"
+#include "Engine/Core/Application.hpp"
+#include <memory>
 
 int main(int argc, char* argv[]) {
-    // We instantiate the game, which is an VECTOR::Application
-    Game::PongGame game("Pong Game", 1280, 720);
+    // Instantiate the application via the client-defined entry point
+    std::unique_ptr<VECTOR::Application> app(VECTOR::CreateApplication());
 
     // Run the game loop
-    game.Run();
+    app->Run();
 
     return 0;
 }

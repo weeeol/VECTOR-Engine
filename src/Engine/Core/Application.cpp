@@ -27,8 +27,9 @@ namespace VECTOR {
         Logger::Init();
 
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0) {
-            VECTOR_LOG_ERROR(std::string("SDL could not initialize! SDL_Error: ") + SDL_GetError());
-            SDL_assert(false && "SDL failed to initialize");
+            std::string error = std::string("SDL could not initialize! SDL_Error: ") + SDL_GetError();
+            VECTOR_LOG_ERROR(error);
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Initialization Error", error.c_str(), nullptr);
             return false;
         }
 
@@ -41,7 +42,9 @@ namespace VECTOR {
         // Initialize Window and Renderer
         m_Renderer = std::make_unique<Renderer>();
         if (!m_Renderer->Initialize(m_Title, m_Width, m_Height)) {
-            SDL_assert(false && "Renderer failed to initialize");
+            std::string error = "Renderer failed to initialize";
+            VECTOR_LOG_ERROR(error);
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Initialization Error", error.c_str(), nullptr);
             return false;
         }
 
@@ -84,7 +87,8 @@ namespace VECTOR {
 
             ProcessInput();
 
-            // Allow Bullet and logic to use actual frame time
+            // Allow Bullet and logic to use actual frame time.
+            // Bullet handles fixed time steps internally and provides interpolated transforms.
             Update(deltaTime / 1000.0f);
 
             Render();

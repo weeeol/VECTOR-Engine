@@ -48,3 +48,7 @@ namespace Game {
     }
 
 } // namespace Game
+
+VECTOR::Application* VECTOR::CreateApplication() {
+    return new Game::PongGame("VECTOR Engine 3D", 1280, 720);
+}

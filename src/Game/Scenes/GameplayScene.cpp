@@ -108,10 +108,10 @@ namespace Game {
         // Floor
         CreateCube(glm::vec3(0, -1, 0), glm::vec3(50, 1, 50), 0.0f, glm::vec3(0.3f, 0.3f, 0.3f));
 
-        // Targets (Static)
-        CreateCube(glm::vec3(0, 1, -10), glm::vec3(2, 2, 2), 5.0f, glm::vec3(0.0f, 0.0f, 1.0f));
-        CreateCube(glm::vec3(5, 1, -10), glm::vec3(2, 2, 2), 5.0f, glm::vec3(0.0f, 1.0f, 0.0f));
-        CreateCube(glm::vec3(-5, 1, -10), glm::vec3(2, 2, 2), 5.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+        // Targets with different weights
+        CreateCube(glm::vec3(0, 1, -10), glm::vec3(2, 2, 2), 10.0f, glm::vec3(0.0f, 0.0f, 1.0f)); // Medium
+        CreateCube(glm::vec3(5, 1, -10), glm::vec3(1, 1, 1), 1.0f, glm::vec3(0.0f, 1.0f, 0.0f));  // Light
+        CreateCube(glm::vec3(-5, 1, -10), glm::vec3(3, 3, 3), 100.0f, glm::vec3(1.0f, 0.0f, 0.0f)); // Heavy
     }
 
     void GameplayScene::CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const glm::vec3& color, bool isEnemy) {
@@ -187,7 +187,7 @@ namespace Game {
         glm::mat4 view = glm::lookAt(camT.position, camT.position + camC.front, camC.up);
         glm::mat4 projection = glm::perspective(glm::radians(camC.fov), (float)m_Width / (float)m_Height, 0.1f, 100.0f);
         
-        renderer->SetViewProjection(view, projection);
+        renderer->SetViewProjection(camT.position, view, projection);
 
         if (m_DebugMode) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

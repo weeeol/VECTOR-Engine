@@ -28,6 +28,15 @@ namespace Game {
             if (cam.pitch > 89.0f) cam.pitch = 89.0f;
             if (cam.pitch < -89.0f) cam.pitch = -89.0f;
 
+            // FOV adjustments
+            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_UP))
+                cam.fov -= 30.0f * deltaTime;
+            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_DOWN))
+                cam.fov += 30.0f * deltaTime;
+
+            if (cam.fov < 10.0f) cam.fov = 10.0f;
+            if (cam.fov > 120.0f) cam.fov = 120.0f;
+
             // Update Front, Right and Up Vectors using the updated Euler angles
             glm::vec3 front;
             front.x = cos(glm::radians(cam.yaw)) * cos(glm::radians(cam.pitch));

@@ -29,7 +29,7 @@ namespace VECTOR {
         void Clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
         void Present();
 
-        void SetViewProjection(const glm::mat4& view, const glm::mat4& projection);
+        void SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection);
         void DrawMesh(const class Mesh* mesh, const class Shader* shader, const class Texture2D* texture, const glm::mat4& model, const glm::vec4& color);
         
         void BeginUI();
@@ -47,6 +47,7 @@ namespace VECTOR {
         SDL_Window* m_Window;
         SDL_GLContext m_GLContext;
         std::shared_ptr<Shader> m_DefaultShader;
+        glm::vec3 m_ViewPos;
         glm::mat4 m_ViewMatrix;
         glm::mat4 m_ProjectionMatrix;
         
