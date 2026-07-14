@@ -43,14 +43,43 @@ namespace VECTOR {
 
         SDL_Window* GetWindow() const { return m_Window; }
 
+        // New Multi-Pass Rendering Methods
+        void BeginShadowPass();
+        void BeginMainPass();
+        void EndPostProcessPass();
+
+        const glm::mat4& GetLightSpaceMatrix() const { return m_LightSpaceMatrix; }
+        class Shader* GetDepthShader() const { return m_DepthShader.get(); }
+        void SetUnlitMode(bool unlit) { m_UnlitMode = unlit; }
+
     private:
         SDL_Window* m_Window;
         SDL_GLContext m_GLContext;
         std::shared_ptr<Shader> m_DefaultShader;
+        std::shared_ptr<Shader> m_DepthShader;
+        std::shared_ptr<Shader> m_PostProcessShader;
+        
+        bool m_UnlitMode = false;
+
         glm::vec3 m_ViewPos;
         glm::mat4 m_ViewMatrix;
         glm::mat4 m_ProjectionMatrix;
+        glm::mat4 m_LightSpaceMatrix;
         
+        // FBOs
+        unsigned int m_DepthMapFBO;
+        unsigned int m_DepthMapTexture;
+        const unsigned int SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
+
+        unsigned int m_PostProcessFBO;
+        unsigned int m_PostProcessTexture;
+        unsigned int m_PostProcessRBO;
+
+        unsigned int m_ScreenQuadVAO, m_ScreenQuadVBO;
+        
+        void SetupFBOs();
+        void SetupScreenQuad();
+
         // 2D Rendering
         std::shared_ptr<Shader> m_2DShader;
         unsigned int m_QuadVAO, m_QuadVBO;

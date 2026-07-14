@@ -14,6 +14,7 @@ namespace VECTOR {
             }
         }
         m_Fonts.clear();
+        m_Shaders.clear();
     }
 
     TTF_Font* ResourceManager::GetFont(const std::string& fontPath, int fontSize) {
@@ -29,6 +30,28 @@ namespace VECTOR {
         }
 
         return m_Fonts[key];
+    }
+
+    std::shared_ptr<Shader> ResourceManager::LoadShader(const std::string& name, const std::string& vertexPath, const std::string& fragmentPath) {
+        if (m_Shaders.find(name) != m_Shaders.end()) {
+            return m_Shaders[name];
+        }
+
+        auto shader = Shader::CreateFromFile(vertexPath, fragmentPath);
+        if (shader) {
+            m_Shaders[name] = shader;
+        } else {
+            VECTOR_LOG_ERROR("Failed to load shader: " + name);
+        }
+
+        return shader;
+    }
+
+    std::shared_ptr<Shader> ResourceManager::GetShader(const std::string& name) {
+        if (m_Shaders.find(name) != m_Shaders.end()) {
+            return m_Shaders[name];
+        }
+        return nullptr;
     }
 
 } // namespace VECTOR

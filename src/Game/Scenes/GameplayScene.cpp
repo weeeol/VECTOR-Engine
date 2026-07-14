@@ -179,8 +179,6 @@ namespace Game {
     }
 
     void GameplayScene::Render(VECTOR::Renderer* renderer) {
-        renderer->Clear(135, 206, 235); // Sky blue
-
         auto& camT = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Player);
         auto& camC = m_Registry.GetComponent<VECTOR::CameraComponent>(m_Player);
 
@@ -189,29 +187,53 @@ namespace Game {
         
         renderer->SetViewProjection(camT.position, view, projection);
 
+        // Helper lambda to render all scene meshes
+        auto renderMeshes = [&](VECTOR::Shader* overrideShader) {
+            m_Registry.View<VECTOR::TransformComponent, VECTOR::MeshComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
+                auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+                auto& m = m_Registry.GetComponent<VECTOR::MeshComponent>(entity);
+                auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
+
+                glm::mat4 model = glm::mat4(1.0f);
+                model = glm::translate(model, t.position);
+                model = model * glm::mat4_cast(t.rotation);
+                model = glm::scale(model, t.scale);
+
+                glm::vec4 color(r.color.r, r.color.g, r.color.b, r.color.a);
+                
+                renderer->DrawMesh(m.mesh.get(), overrideShader ? overrideShader : r.shader.get(), r.texture.get(), model, color);
+            });
+        };
+
+        // PASS 1: SHADOW MAP
+        renderer->BeginShadowPass();
+        renderMeshes(renderer->GetDepthShader());
+
+        // PASS 2: MAIN POST-PROCESS FBO
+        renderer->BeginMainPass();
+        renderer->Clear(135, 206, 235); // Sky blue
+        
         if (m_DebugMode) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         } else {
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
 
-        m_Registry.View<VECTOR::TransformComponent, VECTOR::MeshComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
-            auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
-            auto& m = m_Registry.GetComponent<VECTOR::MeshComponent>(entity);
-            auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
+        renderMeshes(nullptr); // Uses default or component shaders
 
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, t.position);
-            model = model * glm::mat4_cast(t.rotation);
-            model = glm::scale(model, t.scale);
+        // Explicitly draw the sun without shadows
+        glm::vec3 sunDir = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.3f));
+        glm::mat4 sunModel = glm::mat4(1.0f);
+        sunModel = glm::translate(sunModel, sunDir * 80.0f);
+        sunModel = glm::scale(sunModel, glm::vec3(10.0f, 10.0f, 10.0f));
+        renderer->SetUnlitMode(true);
+        renderer->DrawMesh(m_CubeMesh.get(), nullptr, nullptr, sunModel, glm::vec4(1.0f, 1.0f, 0.8f, 1.0f));
+        renderer->SetUnlitMode(false);
 
-            glm::vec4 color(r.color.r, r.color.g, r.color.b, r.color.a);
-            
-            renderer->DrawMesh(m.mesh.get(), r.shader.get(), r.texture.get(), model, color);
-        });
-        
-        // Restore fill mode for UI
+        // PASS 3: POST PROCESS SCREEN QUAD
+        // Make sure polygon mode is filled before drawing full screen quad!
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        renderer->EndPostProcessPass();
 
         renderer->BeginUI();
         // Crosshair
