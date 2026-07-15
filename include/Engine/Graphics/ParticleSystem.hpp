@@ -22,7 +22,7 @@ namespace VECTOR {
         void Emit(float x, float y, int count, Uint8 r, Uint8 g, Uint8 b, float speed = 100.0f, float life = 1.0f);
         
         void Update(float deltaTime);
-        void Render(Renderer* renderer);
+        void Render(Renderer* renderer, int offsetX = 0, int offsetY = 0);
 
     private:
         std::vector<Particle> m_Particles;

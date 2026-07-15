@@ -22,7 +22,7 @@ namespace Game {
 
     class GameplayScene : public VECTOR::Scene {
     public:
-        GameplayScene(int width, int height, VECTOR::InputManager* inputManager, AIDifficulty aiDifficulty);
+        GameplayScene(int width, int height, VECTOR::InputManager* inputManager, AIDifficulty aiDifficulty, GameMode mode);
         ~GameplayScene() override;
 
         void OnEnter() override;
@@ -59,10 +59,23 @@ namespace Game {
         VECTOR::ParticleEmitter m_ExplosionEmitter;
         
         GameState m_State;
+        GameMode m_Mode;
         int m_Winner; // 1 for Player 1, 2 for Player 2
         const int WINNING_SCORE = 5;
 
         std::shared_ptr<VECTOR::Texture> m_BallTexture;
         std::shared_ptr<VECTOR::Animator> m_BallAnimator;
+
+        // Save Data
+        int m_HighScorePlayer;
+        int m_HighScoreAI;
+
+        // Juice
+        float m_ShakeTimer = 0.0f;
+        float m_ShakeMagnitude = 0.0f;
+        float m_BackgroundOffset = 0.0f;
+
+        // Post-Processing
+        std::unique_ptr<VECTOR::Texture> m_SceneTexture;
     };
 }

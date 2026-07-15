@@ -62,4 +62,8 @@ namespace VECTOR {
         Mix_VolumeMusic((int)(volume * MIX_MAX_VOLUME));
     }
 
+    float AudioManager::GetMusicVolume() const {
+        return (float)Mix_VolumeMusic(-1) / (float)MIX_MAX_VOLUME;
+    }
+
 } // namespace VECTOR

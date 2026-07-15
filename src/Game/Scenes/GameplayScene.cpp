@@ -11,17 +11,22 @@
 #include "Engine/Audio/AudioManager.hpp"
 #include "Engine/UI/UISlider.hpp"
 #include "Engine/UI/UIButton.hpp"
+#include "Game/Core/SaveManager.hpp"
 #include <cmath>
 #include <algorithm>
 #include <iostream>
 
 namespace Game {
 
-    GameplayScene::GameplayScene(int width, int height, VECTOR::InputManager* inputManager, AIDifficulty aiDifficulty)
+    GameplayScene::GameplayScene(int width, int height, VECTOR::InputManager* inputManager, AIDifficulty aiDifficulty, GameMode mode)
         : m_Width(width), m_Height(height), m_InputManager(inputManager),
           m_Score1(0), m_Score2(0), m_IsPaused(false), m_WasPausePressed(false), m_DebugMode(false), m_WasF3Pressed(false),
-          m_TrailEmitter(200), m_ExplosionEmitter(300), m_State(GameState::Playing), m_Winner(0)
+          m_TrailEmitter(200), m_ExplosionEmitter(300), m_State(GameState::Playing), m_Mode(mode), m_Winner(0)
     {
+        float volume = 0.5f;
+        SaveManager::LoadData(m_HighScorePlayer, m_HighScoreAI, volume);
+
+        m_SceneTexture = std::make_unique<VECTOR::Texture>(VECTOR::Application::Get().GetRenderer(), width, height);
         m_Registry.RegisterComponent<VECTOR::TransformComponent>();
         m_Registry.RegisterComponent<VECTOR::RigidBodyComponent>();
         m_Registry.RegisterComponent<VECTOR::RenderComponent>();
@@ -79,18 +84,20 @@ namespace Game {
 
         m_Systems.push_back(std::make_unique<AISystem>(m_Ball, m_Height));
 
-        auto volumeSlider = std::make_shared<VECTOR::UISlider>(width / 2 - 100, height / 2 + 20, 200, 20, 0.5f, [](float val) {
+        auto volumeSlider = std::make_shared<VECTOR::UISlider>(width / 2 - 100, height / 2 + 20, 200, 20, volume, [](float val) {
             VECTOR::AudioManager::Get().SetMusicVolume(val);
+            // Save on change is tricky here, but we can do it on exit
         });
         m_PauseMenuUI.AddElement(volumeSlider);
         
-        auto mainMenuButton = std::make_shared<VECTOR::UIButton>(width / 2 - 100, height / 2 + 60, 200, 40, "Main Menu", [this]() {
+        auto mainMenuButton = std::make_shared<VECTOR::UIButton>(width / 2 - 100, height / 2 + 60, 200, 40, "Main Menu", [this, volumeSlider]() {
+            SaveManager::SaveData(m_HighScorePlayer, m_HighScoreAI, volumeSlider->GetValue());
             auto menuScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager);
             VECTOR::SceneManager::Get().ChangeScene(std::move(menuScene));
         });
         m_PauseMenuUI.AddElement(mainMenuButton);
 
-        VECTOR::AudioManager::Get().SetMusicVolume(0.5f);
+        VECTOR::AudioManager::Get().SetMusicVolume(volume);
     }
 
     GameplayScene::~GameplayScene() {}
@@ -138,6 +145,12 @@ namespace Game {
         if (m_IsPaused) {
             m_PauseMenuUI.Update(m_InputManager, deltaTime);
         } else {
+            if (m_ShakeTimer > 0.0f) {
+                m_ShakeTimer -= deltaTime;
+            }
+            m_BackgroundOffset += 50.0f * deltaTime;
+            if (m_BackgroundOffset > 60.0f) m_BackgroundOffset -= 60.0f;
+
             for (auto& system : m_Systems) system->Update(m_Registry, deltaTime);
             
             // Check Box2D 3 Contact Events
@@ -185,16 +198,36 @@ namespace Game {
             if (m_BallSystem->WasLeftScored()) {
                 m_Score1++;
                 VECTOR::EventBus::Get().Publish<ScoreEvent>(1);
-                if (m_Score1 >= WINNING_SCORE) { m_State = GameState::GameOver; m_Winner = 1; } 
-                else ResetGame();
+                
+                if (m_Mode == GameMode::FivePoint && m_Score1 >= WINNING_SCORE) { 
+                    m_State = GameState::GameOver; 
+                    m_Winner = 1; 
+                    SaveManager::SaveData(std::max(m_HighScorePlayer, m_Score1), m_HighScoreAI, VECTOR::AudioManager::Get().GetMusicVolume()); 
+                } else {
+                    m_ShakeTimer = 0.3f; m_ShakeMagnitude = 15.0f; // Shake on normal goals
+                    ResetGame();
+                }
+                
                 m_BallSystem->ResetScoreFlags();
             } else if (m_BallSystem->WasRightScored()) {
                 m_Score2++;
                 VECTOR::EventBus::Get().Publish<ScoreEvent>(2);
-                if (m_Score2 >= WINNING_SCORE) { m_State = GameState::GameOver; m_Winner = 2; } 
-                else ResetGame();
+                
+                if (m_Mode == GameMode::FivePoint && m_Score2 >= WINNING_SCORE) { 
+                    m_State = GameState::GameOver; 
+                    m_Winner = 2; 
+                    SaveManager::SaveData(m_HighScorePlayer, std::max(m_HighScoreAI, m_Score2), VECTOR::AudioManager::Get().GetMusicVolume()); 
+                } else {
+                    m_ShakeTimer = 0.3f; m_ShakeMagnitude = 15.0f; // Shake on normal goals
+                    ResetGame();
+                }
+                
                 m_BallSystem->ResetScoreFlags();
             }
+            
+            // Update high score continuously
+            m_HighScorePlayer = std::max(m_HighScorePlayer, m_Score1);
+            m_HighScoreAI = std::max(m_HighScoreAI, m_Score2);
             
             m_Registry.View<VECTOR::TransformComponent, VECTOR::RigidBodyComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
                 auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
@@ -206,32 +239,67 @@ namespace Game {
     }
 
     void GameplayScene::Render(VECTOR::Renderer* renderer) {
-        m_TrailEmitter.Render(renderer);
-        m_ExplosionEmitter.Render(renderer);
+        // Post-Processing: Set Render Target
+        renderer->SetRenderTarget(m_SceneTexture.get());
+        renderer->Clear(0, 0, 0, 255);
+
+        // Screen Shake
+        int offsetX = 0;
+        int offsetY = 0;
+        if (m_ShakeTimer > 0.0f) {
+            offsetX = (rand() % (int)m_ShakeMagnitude * 2) - m_ShakeMagnitude;
+            offsetY = (rand() % (int)m_ShakeMagnitude * 2) - m_ShakeMagnitude;
+        }
+
+        // Draw Dynamic Background Grid
+        for (int x = (int)m_BackgroundOffset; x < m_Width; x += 60) {
+            renderer->DrawRect(x + offsetX, 0 + offsetY, 2, m_Height, 20, 20, 50, 100);
+        }
+        for (int y = (int)m_BackgroundOffset; y < m_Height; y += 60) {
+            renderer->DrawRect(0 + offsetX, y + offsetY, m_Width, 2, 20, 20, 50, 100);
+        }
+
+        m_TrailEmitter.Render(renderer, offsetX, offsetY);
+        m_ExplosionEmitter.Render(renderer, offsetX, offsetY);
         
         m_Registry.View<VECTOR::TransformComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
             auto& transform = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
             auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
             if (m_Registry.HasComponent<VECTOR::SpriteComponent>(entity)) {
                 auto& sprite = m_Registry.GetComponent<VECTOR::SpriteComponent>(entity);
-                // Draw sprite scaled up so it is easier to see, centered on the physical box
-                int drawWidth = 48; // Draw it 3x larger than the 15x15 hitbox
+                auto& rb = m_Registry.GetComponent<VECTOR::RigidBodyComponent>(entity);
+                
+                int drawWidth = 48; 
                 int drawHeight = 48;
-                int drawX = (int)transform.position.x - (drawWidth - (int)r.width) / 2;
-                int drawY = (int)transform.position.y - (drawHeight - (int)r.height) / 2;
+                
+                // Squish and Stretch based on velocity
+                b2Vec2 vel = b2Body_GetLinearVelocity(rb.bodyId);
+                float speed = b2Length(vel);
+                if (speed > 5.0f) {
+                    if (std::abs(vel.x) > std::abs(vel.y)) {
+                        drawWidth += (int)(speed * 1.5f);
+                        drawHeight -= (int)(speed * 0.5f);
+                    } else {
+                        drawHeight += (int)(speed * 1.5f);
+                        drawWidth -= (int)(speed * 0.5f);
+                    }
+                }
+
+                int drawX = (int)transform.position.x - (drawWidth - (int)r.width) / 2 + offsetX;
+                int drawY = (int)transform.position.y - (drawHeight - (int)r.height) / 2 + offsetY;
                 sprite.animator->Render(renderer, drawX, drawY, drawWidth, drawHeight);
             } else {
-                renderer->DrawRect((int)transform.position.x, (int)transform.position.y, (int)r.width, (int)r.height, r.r, r.g, r.b, r.a);
+                renderer->DrawRect((int)transform.position.x + offsetX, (int)transform.position.y + offsetY, (int)r.width, (int)r.height, r.r, r.g, r.b, r.a);
             }
         });
 
-        for (int y = 0; y < m_Height; y += 30) renderer->DrawRect(m_Width / 2 - 2, y, 4, 15, 255, 255, 255, 100);
-        renderer->DrawText(std::to_string(m_Score1), m_Width / 2 - 50, 20, 255, 255, 255, 48);
-        renderer->DrawText(std::to_string(m_Score2), m_Width / 2 + 20, 20, 255, 255, 255, 48);
+        for (int y = 0; y < m_Height; y += 30) renderer->DrawRect(m_Width / 2 - 2 + offsetX, y + offsetY, 4, 15, 255, 255, 255, 100);
+        renderer->DrawText(std::to_string(m_Score1), m_Width / 2 - 50 + offsetX, 20 + offsetY, 255, 255, 255, 48);
+        renderer->DrawText(std::to_string(m_Score2), m_Width / 2 + 20 + offsetX, 20 + offsetY, 255, 255, 255, 48);
 
         if (m_State == GameState::GameOver) {
             std::string winText = (m_Winner == 1) ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!";
-            renderer->DrawText(winText, m_Width / 2 - 140, m_Height / 2 - 50, 255, 215, 0, 48);
+            renderer->DrawText(winText, m_Width / 2 - 140 + offsetX, m_Height / 2 - 50 + offsetY, 255, 215, 0, 48);
         } else if (m_IsPaused) {
             renderer->DrawRect(0, 0, m_Width, m_Height, 0, 0, 0, 200); // Translucent overlay
             
@@ -243,6 +311,21 @@ namespace Game {
             
             m_PauseMenuUI.Render(renderer);
         }
+
+        // Post-Processing: Render Target to Screen
+        renderer->ResetRenderTarget();
+        renderer->Clear(0, 0, 0, 255);
+        renderer->DrawTexture(m_SceneTexture.get(), 0, 0, m_Width, m_Height);
+
+        // CRT Scanline Effect (draw semi-transparent black lines)
+        renderer->SetRenderDrawBlendMode(SDL_BLENDMODE_BLEND);
+        for (int y = 0; y < m_Height; y += 4) {
+            renderer->DrawRect(0, y, m_Width, 2, 0, 0, 0, 60);
+        }
+
+        // High Score Overlay
+        renderer->DrawText("Player High Score: " + std::to_string(m_HighScorePlayer), 10, 10, 150, 150, 150, 24);
+        renderer->DrawText("AI High Score: " + std::to_string(m_HighScoreAI), m_Width - 300, 10, 150, 150, 150, 24);
     }
 
     void GameplayScene::ResetGame() {

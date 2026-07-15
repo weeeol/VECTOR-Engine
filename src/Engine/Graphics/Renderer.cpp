@@ -117,4 +117,18 @@ namespace VECTOR {
         SDL_RenderCopy(m_Renderer, texture->GetSDLTexture(), nullptr, &destRect);
     }
 
+    void Renderer::SetRenderTarget(Texture* texture) {
+        if (texture && texture->IsValid()) {
+            SDL_SetRenderTarget(m_Renderer, texture->GetSDLTexture());
+        }
+    }
+
+    void Renderer::ResetRenderTarget() {
+        SDL_SetRenderTarget(m_Renderer, nullptr);
+    }
+
+    void Renderer::SetRenderDrawBlendMode(SDL_BlendMode mode) {
+        SDL_SetRenderDrawBlendMode(m_Renderer, mode);
+    }
+
 } // namespace VECTOR

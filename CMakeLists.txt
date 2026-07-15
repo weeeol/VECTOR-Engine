@@ -52,6 +52,7 @@ target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} box2d::box2d)
 # ==============================================================================
 set(GAME_SOURCES
     src/Game/Core/PongGame.cpp
+    src/Game/Core/SaveManager.cpp
     src/Game/Scenes/MainMenuScene.cpp
     src/Game/Scenes/GameplayScene.cpp
     src/Game/Systems/GameSystems.cpp

@@ -87,6 +87,9 @@ namespace VECTOR {
             // Fixed time-step update loop
             while (accumulator >= targetFrameTime) {
                 Update(targetFrameTime / 1000.0f); // Convert back to seconds for logic
+                if (m_InputManager) {
+                    m_InputManager->ClearJustPressed(); // Consume single-frame inputs
+                }
                 accumulator -= targetFrameTime;
             }
 
@@ -120,10 +123,17 @@ namespace VECTOR {
     }
 
     void Application::ProcessInput() {
+        if (m_InputManager) {
+            m_InputManager->PrepareForEvents();
+        }
+        
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 Quit();
+            }
+            if (m_InputManager) {
+                m_InputManager->ProcessEvent(event);
             }
         }
         

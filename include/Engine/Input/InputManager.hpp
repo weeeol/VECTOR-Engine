@@ -15,7 +15,10 @@ namespace VECTOR {
         ~InputManager();
 
         // Update keyboard state at the beginning of the frame
+        void PrepareForEvents();
+        void ProcessEvent(const SDL_Event& e);
         void Update();
+        void ClearJustPressed();
 
         // Check if a specific key is currently held down
         // SDL_Scancode is used (e.g., SDL_SCANCODE_W, SDL_SCANCODE_UP)
@@ -32,9 +35,9 @@ namespace VECTOR {
     private:
         const Uint8* m_KeyboardState;
         Uint32 m_MouseState;
-        Uint32 m_PrevMouseState;
         int m_MouseX;
         int m_MouseY;
+        bool m_MouseJustPressed[6];
     };
 
 } // namespace VECTOR

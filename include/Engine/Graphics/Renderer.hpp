@@ -43,6 +43,11 @@ namespace VECTOR {
         // Draw texture
         void DrawTexture(class Texture* texture, int x, int y, int w = -1, int h = -1);
 
+        // Render Targets
+        void SetRenderTarget(class Texture* texture);
+        void ResetRenderTarget();
+        void SetRenderDrawBlendMode(SDL_BlendMode mode);
+
         SDL_Renderer* GetSDLRenderer() const { return m_Renderer; }
 
     private:

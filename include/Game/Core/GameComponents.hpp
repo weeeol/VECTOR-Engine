@@ -3,6 +3,11 @@
 
 namespace Game {
 
+    enum class GameMode {
+        FivePoint,
+        Endless
+    };
+
     struct PlayerInputComponent {
         SDL_Scancode upKey;
         SDL_Scancode downKey;

@@ -23,6 +23,7 @@ namespace VECTOR {
         void PlayMusic(const std::string& filepath, int loops = -1);
         void StopMusic();
         void SetMusicVolume(float volume);
+        float GetMusicVolume() const;
 
     private:
         AudioManager() = default;

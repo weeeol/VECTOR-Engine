@@ -10,6 +10,8 @@ namespace VECTOR {
     class Texture {
     public:
         Texture(Renderer* renderer, const std::string& filepath);
+        // Constructor for creating an empty render target texture
+        Texture(Renderer* renderer, int width, int height);
         ~Texture();
 
         // Prevent copying

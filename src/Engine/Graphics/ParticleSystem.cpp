@@ -61,7 +61,7 @@ namespace VECTOR {
         }
     }
 
-    void ParticleEmitter::Render(Renderer* renderer) {
+    void ParticleEmitter::Render(Renderer* renderer, int offsetX, int offsetY) {
         for (auto& p : m_Particles) {
             if (!p.active) continue;
 
@@ -69,7 +69,7 @@ namespace VECTOR {
             Uint8 alpha = (Uint8)(255.0f * (p.life / p.maxLife));
             
             // Draw as a small 4x4 rect
-            renderer->DrawRect((int)p.x, (int)p.y, 4, 4, p.r, p.g, p.b, alpha);
+            renderer->DrawRect((int)p.x + offsetX, (int)p.y + offsetY, 4, 4, p.r, p.g, p.b, alpha);
         }
     }
 

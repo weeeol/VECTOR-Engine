@@ -2,17 +2,33 @@
 
 namespace VECTOR {
 
-    InputManager::InputManager() : m_MouseState(0), m_PrevMouseState(0), m_MouseX(0), m_MouseY(0) {
+    InputManager::InputManager() : m_MouseState(0), m_MouseX(0), m_MouseY(0) {
         // Initialize keyboard state pointer
         m_KeyboardState = SDL_GetKeyboardState(nullptr);
+        for(int i=0; i<6; ++i) m_MouseJustPressed[i] = false;
     }
 
     InputManager::~InputManager() {
     }
 
+    void InputManager::PrepareForEvents() {
+        // Handled per frame if needed, but we clear it in ClearJustPressed now
+    }
+
+    void InputManager::ProcessEvent(const SDL_Event& e) {
+        if (e.type == SDL_MOUSEBUTTONDOWN) {
+            if (e.button.button < 6) {
+                m_MouseJustPressed[e.button.button] = true;
+            }
+        }
+    }
+
     void InputManager::Update() {
-        m_PrevMouseState = m_MouseState;
         m_MouseState = SDL_GetMouseState(&m_MouseX, &m_MouseY);
+    }
+
+    void InputManager::ClearJustPressed() {
+        for(int i=0; i<6; ++i) m_MouseJustPressed[i] = false;
     }
 
     bool InputManager::IsKeyPressed(SDL_Scancode key) const {
@@ -27,9 +43,10 @@ namespace VECTOR {
     }
     
     bool InputManager::IsMouseButtonJustPressed(int button) const {
-        bool isPressedNow = (m_MouseState & SDL_BUTTON(button)) != 0;
-        bool wasPressedBefore = (m_PrevMouseState & SDL_BUTTON(button)) != 0;
-        return isPressedNow && !wasPressedBefore;
+        if (button < 6) {
+            return m_MouseJustPressed[button];
+        }
+        return false;
     }
 
 } // namespace VECTOR

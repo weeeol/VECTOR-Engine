@@ -28,6 +28,21 @@ namespace VECTOR {
         SDL_FreeSurface(surface);
     }
 
+    Texture::Texture(Renderer* renderer, int width, int height)
+        : m_Texture(nullptr), m_Width(width), m_Height(height)
+    {
+        m_Texture = SDL_CreateTexture(
+            renderer->GetSDLRenderer(),
+            SDL_PIXELFORMAT_RGBA8888,
+            SDL_TEXTUREACCESS_TARGET,
+            width, height
+        );
+
+        if (!m_Texture) {
+            VECTOR_LOG_ERROR(std::string("Failed to create target texture. SDL_Error: ") + SDL_GetError());
+        }
+    }
+
     Texture::~Texture() {
         if (m_Texture) {
             SDL_DestroyTexture(m_Texture);

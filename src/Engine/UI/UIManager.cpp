@@ -11,7 +11,8 @@ namespace VECTOR {
     }
 
     void UIManager::Update(InputManager* input, float deltaTime) {
-        for (auto& element : m_Elements) {
+        for (size_t i = 0; i < m_Elements.size(); ++i) {
+            auto element = m_Elements[i]; // Keep a strong reference
             element->Update(input, deltaTime);
         }
     }
