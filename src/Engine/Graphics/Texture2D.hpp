@@ -7,22 +7,16 @@ namespace VECTOR {
 
     class Texture2D {
     public:
-        Texture2D(const std::string& path);
-        ~Texture2D();
+        virtual ~Texture2D() = default;
 
-        void Bind(unsigned int slot = 0) const;
-        void Unbind() const;
+        virtual void Bind(unsigned int slot = 0) const = 0;
+        virtual void Unbind() const = 0;
 
-        unsigned int GetID() const { return m_RendererID; }
-        int GetWidth() const { return m_Width; }
-        int GetHeight() const { return m_Height; }
+        virtual unsigned int GetID() const = 0;
+        virtual int GetWidth() const = 0;
+        virtual int GetHeight() const = 0;
 
         static std::shared_ptr<Texture2D> Create(const std::string& path);
-
-    private:
-        unsigned int m_RendererID;
-        int m_Width, m_Height, m_BPP;
-        std::string m_FilePath;
     };
 
 } // namespace VECTOR
