@@ -16,6 +16,7 @@ namespace VECTOR {
     }
 
     bool Renderer::Initialize(const std::string& title, int width, int height) {
+        VECTOR_LOG_INFO("Renderer::Initialize start");
         m_Width = width;
         m_Height = height;
 
@@ -23,6 +24,7 @@ namespace VECTOR {
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
+        VECTOR_LOG_INFO("Creating SDL Window...");
         m_Window = SDL_CreateWindow(
             title.c_str(),
             SDL_WINDOWPOS_CENTERED,
@@ -37,18 +39,21 @@ namespace VECTOR {
             return false;
         }
 
+        VECTOR_LOG_INFO("Creating OpenGL Context...");
         m_GLContext = SDL_GL_CreateContext(m_Window);
         if (!m_GLContext) {
             VECTOR_LOG_ERROR("Failed to create OpenGL context.");
             return false;
         }
 
+        VECTOR_LOG_INFO("Initializing GLEW...");
         glewExperimental = GL_TRUE;
         if (glewInit() != GLEW_OK) {
             VECTOR_LOG_ERROR("Failed to initialize GLEW.");
             return false;
         }
 
+        VECTOR_LOG_INFO("Initializing TTF...");
         if (TTF_Init() == -1) {
             VECTOR_LOG_ERROR("Failed to initialize SDL_ttf.");
             return false;
@@ -58,11 +63,13 @@ namespace VECTOR {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
+        VECTOR_LOG_INFO("Loading Shaders...");
         m_DefaultShader = ResourceManager::Get().LoadShader("Default3D", "assets/engine/shaders/main3D.vert", "assets/engine/shaders/main3D.frag");
         m_DepthShader = ResourceManager::Get().LoadShader("Depth", "assets/engine/shaders/depth.vert", "assets/engine/shaders/depth.frag");
         m_PostProcessShader = ResourceManager::Get().LoadShader("PostProcess", "assets/engine/shaders/postprocess.vert", "assets/engine/shaders/postprocess.frag");
         m_2DShader = ResourceManager::Get().LoadShader("Default2D", "assets/engine/shaders/main2D.vert", "assets/engine/shaders/main2D.frag");
 
+        VECTOR_LOG_INFO("Setup FBOs...");
         SetupFBOs();
         SetupScreenQuad();
 

@@ -58,6 +58,7 @@ namespace Game {
             btDefaultMotionState* myMotionState = new btDefaultMotionState(startTransform);
             btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, myMotionState, colShape, localInertia);
             btRigidBody* body = new btRigidBody(rbInfo);
+            body->setFriction(0.8f);
             
             // Shoot forward
             btVector3 velocity = btVector3(camC.front.x, camC.front.y, camC.front.z) * 50.0f;

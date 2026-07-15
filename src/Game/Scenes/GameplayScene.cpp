@@ -98,9 +98,9 @@ namespace Game {
         btDefaultMotionState* playerMotionState = new btDefaultMotionState(playerStartTransform);
         btRigidBody::btRigidBodyConstructionInfo playerRbInfo(playerMass, playerMotionState, playerShape, playerLocalInertia);
         btRigidBody* playerBody = new btRigidBody(playerRbInfo);
-        
-        // Prevent player from falling over
-        playerBody->setAngularFactor(btVector3(0, 0, 0));
+        playerBody->setFriction(0.8f); // Added friction
+        // lock rotations
+        playerBody->setAngularFactor(btVector3(0,0,0));
         
         m_PhysicsSystem->GetWorld()->addRigidBody(playerBody);
         m_Registry.AddComponent(m_Player, VECTOR::RigidBodyComponent{playerBody});
@@ -140,6 +140,7 @@ namespace Game {
         btDefaultMotionState* myMotionState = new btDefaultMotionState(startTransform);
         btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, myMotionState, colShape, localInertia);
         btRigidBody* body = new btRigidBody(rbInfo);
+        body->setFriction(0.8f); // Added friction
         
         m_PhysicsSystem->GetWorld()->addRigidBody(body);
         m_Registry.AddComponent(entity, VECTOR::RigidBodyComponent{body});
