@@ -3,14 +3,17 @@
 **VECTOR** (Velocity Engine for C++ Texturing and Object Rendering) is a custom hardware-accelerated 2D C++ game engine built from scratch using SDL2. It is compiled as a standalone static library (`libVECTOR.a`) and includes a fully functional Pong game that demonstrates the engine's capabilities.
 
 ## Features
+- **Post-Processing & Juice**: Engine support for render targets enables dynamic CRT scanline overlays. Gameplay features impact screen shake, particle explosions, and velocity-based ball squish & stretch.
+- **Save System**: Lightweight persistent data storage (`save.dat`) to track Player and AI High Scores, as well as Audio Volume preferences across sessions.
+- **Game Modes**: Play in standard "5 Point Mode" or "Endless Mode".
+- **Dynamic AI Opponent**: Play against a computer-controlled AI with 3 difficulty levels!
 - **Data-Oriented ECS**: A custom Entity-Component System core framework, maximizing cache locality and decoupling logic from data.
 - **Audio & BGM Support**: Robust audio manager supporting `SDL_mixer` sound effects and endless `.mp3`/`.wav`/`.ogg` background music.
 - **Sprite Animations**: Core `Animator` subsystem for slicing and animating spritesheets.
 - **Physics Engine**: Integrated Box2D v3 for rigid body simulation, collision events, and continuous collision detection (CCD).
 - **Fixed Time-Step**: Physics run at a constant rate regardless of frame rate.
 - **High Definition**: 1280x720 window resolution.
-- **Game States**: Includes Start, Playing, and Paused menus.
-- **Dynamic AI Opponent**: Play against a computer-controlled AI with 3 difficulty levels!
+- **Game States**: Includes Start, Playing, and Paused menus with interactive mouse-driven UI.
 
 ## Requirements
 
@@ -23,7 +26,7 @@
 - **Player 1 (Left)**: `W` (Up) and `S` (Down)
 - **Player 2 (Right)**: Controlled by AI
 - **Pause**: `P` or `ESC`
-- **Start / Select Difficulty**: `1` (Easy), `2` (Medium), `3` (Hard), then `ENTER` to start.
+- **UI Interaction**: Use the `Mouse` to click buttons (Select Game Mode, Select Difficulty, Adjust Volume).
 
 ## Building
 
