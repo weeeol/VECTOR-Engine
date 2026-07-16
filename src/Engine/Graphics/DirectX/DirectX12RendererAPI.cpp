@@ -15,7 +15,9 @@ namespace VECTOR {
     }
 
     void DirectX12RendererAPI::Clear() {
-        // Will clear the Render Target View using m_ClearColor
+        // Since we don't have global state, this depends on the Context having a CommandList we can use
+        // A complete implementation would get the CommandList from the Context, transition the RTV, clear it, etc.
+        // For now, it's stubbed as we need a way for the Renderer to submit commands properly.
     }
 
 } // namespace VECTOR

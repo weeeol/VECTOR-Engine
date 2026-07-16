@@ -72,6 +72,7 @@ namespace VECTOR {
         const unsigned int SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
 
         std::shared_ptr<Framebuffer> m_PostProcessFramebuffer;
+        Framebuffer* m_ActiveFBO = nullptr;
 
         std::shared_ptr<VertexArray> m_ScreenQuadVertexArray;
         

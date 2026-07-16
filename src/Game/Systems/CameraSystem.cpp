@@ -29,9 +29,9 @@ namespace Game {
             if (cam.pitch < -89.0f) cam.pitch = -89.0f;
 
             // FOV adjustments
-            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_UP))
+            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::Up))
                 cam.fov -= 30.0f * deltaTime;
-            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_DOWN))
+            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::Down))
                 cam.fov += 30.0f * deltaTime;
 
             if (cam.fov < 10.0f) cam.fov = 10.0f;
@@ -52,13 +52,13 @@ namespace Game {
             float velocityMag = m_MovementSpeed;
             glm::vec3 moveDir(0.0f);
 
-            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_W))
+            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::W))
                 moveDir += cam.front;
-            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_S))
+            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::S))
                 moveDir -= cam.front;
-            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_A))
+            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::A))
                 moveDir -= cam.right;
-            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_D))
+            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::D))
                 moveDir += cam.right;
 
             // Flatten movement direction on Y axis to prevent flying

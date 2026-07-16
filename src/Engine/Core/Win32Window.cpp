@@ -2,7 +2,7 @@
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Graphics/RendererAPI.hpp"
 #include "Engine/Graphics/DirectX/DirectX12Context.hpp"
-
+#include "Engine/Input/InputManager.hpp"
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
@@ -80,17 +80,47 @@ namespace VECTOR {
     }
 
     void Win32Window::OnUpdate() {
+        if (m_Context) {
+            m_Context->SwapBuffers();
+        }
+    }
+
+    void Win32Window::ProcessEvents(class InputManager* inputManager) {
         MSG msg = {};
         while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
             if (msg.message == WM_QUIT) {
-                // Handle application quit here
+                m_ShouldClose = true;
+            } else if (msg.message == WM_KEYDOWN || msg.message == WM_KEYUP) {
+                if (inputManager) {
+                    bool isPressed = (msg.message == WM_KEYDOWN);
+                    KeyCode key = (KeyCode)msg.wParam; // Win32 Virtual Key Codes closely match our ASCII mappings!
+                    inputManager->SetKeyState(key, isPressed);
+                }
+            } else if (msg.message == WM_LBUTTONDOWN || msg.message == WM_LBUTTONUP) {
+                if (inputManager) inputManager->SetMouseButtonState(MouseButton::Left, msg.message == WM_LBUTTONDOWN);
+            } else if (msg.message == WM_RBUTTONDOWN || msg.message == WM_RBUTTONUP) {
+                if (inputManager) inputManager->SetMouseButtonState(MouseButton::Right, msg.message == WM_RBUTTONDOWN);
+            } else if (msg.message == WM_MBUTTONDOWN || msg.message == WM_MBUTTONUP) {
+                if (inputManager) inputManager->SetMouseButtonState(MouseButton::Middle, msg.message == WM_MBUTTONDOWN);
             }
+            
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
-
-        if (m_Context) {
-            m_Context->SwapBuffers();
+        
+        if (inputManager) {
+            POINT p;
+            GetCursorPos(&p);
+            ScreenToClient(m_Window, &p);
+            
+            static int lastX = p.x;
+            static int lastY = p.y;
+            
+            inputManager->SetMouseDelta(p.x - lastX, p.y - lastY);
+            inputManager->SetMousePosition(p.x, p.y);
+            
+            lastX = p.x;
+            lastY = p.y;
         }
     }
 

@@ -4,6 +4,7 @@
 #include <wrl.h>
 #include <d3d12.h>
 #include <string>
+#include <cstdint>
 
 namespace VECTOR {
 
@@ -19,10 +20,16 @@ namespace VECTOR {
         virtual int GetWidth() const override { return m_Width; }
         virtual int GetHeight() const override { return m_Height; }
 
+        D3D12_GPU_DESCRIPTOR_HANDLE GetGpuDescriptorHandle() const { return m_GpuDescriptorHandle; }
+
     private:
         Microsoft::WRL::ComPtr<ID3D12Resource> m_Texture;
         int m_Width, m_Height, m_BPP;
         std::string m_FilePath;
+
+        D3D12_CPU_DESCRIPTOR_HANDLE m_CpuDescriptorHandle;
+        D3D12_GPU_DESCRIPTOR_HANDLE m_GpuDescriptorHandle;
+        uint32_t m_DescriptorIndex;
     };
 
 } // namespace VECTOR

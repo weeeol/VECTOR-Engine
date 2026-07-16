@@ -22,6 +22,8 @@ namespace VECTOR {
         virtual ~Window() = default;
 
         virtual void OnUpdate() = 0;
+        virtual void ProcessEvents(class InputManager* inputManager) = 0;
+        virtual bool ShouldClose() const = 0;
 
         virtual uint32_t GetWidth() const = 0;
         virtual uint32_t GetHeight() const = 0;

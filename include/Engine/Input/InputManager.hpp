@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL.h>
+#include "Engine/Input/KeyCodes.hpp"
 #include <unordered_map>
 
 namespace VECTOR {
@@ -18,8 +18,7 @@ namespace VECTOR {
         void Update();
 
         // Check if a specific key is currently held down
-        // SDL_Scancode is used (e.g., SDL_SCANCODE_W, SDL_SCANCODE_UP)
-        bool IsKeyPressed(SDL_Scancode key) const;
+        bool IsKeyPressed(KeyCode key) const;
 
         // Mouse input
         int GetMouseX() const { return m_MouseX; }
@@ -28,15 +27,21 @@ namespace VECTOR {
         int GetMouseDeltaY() const { return m_MouseDeltaY; }
         
         void SetRelativeMouseMode(bool enable);
-        bool IsMouseButtonPressed(int button) const; // Use SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT, etc.
+        bool IsMouseButtonPressed(MouseButton button) const;
         
         // Check if mouse button was just pressed this frame
-        bool IsMouseButtonJustPressed(int button) const;
+        bool IsMouseButtonJustPressed(MouseButton button) const;
+
+        // Called by Window ProcessEvents to update state
+        void SetKeyState(KeyCode key, bool isPressed);
+        void SetMouseButtonState(MouseButton button, bool isPressed);
+        void SetMousePosition(int x, int y);
+        void SetMouseDelta(int dx, int dy);
 
     private:
-        const Uint8* m_KeyboardState;
-        Uint32 m_MouseState;
-        Uint32 m_PrevMouseState;
+        std::unordered_map<KeyCode, bool> m_Keys;
+        std::unordered_map<MouseButton, bool> m_MouseButtons;
+        std::unordered_map<MouseButton, bool> m_PrevMouseButtons;
         int m_MouseX;
         int m_MouseY;
         int m_MouseDeltaX;

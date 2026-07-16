@@ -1,0 +1,23 @@
+Texture2D screenTexture : register(t0);
+SamplerState smp : register(s0);
+
+struct VSInput {
+    float2 position : POSITION;
+    float2 texCoord : TEXCOORD;
+};
+
+struct PSInput {
+    float4 position : SV_POSITION;
+    float2 texCoord : TEXCOORD;
+};
+
+PSInput VSMain(VSInput input) {
+    PSInput output;
+    output.position = float4(input.position, 0.0f, 1.0f);
+    output.texCoord = input.texCoord;
+    return output;
+}
+
+float4 PSMain(PSInput input) : SV_TARGET {
+    return screenTexture.Sample(smp, input.texCoord);
+}

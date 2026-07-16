@@ -9,7 +9,7 @@ namespace VECTOR {
 
         int mx = m_Input->GetMouseX();
         int my = m_Input->GetMouseY();
-        bool isPressedNow = m_Input->IsMouseButtonPressed(SDL_BUTTON_LEFT);
+        bool isPressedNow = m_Input->IsMouseButtonPressed(MouseButton::Left);
 
         // Update Buttons
         registry.View<UIRectComponent, UIButtonComponent>([&](Entity entity) {

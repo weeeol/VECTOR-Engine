@@ -5,7 +5,11 @@
 
 namespace VECTOR {
 
+#ifdef VECTOR_BUILD_DIRECTX
+    RendererAPI::API RendererAPI::s_API = RendererAPI::API::DirectX12;
+#else
     RendererAPI::API RendererAPI::s_API = RendererAPI::API::OpenGL;
+#endif
 
     RendererAPI* RendererAPI::Create() {
         switch (s_API) {

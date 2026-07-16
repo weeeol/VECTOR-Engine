@@ -2,39 +2,69 @@
 
 namespace VECTOR {
 
-    InputManager::InputManager() : m_MouseState(0), m_PrevMouseState(0), m_MouseX(0), m_MouseY(0), m_MouseDeltaX(0), m_MouseDeltaY(0) {
-        // Initialize keyboard state pointer
-        m_KeyboardState = SDL_GetKeyboardState(nullptr);
+    InputManager::InputManager() 
+        : m_MouseX(0), m_MouseY(0), m_MouseDeltaX(0), m_MouseDeltaY(0) {
     }
 
     InputManager::~InputManager() {
     }
 
     void InputManager::Update() {
-        m_PrevMouseState = m_MouseState;
-        m_MouseState = SDL_GetMouseState(&m_MouseX, &m_MouseY);
-        SDL_GetRelativeMouseState(&m_MouseDeltaX, &m_MouseDeltaY);
+        m_PrevMouseButtons = m_MouseButtons;
+        // Mouse Delta is only valid for the frame it was received in
+        m_MouseDeltaX = 0;
+        m_MouseDeltaY = 0;
     }
 
     void InputManager::SetRelativeMouseMode(bool enable) {
-        SDL_SetRelativeMouseMode(enable ? SDL_TRUE : SDL_FALSE);
+        // This still requires an external platform call, which will be handled later
+        // via a Window or Platform abstraction call.
     }
 
-    bool InputManager::IsKeyPressed(SDL_Scancode key) const {
-        if (m_KeyboardState) {
-            return m_KeyboardState[key] == 1;
+    bool InputManager::IsKeyPressed(KeyCode key) const {
+        auto it = m_Keys.find(key);
+        if (it != m_Keys.end()) {
+            return it->second;
         }
         return false;
     }
 
-    bool InputManager::IsMouseButtonPressed(int button) const {
-        return (m_MouseState & SDL_BUTTON(button)) != 0;
+    bool InputManager::IsMouseButtonPressed(MouseButton button) const {
+        auto it = m_MouseButtons.find(button);
+        if (it != m_MouseButtons.end()) {
+            return it->second;
+        }
+        return false;
     }
     
-    bool InputManager::IsMouseButtonJustPressed(int button) const {
-        bool isPressedNow = (m_MouseState & SDL_BUTTON(button)) != 0;
-        bool wasPressedBefore = (m_PrevMouseState & SDL_BUTTON(button)) != 0;
-        return isPressedNow && !wasPressedBefore;
+    bool InputManager::IsMouseButtonJustPressed(MouseButton button) const {
+        bool isPressed = IsMouseButtonPressed(button);
+        
+        bool wasPressed = false;
+        auto it = m_PrevMouseButtons.find(button);
+        if (it != m_PrevMouseButtons.end()) {
+            wasPressed = it->second;
+        }
+        
+        return isPressed && !wasPressed;
+    }
+
+    void InputManager::SetKeyState(KeyCode key, bool isPressed) {
+        m_Keys[key] = isPressed;
+    }
+
+    void InputManager::SetMouseButtonState(MouseButton button, bool isPressed) {
+        m_MouseButtons[button] = isPressed;
+    }
+
+    void InputManager::SetMousePosition(int x, int y) {
+        m_MouseX = x;
+        m_MouseY = y;
+    }
+
+    void InputManager::SetMouseDelta(int dx, int dy) {
+        m_MouseDeltaX = dx;
+        m_MouseDeltaY = dy;
     }
 
 } // namespace VECTOR

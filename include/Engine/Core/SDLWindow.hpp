@@ -13,6 +13,8 @@ namespace VECTOR {
         virtual ~SDLWindow();
 
         void OnUpdate() override;
+        void ProcessEvents(class InputManager* inputManager) override;
+        bool ShouldClose() const override { return m_ShouldClose; }
 
         inline uint32_t GetWidth() const override { return m_Data.Width; }
         inline uint32_t GetHeight() const override { return m_Data.Height; }
@@ -37,6 +39,7 @@ namespace VECTOR {
         };
 
         WindowData m_Data;
+        bool m_ShouldClose = false;
     };
 
 } // namespace VECTOR

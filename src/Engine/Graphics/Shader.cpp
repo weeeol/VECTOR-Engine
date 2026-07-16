@@ -9,6 +9,19 @@
 namespace VECTOR {
 
     std::shared_ptr<Shader> Shader::CreateFromFile(const std::string& vertexPath, const std::string& fragmentPath) {
+        std::string vPath = vertexPath;
+        std::string fPath = fragmentPath;
+
+        if (RendererAPI::GetAPI() == RendererAPI::API::DirectX12) {
+            // In DX12, we expect a single .hlsl file that contains both vertex and pixel shaders
+            // We'll infer the HLSL path from the vertex path by replacing .vert with .hlsl
+            size_t pos = vPath.find(".vert");
+            if (pos != std::string::npos) {
+                vPath.replace(pos, 5, ".hlsl");
+            }
+            fPath = vPath; // Same file for both
+        }
+
         std::string vertexCode;
         std::string fragmentCode;
         std::ifstream vShaderFile;
@@ -18,18 +31,22 @@ namespace VECTOR {
         fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
         try {
-            vShaderFile.open(vertexPath);
-            fShaderFile.open(fragmentPath);
-            std::stringstream vShaderStream, fShaderStream;
-
+            vShaderFile.open(vPath);
+            std::stringstream vShaderStream;
             vShaderStream << vShaderFile.rdbuf();
-            fShaderStream << fShaderFile.rdbuf();
-
             vShaderFile.close();
-            fShaderFile.close();
-
             vertexCode = vShaderStream.str();
-            fragmentCode = fShaderStream.str();
+
+            if (vPath == fPath) {
+                // If it's the same file (HLSL), use the same source code
+                fragmentCode = vertexCode;
+            } else {
+                fShaderFile.open(fPath);
+                std::stringstream fShaderStream;
+                fShaderStream << fShaderFile.rdbuf();
+                fShaderFile.close();
+                fragmentCode = fShaderStream.str();
+            }
         } catch (std::ifstream::failure& e) {
             VECTOR_LOG_ERROR("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: " + std::string(e.what()));
             return nullptr;

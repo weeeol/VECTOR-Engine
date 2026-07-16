@@ -1,6 +1,7 @@
 #include "Engine/Graphics/Framebuffer.hpp"
 #include "Engine/Graphics/RendererAPI.hpp"
 #include "Engine/Graphics/OpenGL/OpenGLFramebuffer.hpp"
+#include "Engine/Graphics/DirectX/DirectX12Framebuffer.hpp"
 #include "Engine/Core/Logger.hpp"
 
 namespace VECTOR {
@@ -13,9 +14,7 @@ namespace VECTOR {
             case RendererAPI::API::OpenGL:
                 return std::make_shared<OpenGLFramebuffer>(spec);
             case RendererAPI::API::DirectX12:
-                // TODO: Implement DirectX12Framebuffer
-                VECTOR_LOG_ERROR("RendererAPI::DirectX12 Framebuffer not fully implemented yet!");
-                return nullptr;
+                return std::make_shared<DirectX12Framebuffer>(spec);
         }
 
         VECTOR_LOG_ERROR("Unknown RendererAPI!");

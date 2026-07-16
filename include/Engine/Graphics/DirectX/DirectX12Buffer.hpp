@@ -16,6 +16,16 @@ namespace VECTOR {
 
         virtual void SetLayoutType(BufferLayoutType type) override { m_LayoutType = type; }
         virtual BufferLayoutType GetLayoutType() const override { return m_LayoutType; }
+        
+        D3D12_VERTEX_BUFFER_VIEW GetView() const {
+            D3D12_VERTEX_BUFFER_VIEW view = m_BufferView;
+            switch (m_LayoutType) {
+                case BufferLayoutType::Mesh3D: view.StrideInBytes = sizeof(float) * 8; break;
+                case BufferLayoutType::Quad2D: view.StrideInBytes = sizeof(float) * 4; break;
+                default: view.StrideInBytes = sizeof(float) * 8; break;
+            }
+            return view;
+        }
 
     private:
         Microsoft::WRL::ComPtr<ID3D12Resource> m_VertexBuffer;
@@ -32,6 +42,8 @@ namespace VECTOR {
         virtual void Unbind() const override;
 
         virtual uint32_t GetCount() const override { return m_Count; }
+
+        const D3D12_INDEX_BUFFER_VIEW& GetView() const { return m_BufferView; }
 
     private:
         Microsoft::WRL::ComPtr<ID3D12Resource> m_IndexBuffer;

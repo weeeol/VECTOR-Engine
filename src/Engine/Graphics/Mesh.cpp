@@ -6,6 +6,10 @@
 // Optional for fallback direct API calls, but we should avoid it.
 #include <GL/glew.h> 
 
+#ifdef VECTOR_BUILD_DIRECTX
+#include "Engine/Graphics/DirectX/DirectX12Context.hpp"
+#endif
+
 namespace VECTOR {
 
     Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices) {
@@ -31,13 +35,21 @@ namespace VECTOR {
     }
 
     void Mesh::Draw() const {
+#ifdef VECTOR_BUILD_DIRECTX
+        m_VertexArray->Bind();
+        auto context = VECTOR::DirectX12Context::Get();
+        if (context) {
+            auto cmdList = context->GetCommandList();
+            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            cmdList->DrawIndexedInstanced(m_IndexCount, 1, 0, 0, 0);
+        }
+#else
         if (RendererAPI::GetAPI() == RendererAPI::API::OpenGL) {
             m_VertexArray->Bind();
             glDrawElements(GL_TRIANGLES, m_IndexCount, GL_UNSIGNED_INT, 0);
             m_VertexArray->Unbind();
-        } else if (RendererAPI::GetAPI() == RendererAPI::API::DirectX12) {
-            // DirectX 12 draw logic will be handled by the CommandList in the Renderer
         }
+#endif
     }
 
     std::shared_ptr<Mesh> Mesh::CreateCube() {

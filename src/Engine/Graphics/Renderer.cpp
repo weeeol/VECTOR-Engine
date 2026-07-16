@@ -8,6 +8,17 @@
 
 #include <vector>
 
+#ifdef VECTOR_BUILD_DIRECTX
+#include "Engine/Graphics/DirectX/DirectX12Context.hpp"
+#include "Engine/Graphics/DirectX/DirectX12Shader.hpp"
+#include "Engine/Graphics/DirectX/DirectX12Texture2D.hpp"
+#include "Engine/Graphics/DirectX/DirectX12Framebuffer.hpp"
+
+#ifdef DrawText
+#undef DrawText
+#endif
+#endif
+
 namespace VECTOR {
 
     Renderer::Renderer() {}
@@ -52,7 +63,9 @@ namespace VECTOR {
 
         VECTOR_LOG_INFO("Setup FBOs...");
         SetupFBOs();
+        VECTOR_LOG_INFO("Setup FBOs done. Setting up Screen Quad...");
         SetupScreenQuad();
+        VECTOR_LOG_INFO("Screen Quad done. Setting up UI Quad...");
 
         // Setup Quad for 2D rendering
         float vertices[] = {
@@ -71,6 +84,7 @@ namespace VECTOR {
         vbo.reset(VertexBuffer::Create(vertices, sizeof(vertices)));
         vbo->SetLayoutType(BufferLayoutType::Quad2D);
         m_QuadVertexArray->AddVertexBuffer(vbo);
+        VECTOR_LOG_INFO("UI Quad done. Renderer initialized successfully.");
 
         return true;
     }
@@ -98,10 +112,75 @@ namespace VECTOR {
     void Renderer::Clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
         m_RendererAPI->SetClearColor(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
         m_RendererAPI->Clear();
+
+#ifdef VECTOR_BUILD_DIRECTX
+        auto context = DirectX12Context::Get();
+        if (context) {
+            auto cmdList = context->GetCommandList();
+            float clearColor[] = { r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f };
+
+            if (m_ActiveFBO) {
+                auto dxFBO = dynamic_cast<DirectX12Framebuffer*>(m_ActiveFBO);
+                if (dxFBO) {
+                    D3D12_CPU_DESCRIPTOR_HANDLE rtv = dxFBO->GetRTV();
+                    cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+                    
+                    D3D12_CPU_DESCRIPTOR_HANDLE dsv = dxFBO->GetDSV();
+                    cmdList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+                }
+            } else {
+                auto rtvHandle = context->GetCurrentRTV();
+                auto backBuffer = context->GetCurrentBackBuffer();
+                
+                // Transition to render target
+                D3D12_RESOURCE_BARRIER barrier = {};
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Transition.pResource = backBuffer;
+                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                cmdList->ResourceBarrier(1, &barrier);
+                
+                cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+                cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+                
+                D3D12_VIEWPORT viewport = { 0.0f, 0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, 1.0f };
+                D3D12_RECT scissor = { 0, 0, static_cast<LONG>(m_Width), static_cast<LONG>(m_Height) };
+                cmdList->RSSetViewports(1, &viewport);
+                cmdList->RSSetScissorRects(1, &scissor);
+            }
+            
+            // Set Root Signature and Descriptor Heaps
+            ID3D12DescriptorHeap* descriptorHeaps[] = { context->GetSrvHeap() };
+            cmdList->SetDescriptorHeaps(1, descriptorHeaps);
+            cmdList->SetGraphicsRootSignature(context->GetRootSignature());
+        }
+#endif
     }
 
     void Renderer::Present() {
-        m_Window->OnUpdate();
+#ifdef VECTOR_BUILD_DIRECTX
+        auto context = DirectX12Context::Get();
+        if (context) {
+            auto cmdList = context->GetCommandList();
+            auto backBuffer = context->GetCurrentBackBuffer();
+            
+            // Transition back to present
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = backBuffer;
+            barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            cmdList->ResourceBarrier(1, &barrier);
+            
+            // Close command list and execute
+            cmdList->Close();
+            ID3D12CommandList* ppCommandLists[] = { cmdList };
+            context->GetCommandQueue()->ExecuteCommandLists(1, ppCommandLists);
+        }
+#endif
+        m_Window->OnUpdate(); // Swaps buffers
     }
 
     void Renderer::SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) {
@@ -154,38 +233,143 @@ namespace VECTOR {
     }
 
     void Renderer::BeginShadowPass() {
-        m_ShadowMapFramebuffer->Bind();
+        m_ActiveFBO = m_ShadowMapFramebuffer.get();
+        if (m_ActiveFBO) m_ActiveFBO->Bind();
+#ifndef VECTOR_BUILD_DIRECTX
         m_RendererAPI->Clear();
+#endif
     }
 
     void Renderer::BeginMainPass() {
-        m_PostProcessFramebuffer->Bind();
+        m_ActiveFBO = m_PostProcessFramebuffer.get();
+        if (m_ActiveFBO) m_ActiveFBO->Bind();
+#ifndef VECTOR_BUILD_DIRECTX
         m_RendererAPI->Clear();
+#endif
     }
 
     void Renderer::EndPostProcessPass() {
-        m_PostProcessFramebuffer->Unbind();
+        if (m_ActiveFBO) m_ActiveFBO->Unbind();
+        m_ActiveFBO = nullptr;
+
+#ifndef VECTOR_BUILD_DIRECTX
         m_RendererAPI->Clear();
+#else
+        Clear(0, 0, 0, 255); // Clears the backbuffer and transitions it
+#endif
 
         m_PostProcessShader->Bind();
         m_PostProcessShader->SetInt("screenTexture", 0);
+
+#ifdef VECTOR_BUILD_DIRECTX
+        auto context = DirectX12Context::Get();
+        if (context) {
+            auto cmdList = context->GetCommandList();
+            auto dxShader = dynamic_cast<DirectX12Shader*>(m_PostProcessShader.get());
+            if (dxShader && dxShader->GetPipelineState()) {
+                cmdList->SetPipelineState(dxShader->GetPipelineState());
+            }
+
+            // Dummy CBV to satisfy Root Signature
+            struct DummyCBV { glm::mat4 dummy; } dummyData = {};
+            D3D12_GPU_VIRTUAL_ADDRESS cbvAddress = context->UploadConstantBuffer(&dummyData, sizeof(dummyData));
+            cmdList->SetGraphicsRootConstantBufferView(0, cbvAddress);
+
+            auto dxFBO = dynamic_cast<DirectX12Framebuffer*>(m_PostProcessFramebuffer.get());
+            if (dxFBO) {
+                cmdList->SetGraphicsRootDescriptorTable(1, dxFBO->GetColorAttachmentSRV());
+            } else {
+                cmdList->SetGraphicsRootDescriptorTable(1, context->GetSrvHeap()->GetGPUDescriptorHandleForHeapStart());
+            }
+
+            m_ScreenQuadVertexArray->Bind();
+
+            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            cmdList->DrawInstanced(6, 1, 0, 0);
+        }
+        return;
+#endif
 
         // Bind the post process texture
         // Note: For full abstraction we should have a Texture2D::CreateFromID or similar, 
         // but since texture binding for FBOs is currently manual in OpenGL, we'll leave a TODO here
         // and temporarily retain the OpenGL call for the color attachment binding until a RenderCommand queue is built
         // TODO: Abstract this using Texture2D API
+#ifndef VECTOR_BUILD_DIRECTX
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_PostProcessFramebuffer->GetColorAttachmentRendererID());
 
         m_ScreenQuadVertexArray->Bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
         m_ScreenQuadVertexArray->Unbind();
+#endif
     }
 
     void Renderer::DrawMesh(const Mesh* mesh, const Shader* shader, const Texture2D* texture, const glm::mat4& model, const glm::vec4& color) {
         const Shader* activeShader = shader ? shader : m_DefaultShader.get();
         activeShader->Bind();
+
+#ifdef VECTOR_BUILD_DIRECTX
+        auto context = DirectX12Context::Get();
+        if (context && mesh) {
+            auto cmdList = context->GetCommandList();
+            
+            auto dxShader = dynamic_cast<const DirectX12Shader*>(activeShader);
+            if (dxShader && dxShader->GetPipelineState()) {
+                cmdList->SetPipelineState(dxShader->GetPipelineState());
+            }
+
+            // Define the CBV struct layout exactly matching the HLSL
+            struct ConstantBufferData {
+                glm::mat4 model;
+                glm::mat4 view;
+                glm::mat4 projection;
+                glm::mat4 lightSpaceMatrix;
+                glm::vec3 objectColor;
+                float padding1;
+                glm::vec3 lightPos;
+                float padding2;
+                glm::vec3 lightColor;
+                float padding3;
+                glm::vec3 viewPos;
+                float padding4;
+                glm::vec3 sunDir;
+                float padding5;
+                int isUnlit;
+                int hasTexture;
+                int hasShadowMap;
+                int padding6;
+            } cbvData;
+
+            // Transpose matrices because HLSL expects column-major by default
+            cbvData.model = glm::transpose(model);
+            cbvData.view = glm::transpose(m_ViewMatrix);
+            cbvData.projection = glm::transpose(m_ProjectionMatrix);
+            cbvData.lightSpaceMatrix = glm::transpose(m_LightSpaceMatrix);
+            cbvData.objectColor = glm::vec3(color);
+            cbvData.lightPos = glm::vec3(0.0f, 10.0f, 10.0f);
+            cbvData.lightColor = glm::vec3(1.0f, 0.8f, 0.6f);
+            cbvData.viewPos = m_ViewPos;
+            cbvData.sunDir = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.3f));
+            cbvData.isUnlit = m_UnlitMode ? 1 : 0;
+            cbvData.hasTexture = texture ? 1 : 0;
+            cbvData.hasShadowMap = 0;
+
+            D3D12_GPU_VIRTUAL_ADDRESS cbvAddress = context->UploadConstantBuffer(&cbvData, sizeof(cbvData));
+            cmdList->SetGraphicsRootConstantBufferView(0, cbvAddress);
+
+            auto dxTexture = dynamic_cast<const DirectX12Texture2D*>(texture);
+            if (dxTexture) {
+                cmdList->SetGraphicsRootDescriptorTable(1, dxTexture->GetGpuDescriptorHandle());
+            } else {
+                cmdList->SetGraphicsRootDescriptorTable(1, context->GetSrvHeap()->GetGPUDescriptorHandleForHeapStart());
+            }
+
+            // Assume mesh VertexArray is bound and buffers are set in DX12 VertexArray
+            mesh->Draw();
+        }
+        return;
+#endif
 
         activeShader->SetMat4("model", model);
         
@@ -223,10 +407,7 @@ namespace VECTOR {
         }
 
         if (texture) {
-            // Need to bind texture
             texture->Bind(0);
-            // Assuming shader has "diffuseTexture" uniform
-            // activeShader->SetInt("diffuseTexture", 0);
         }
 
         if (mesh) {
@@ -241,7 +422,9 @@ namespace VECTOR {
 
     void Renderer::BeginUI() {
         m_2DShader->Bind();
+#ifndef VECTOR_BUILD_DIRECTX
         glDisable(GL_DEPTH_TEST);
+#endif
 
         glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
         m_2DShader->SetMat4("projection", projection);
@@ -253,15 +436,50 @@ namespace VECTOR {
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(x, y, 0.0f));
         model = glm::scale(model, glm::vec3(w, h, 1.0f));
-        m_2DShader->SetMat4("model", model);
+        
+#ifdef VECTOR_BUILD_DIRECTX
+        auto context = DirectX12Context::Get();
+        if (context) {
+            auto cmdList = context->GetCommandList();
+            auto dxShader = dynamic_cast<const DirectX12Shader*>(m_2DShader.get());
+            if (dxShader && dxShader->GetPipelineState()) {
+                cmdList->SetPipelineState(dxShader->GetPipelineState());
+            }
 
+            struct CBV2D {
+                glm::mat4 projection;
+                glm::mat4 model;
+                glm::vec4 spriteColor;
+                int useTexture;
+                int padding[3];
+            } cbvData;
+            
+            glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
+            cbvData.projection = glm::transpose(projection);
+            cbvData.model = glm::transpose(model);
+            cbvData.spriteColor = color;
+            cbvData.useTexture = 0;
+
+            D3D12_GPU_VIRTUAL_ADDRESS cbvAddress = context->UploadConstantBuffer(&cbvData, sizeof(cbvData));
+            cmdList->SetGraphicsRootConstantBufferView(0, cbvAddress);
+            cmdList->SetGraphicsRootDescriptorTable(1, context->GetSrvHeap()->GetGPUDescriptorHandleForHeapStart());
+
+            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            cmdList->DrawInstanced(6, 1, 0, 0);
+        }
+        return;
+#endif
+
+        m_2DShader->SetMat4("model", model);
         m_2DShader->SetVec4("spriteColor", color);
         m_2DShader->SetInt("useTexture", 0);
-
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
 
     void Renderer::DrawUIText(const std::string& text, int x, int y, const glm::vec4& renderColor, int fontSize) {
+#ifdef VECTOR_BUILD_DIRECTX
+        return;
+#endif
         if (text.empty()) return;
 
         // Use cached texture or create it
@@ -288,6 +506,7 @@ namespace VECTOR {
             SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), color);
             if (!surface) return;
 
+#ifndef VECTOR_BUILD_DIRECTX
             unsigned int texture;
             glGenTextures(1, &texture);
             glBindTexture(GL_TEXTURE_2D, texture);
@@ -317,6 +536,7 @@ namespace VECTOR {
             
             m_TextTextureCache[cacheKey] = textTex;
             SDL_FreeSurface(surface);
+#endif
         } else {
             textTex = m_TextTextureCache[cacheKey];
         }
@@ -330,22 +550,34 @@ namespace VECTOR {
         m_2DShader->SetVec4("spriteColor", glm::vec4(1.0f));
         m_2DShader->SetInt("useTexture", 1);
 
+#ifndef VECTOR_BUILD_DIRECTX
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textTex.id);
         m_2DShader->SetInt("text", 0);
 
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindTexture(GL_TEXTURE_2D, 0);
+#endif
     }
 
     void Renderer::EndUI() {
+#ifdef VECTOR_BUILD_DIRECTX
+        return;
+#endif
         m_QuadVertexArray->Unbind();
+#ifndef VECTOR_BUILD_DIRECTX
         glEnable(GL_DEPTH_TEST);
+#endif
     }
 
     void Renderer::DrawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+#ifdef VECTOR_BUILD_DIRECTX
+        return;
+#endif
         m_2DShader->Bind();
+#ifndef VECTOR_BUILD_DIRECTX
         glDisable(GL_DEPTH_TEST);
+#endif
 
         glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
         m_2DShader->SetMat4("projection", projection);
@@ -358,14 +590,19 @@ namespace VECTOR {
         m_2DShader->SetVec4("spriteColor", glm::vec4(r/255.0f, g/255.0f, b/255.0f, a/255.0f));
         m_2DShader->SetInt("useTexture", 0);
 
+#ifndef VECTOR_BUILD_DIRECTX
         m_QuadVertexArray->Bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
         m_QuadVertexArray->Unbind();
 
         glEnable(GL_DEPTH_TEST);
+#endif
     }
 
     void Renderer::DrawText(const std::string& text, int x, int y, uint8_t r, uint8_t g, uint8_t b, int fontSize) {
+#ifdef VECTOR_BUILD_DIRECTX
+        return;
+#endif
         if (text.empty()) return;
 
         std::string cacheKey = text + "_" + std::to_string(r) + "_" + std::to_string(g) + "_" + std::to_string(b) + "_" + std::to_string(fontSize);
@@ -373,12 +610,14 @@ namespace VECTOR {
         TextTexture textTex;
 
         if (m_TextTextureCache.find(cacheKey) == m_TextTextureCache.end()) {
+#ifndef VECTOR_BUILD_DIRECTX
             if (m_TextTextureCache.size() > 128) {
                 for (auto& pair : m_TextTextureCache) {
                     glDeleteTextures(1, &pair.second.id);
                 }
                 m_TextTextureCache.clear();
             }
+#endif
 
             TTF_Font* font = ResourceManager::Get().GetFont("assets/font.ttf", fontSize);
             if (!font) return;
@@ -387,6 +626,7 @@ namespace VECTOR {
             SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), color);
             if (!surface) return;
 
+#ifndef VECTOR_BUILD_DIRECTX
             unsigned int texture;
             glGenTextures(1, &texture);
             glBindTexture(GL_TEXTURE_2D, texture);
@@ -420,12 +660,15 @@ namespace VECTOR {
             
             glBindTexture(GL_TEXTURE_2D, 0);
             SDL_FreeSurface(surface);
+#endif
         } else {
             textTex = m_TextTextureCache[cacheKey];
         }
 
         m_2DShader->Bind();
+#ifndef VECTOR_BUILD_DIRECTX
         glDisable(GL_DEPTH_TEST);
+#endif
 
         glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
         m_2DShader->SetMat4("projection", projection);
@@ -438,6 +681,7 @@ namespace VECTOR {
         m_2DShader->SetVec4("spriteColor", glm::vec4(1.0f));
         m_2DShader->SetInt("useTexture", 1);
 
+#ifndef VECTOR_BUILD_DIRECTX
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textTex.id);
         m_2DShader->SetInt("text", 0);
@@ -448,6 +692,7 @@ namespace VECTOR {
 
         glEnable(GL_DEPTH_TEST);
         glBindTexture(GL_TEXTURE_2D, 0);
+#endif
     }
 
 } // namespace VECTOR
