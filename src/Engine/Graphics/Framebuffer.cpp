@@ -1,20 +1,21 @@
-#include "Engine/Graphics/Texture2D.hpp"
+#include "Engine/Graphics/Framebuffer.hpp"
 #include "Engine/Graphics/RendererAPI.hpp"
-#include "Engine/Graphics/OpenGL/OpenGLTexture2D.hpp"
-#include "Engine/Graphics/DirectX/DirectX12Texture2D.hpp"
+#include "Engine/Graphics/OpenGL/OpenGLFramebuffer.hpp"
 #include "Engine/Core/Logger.hpp"
 
 namespace VECTOR {
 
-    std::shared_ptr<Texture2D> Texture2D::Create(const std::string& path) {
+    std::shared_ptr<Framebuffer> Framebuffer::Create(const FramebufferSpecification& spec) {
         switch (RendererAPI::GetAPI()) {
             case RendererAPI::API::None:
                 VECTOR_LOG_ERROR("RendererAPI::None is currently not supported!");
                 return nullptr;
             case RendererAPI::API::OpenGL:
-                return std::make_shared<OpenGLTexture2D>(path);
+                return std::make_shared<OpenGLFramebuffer>(spec);
             case RendererAPI::API::DirectX12:
-                return std::make_shared<DirectX12Texture2D>(path);
+                // TODO: Implement DirectX12Framebuffer
+                VECTOR_LOG_ERROR("RendererAPI::DirectX12 Framebuffer not fully implemented yet!");
+                return nullptr;
         }
 
         VECTOR_LOG_ERROR("Unknown RendererAPI!");
@@ -22,4 +23,3 @@ namespace VECTOR {
     }
 
 } // namespace VECTOR
-

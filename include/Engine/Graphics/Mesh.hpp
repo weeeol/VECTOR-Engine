@@ -19,13 +19,13 @@ namespace VECTOR {
 
         void Draw() const;
 
-        unsigned int GetVAO() const { return m_VAO; }
+        const std::shared_ptr<class VertexArray>& GetVertexArray() const { return m_VertexArray; }
         int GetIndexCount() const { return m_IndexCount; }
 
         static std::shared_ptr<Mesh> CreateCube();
 
     private:
-        unsigned int m_VAO, m_VBO, m_EBO;
+        std::shared_ptr<class VertexArray> m_VertexArray;
         int m_IndexCount;
 
         void SetupMesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices);

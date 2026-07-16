@@ -4,12 +4,13 @@
 #include <iostream>
 #include <glm/gtc/type_ptr.hpp>
 #include <SDL_ttf.h>
+#include <GL/glew.h>
 
 #include <vector>
 
 namespace VECTOR {
 
-    Renderer::Renderer() : m_Window(nullptr), m_GLContext(nullptr) {}
+    Renderer::Renderer() {}
 
     Renderer::~Renderer() {
         Shutdown();
@@ -20,36 +21,9 @@ namespace VECTOR {
         m_Width = width;
         m_Height = height;
 
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-
-        VECTOR_LOG_INFO("Creating SDL Window...");
-        m_Window = SDL_CreateWindow(
-            title.c_str(),
-            SDL_WINDOWPOS_CENTERED,
-            SDL_WINDOWPOS_CENTERED,
-            width,
-            height,
-            SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN
-        );
-
-        if (!m_Window) {
-            VECTOR_LOG_ERROR("Failed to create SDL window for OpenGL.");
-            return false;
-        }
-
-        VECTOR_LOG_INFO("Creating OpenGL Context...");
-        m_GLContext = SDL_GL_CreateContext(m_Window);
-        if (!m_GLContext) {
-            VECTOR_LOG_ERROR("Failed to create OpenGL context.");
-            return false;
-        }
-
-        VECTOR_LOG_INFO("Initializing GLEW...");
-        glewExperimental = GL_TRUE;
-        if (glewInit() != GLEW_OK) {
-            VECTOR_LOG_ERROR("Failed to initialize GLEW.");
+        // Ensure SDL is initialized for input and font rendering (even if using DX12)
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
+            VECTOR_LOG_ERROR("Failed to initialize SDL.");
             return false;
         }
 
@@ -59,10 +33,17 @@ namespace VECTOR {
             return false;
         }
 
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // Set API BEFORE creating window
+#if defined(WIN32)
+        // RendererAPI::SetAPI(RendererAPI::API::DirectX12); // Uncomment to use DX12 backend
+#endif
+
+        WindowProps props(title, width, height);
+        m_Window.reset(Window::Create(props));
         
+        m_RendererAPI.reset(RendererAPI::Create());
+        m_RendererAPI->Init();
+
         VECTOR_LOG_INFO("Loading Shaders...");
         m_DefaultShader = ResourceManager::Get().LoadShader("Default3D", "assets/engine/shaders/main3D.vert", "assets/engine/shaders/main3D.frag");
         m_DepthShader = ResourceManager::Get().LoadShader("Depth", "assets/engine/shaders/depth.vert", "assets/engine/shaders/depth.frag");
@@ -85,62 +66,42 @@ namespace VECTOR {
             1.0f, 0.0f, 1.0f, 0.0f
         };
         
-        glGenVertexArrays(1, &m_QuadVAO);
-        glGenBuffers(1, &m_QuadVBO);
-        
-        glBindVertexArray(m_QuadVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, m_QuadVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-        
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-        glEnableVertexAttribArray(1);
-        
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
+        m_QuadVertexArray.reset(VertexArray::Create());
+        std::shared_ptr<VertexBuffer> vbo;
+        vbo.reset(VertexBuffer::Create(vertices, sizeof(vertices)));
+        vbo->SetLayoutType(BufferLayoutType::Quad2D);
+        m_QuadVertexArray->AddVertexBuffer(vbo);
 
         return true;
     }
 
     void Renderer::Shutdown() {
-        if (m_DepthMapFBO) glDeleteFramebuffers(1, &m_DepthMapFBO);
-        if (m_DepthMapTexture) glDeleteTextures(1, &m_DepthMapTexture);
-        if (m_PostProcessFBO) glDeleteFramebuffers(1, &m_PostProcessFBO);
-        if (m_PostProcessTexture) glDeleteTextures(1, &m_PostProcessTexture);
-        if (m_PostProcessRBO) glDeleteRenderbuffers(1, &m_PostProcessRBO);
-        if (m_ScreenQuadVAO) glDeleteVertexArrays(1, &m_ScreenQuadVAO);
-        if (m_ScreenQuadVBO) glDeleteBuffers(1, &m_ScreenQuadVBO);
+        m_ShadowMapFramebuffer.reset();
+        m_PostProcessFramebuffer.reset();
+        m_ScreenQuadVertexArray.reset();
+        m_QuadVertexArray.reset();
 
-        if (m_QuadVAO) glDeleteVertexArrays(1, &m_QuadVAO);
-        if (m_QuadVBO) glDeleteBuffers(1, &m_QuadVBO);
         m_DefaultShader.reset();
+        m_DepthShader.reset();
+        m_PostProcessShader.reset();
         m_2DShader.reset();
 
-        for (auto& pair : m_TextTextureCache) {
-            glDeleteTextures(1, &pair.second.id);
-        }
         m_TextTextureCache.clear();
 
-        TTF_Quit();
+        m_RendererAPI.reset();
+        m_Window.reset();
 
-        if (m_GLContext) {
-            SDL_GL_DeleteContext(m_GLContext);
-            m_GLContext = nullptr;
-        }
-        if (m_Window) {
-            SDL_DestroyWindow(m_Window);
-            m_Window = nullptr;
-        }
+        TTF_Quit();
+        SDL_Quit();
     }
 
     void Renderer::Clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-        glClearColor(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        m_RendererAPI->SetClearColor(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
+        m_RendererAPI->Clear();
     }
 
     void Renderer::Present() {
-        SDL_GL_SwapWindow(m_Window);
+        m_Window->OnUpdate();
     }
 
     void Renderer::SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) {
@@ -158,36 +119,18 @@ namespace VECTOR {
 
     void Renderer::SetupFBOs() {
         // 1. Shadow map FBO
-        glGenFramebuffers(1, &m_DepthMapFBO);
-        glGenTextures(1, &m_DepthMapTexture);
-        glBindTexture(GL_TEXTURE_2D, m_DepthMapTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-        float borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-        glBindFramebuffer(GL_FRAMEBUFFER, m_DepthMapFBO);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_DepthMapTexture, 0);
-        glDrawBuffer(GL_NONE);
-        glReadBuffer(GL_NONE);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        FramebufferSpecification shadowSpec;
+        shadowSpec.Width = SHADOW_WIDTH;
+        shadowSpec.Height = SHADOW_HEIGHT;
+        shadowSpec.DepthOnly = true;
+        m_ShadowMapFramebuffer = Framebuffer::Create(shadowSpec);
 
         // 2. Post process FBO
-        glGenFramebuffers(1, &m_PostProcessFBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, m_PostProcessFBO);
-        glGenTextures(1, &m_PostProcessTexture);
-        glBindTexture(GL_TEXTURE_2D, m_PostProcessTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_Width, m_Height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_PostProcessTexture, 0);
-        glGenRenderbuffers(1, &m_PostProcessRBO);
-        glBindRenderbuffer(GL_RENDERBUFFER, m_PostProcessRBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, m_Width, m_Height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, m_PostProcessRBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        FramebufferSpecification postProcessSpec;
+        postProcessSpec.Width = m_Width;
+        postProcessSpec.Height = m_Height;
+        postProcessSpec.DepthOnly = false;
+        m_PostProcessFramebuffer = Framebuffer::Create(postProcessSpec);
     }
 
     void Renderer::SetupScreenQuad() {
@@ -201,47 +144,43 @@ namespace VECTOR {
              1.0f, -1.0f,  1.0f, 0.0f,
              1.0f,  1.0f,  1.0f, 1.0f
         };
-        glGenVertexArrays(1, &m_ScreenQuadVAO);
-        glGenBuffers(1, &m_ScreenQuadVBO);
-        glBindVertexArray(m_ScreenQuadVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, m_ScreenQuadVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+        m_ScreenQuadVertexArray.reset(VertexArray::Create());
+        
+        std::shared_ptr<VertexBuffer> vbo;
+        vbo.reset(VertexBuffer::Create(quadVertices, sizeof(quadVertices)));
+        vbo->SetLayoutType(BufferLayoutType::Quad2D);
+        m_ScreenQuadVertexArray->AddVertexBuffer(vbo);
     }
 
     void Renderer::BeginShadowPass() {
-        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-        glBindFramebuffer(GL_FRAMEBUFFER, m_DepthMapFBO);
-        glClear(GL_DEPTH_BUFFER_BIT);
-        glCullFace(GL_FRONT); // Peter panning fix
+        m_ShadowMapFramebuffer->Bind();
+        m_RendererAPI->Clear();
     }
 
     void Renderer::BeginMainPass() {
-        glCullFace(GL_BACK);
-        glViewport(0, 0, m_Width, m_Height);
-        glBindFramebuffer(GL_FRAMEBUFFER, m_PostProcessFBO);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        m_PostProcessFramebuffer->Bind();
+        m_RendererAPI->Clear();
     }
 
     void Renderer::EndPostProcessPass() {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glDisable(GL_DEPTH_TEST);
-        glClear(GL_COLOR_BUFFER_BIT);
+        m_PostProcessFramebuffer->Unbind();
+        m_RendererAPI->Clear();
 
         m_PostProcessShader->Bind();
         m_PostProcessShader->SetInt("screenTexture", 0);
 
+        // Bind the post process texture
+        // Note: For full abstraction we should have a Texture2D::CreateFromID or similar, 
+        // but since texture binding for FBOs is currently manual in OpenGL, we'll leave a TODO here
+        // and temporarily retain the OpenGL call for the color attachment binding until a RenderCommand queue is built
+        // TODO: Abstract this using Texture2D API
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_PostProcessTexture);
+        glBindTexture(GL_TEXTURE_2D, m_PostProcessFramebuffer->GetColorAttachmentRendererID());
 
-        glBindVertexArray(m_ScreenQuadVAO);
+        m_ScreenQuadVertexArray->Bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
-
-        glEnable(GL_DEPTH_TEST);
+        m_ScreenQuadVertexArray->Unbind();
     }
 
     void Renderer::DrawMesh(const Mesh* mesh, const Shader* shader, const Texture2D* texture, const glm::mat4& model, const glm::vec4& color) {
@@ -271,7 +210,8 @@ namespace VECTOR {
 
             activeShader->SetInt("shadowMap", 1);
             glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, m_DepthMapTexture);
+            // TODO: Abstract Texture binding
+            glBindTexture(GL_TEXTURE_2D, m_ShadowMapFramebuffer->GetDepthAttachmentRendererID());
             
             if (texture) {
                 texture->Bind(0);
@@ -306,7 +246,7 @@ namespace VECTOR {
         glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
         m_2DShader->SetMat4("projection", projection);
         
-        glBindVertexArray(m_QuadVAO);
+        m_QuadVertexArray->Bind();
     }
 
     void Renderer::DrawUIRect(int x, int y, int w, int h, const glm::vec4& color) {
@@ -399,7 +339,7 @@ namespace VECTOR {
     }
 
     void Renderer::EndUI() {
-        glBindVertexArray(0);
+        m_QuadVertexArray->Unbind();
         glEnable(GL_DEPTH_TEST);
     }
 
@@ -418,9 +358,9 @@ namespace VECTOR {
         m_2DShader->SetVec4("spriteColor", glm::vec4(r/255.0f, g/255.0f, b/255.0f, a/255.0f));
         m_2DShader->SetInt("useTexture", 0);
 
-        glBindVertexArray(m_QuadVAO);
+        m_QuadVertexArray->Bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
+        m_QuadVertexArray->Unbind();
 
         glEnable(GL_DEPTH_TEST);
     }
@@ -502,9 +442,9 @@ namespace VECTOR {
         glBindTexture(GL_TEXTURE_2D, textTex.id);
         m_2DShader->SetInt("text", 0);
 
-        glBindVertexArray(m_QuadVAO);
+        m_QuadVertexArray->Bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
+        m_QuadVertexArray->Unbind();
 
         glEnable(GL_DEPTH_TEST);
         glBindTexture(GL_TEXTURE_2D, 0);
