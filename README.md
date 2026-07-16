@@ -3,21 +3,21 @@
 **VECTOR** (Velocity Engine for C++ Texturing and Object Rendering) is a custom hardware-accelerated 3D C++ game engine built from scratch. Originally a 2D Pong Engine, it has been completely pivoted into a **3D First-Person Shooter (FPS)** prototype using OpenGL and Bullet Physics!
 
 ## Features
+- **Dual Graphics Backend**: Fully abstracted Renderer API supporting both **OpenGL 3.3 Core Profile** (Cross-platform) and **DirectX 12** (Windows native) natively!
 - **Data-Oriented ECS**: A custom Entity-Component System core framework, maximizing cache locality and decoupling logic from data.
-- **3D Graphics Pipeline**: Fully abstracted modular OpenGL 3.3 Core Profile pipeline featuring custom `Shader`, `Mesh`, and `Texture2D` architecture.
-- **Physical Volumetric Lighting**: Advanced fragment shaders that perform True 3D Volumetric Raymarching directly against the shadow map to calculate real atmospheric scattering, rays, and fog.
+- **Physical Volumetric Lighting**: Advanced shaders performing True 3D Volumetric Raymarching directly against the shadow map to calculate real atmospheric scattering, rays, and fog.
 - **Shadow Mapping**: Multi-pass rendering pipeline with a dedicated depth pre-pass and PCF (Percentage-Closer Filtering) soft shadows.
 - **Asset Management & Shader Cache**: A centralized `ResourceManager` handling on-the-fly shader compilation, caching, and font loading. Core engine shaders are abstracted completely into an `assets/engine/shaders` library.
 - **Physics Simulation**: Integrated Bullet3 for 3D rigid body dynamics, gravity, and continuous collision detection. Includes physics-based projectile shooting.
-- **First-Person Camera**: Mouse-look and WASD movement systems that apply forces directly to the player's physical RigidBody.
-- **OpenGL 2D UI Overlay**: Custom orthographic rendering layer built on top of the 3D pipeline for menus, crosshairs, and text using `SDL2_ttf`.
-- **Audio & BGM Support**: Robust audio manager supporting `SDL2_mixer` sound effects and endless background music.
+- **First-Person Camera**: Infinite mouse-look and WASD movement systems that apply forces directly to the player's physical RigidBody.
+- **2D UI Overlay**: Custom orthographic rendering layer built on top of the 3D pipeline for menus, crosshairs, and text.
+- **Dual Audio Backend**: Robust audio manager supporting **SDL2_mixer** (Cross-platform) and **XAudio2** (Windows native) for endless background music and sound effects.
 
 ## Requirements
 
-* C++17 or C++20 compatible compiler
+* C++17 or C++20 compatible compiler (MSVC highly recommended for DirectX 12)
 * CMake 3.10+
-* OpenGL 3.3+ Compatible GPU
+* Windows 10+ SDK (for DirectX 12 / XAudio2) OR OpenGL 3.3+ Compatible GPU
 * GLEW and GLM
 * SDL2, SDL2_ttf, SDL2_image, and SDL2_mixer development libraries
 * Bullet Physics (Bullet3)
