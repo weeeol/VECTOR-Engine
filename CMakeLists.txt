@@ -75,7 +75,7 @@ if(WIN32)
 endif()
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
-target_include_directories(VECTOR PUBLIC src include ${VECTOR_SDL_INCLUDES} ${BULLET_ROOT_DIR}/${BULLET_INCLUDE_DIRS})
+target_include_directories(VECTOR PUBLIC src ${VECTOR_SDL_INCLUDES} ${BULLET_ROOT_DIR}/${BULLET_INCLUDE_DIRS})
 target_link_directories(VECTOR PUBLIC ${BULLET_ROOT_DIR}/${BULLET_LIBRARY_DIRS})
 target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES})
 
