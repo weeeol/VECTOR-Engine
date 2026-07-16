@@ -3,7 +3,7 @@
 #include "Engine/Core/ResourceManager.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include "Engine/Core/SceneManager.hpp"
-#include <chrono>
+#include <SDL.h>
 
 namespace VECTOR {
 
@@ -26,6 +26,13 @@ namespace VECTOR {
     bool Application::Initialize() {
         Logger::Init();
 
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0) {
+            std::string error = std::string("SDL could not initialize! SDL_Error: ") + SDL_GetError();
+            VECTOR_LOG_ERROR(error);
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Initialization Error", error.c_str(), nullptr);
+            return false;
+        }
+
         ResourceManager::Get().Initialize();
         
         if (!AudioManager::Get().Initialize()) {
@@ -37,6 +44,7 @@ namespace VECTOR {
         if (!m_Renderer->Initialize(m_Title, m_Width, m_Height)) {
             std::string error = "Renderer failed to initialize";
             VECTOR_LOG_ERROR(error);
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Initialization Error", error.c_str(), nullptr);
             return false;
         }
 
@@ -55,15 +63,19 @@ namespace VECTOR {
             return;
         }
 
-        auto previousTime = std::chrono::high_resolution_clock::now();
+        // Setup fixed time step variables
+        const float targetFPS = 60.0f;
+        const float targetFrameTime = 1000.0f / targetFPS; // In milliseconds
+
+        Uint64 previousTime = SDL_GetPerformanceCounter();
         float accumulator = 0.0f;
-        uint32_t frameCount = 0;
-        
-        auto fpsTimer = std::chrono::high_resolution_clock::now();
+        Uint32 frameCount = 0;
+        Uint32 fpsTimer = SDL_GetTicks();
 
         while (m_IsRunning) {
-            auto currentTime = std::chrono::high_resolution_clock::now();
-            float deltaTime = std::chrono::duration<float, std::milli>(currentTime - previousTime).count();
+            Uint64 currentTime = SDL_GetPerformanceCounter();
+            // Convert to milliseconds
+            float deltaTime = (float)((currentTime - previousTime) * 1000.0 / SDL_GetPerformanceFrequency());
             previousTime = currentTime;
 
             // Prevent spiral of death if deltaTime is too large
@@ -76,17 +88,17 @@ namespace VECTOR {
             ProcessInput();
 
             // Allow Bullet and logic to use actual frame time.
+            // Bullet handles fixed time steps internally and provides interpolated transforms.
             Update(deltaTime / 1000.0f);
 
             Render();
             frameCount++;
 
-            auto currentFpsTime = std::chrono::high_resolution_clock::now();
-            float elapsedSinceLastFPS = std::chrono::duration<float, std::milli>(currentFpsTime - fpsTimer).count();
-            if (elapsedSinceLastFPS >= 1000.0f) {
+            Uint32 currentTicks = SDL_GetTicks();
+            if (currentTicks - fpsTimer >= 1000) {
                 m_CurrentFPS = frameCount;
                 frameCount = 0;
-                fpsTimer = currentFpsTime;
+                fpsTimer = currentTicks;
             }
         }
     }
@@ -104,18 +116,20 @@ namespace VECTOR {
         
         AudioManager::Get().Shutdown();
         ResourceManager::Get().Shutdown();
+        
+        SDL_Quit();
     }
 
     void Application::ProcessInput() {
-        if (m_InputManager) {
-            m_InputManager->Update();
-        }
-
-        if (m_Renderer && m_Renderer->GetWindow()) {
-            m_Renderer->GetWindow()->ProcessEvents(m_InputManager.get());
-            if (m_Renderer->GetWindow()->ShouldClose()) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
                 Quit();
             }
+        }
+        
+        if (m_InputManager) {
+            m_InputManager->Update();
         }
     }
 

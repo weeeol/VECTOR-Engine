@@ -1,4 +1,4 @@
-#include "Engine/Graphics/OpenGL/OpenGLTexture2D.hpp"
+#include "OpenGLTexture2D.hpp"
 #include "Engine/Core/Logger.hpp"
 #include <GL/glew.h>
 #include <SDL_image.h>
@@ -55,22 +55,6 @@ namespace VECTOR {
         SDL_FreeSurface(surface);
     }
 
-    OpenGLTexture2D::OpenGLTexture2D(const void* pixels, int width, int height)
-        : m_FilePath("memory"), m_Width(width), m_Height(height), m_BPP(4) {
-        VECTOR_LOG_INFO("Creating OpenGLTexture2D from memory");
-
-        glGenTextures(1, &m_RendererID);
-        glBindTexture(GL_TEXTURE_2D, m_RendererID);
-
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_Width, m_Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
-
     OpenGLTexture2D::~OpenGLTexture2D() {
         if (m_RendererID) {
             glDeleteTextures(1, &m_RendererID);
@@ -87,4 +71,3 @@ namespace VECTOR {
     }
 
 } // namespace VECTOR
-

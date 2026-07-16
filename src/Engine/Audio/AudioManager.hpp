@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Engine/Audio/AudioAPI.hpp"
+#include <SDL_mixer.h>
 #include <string>
-#include <memory>
+#include <unordered_map>
 
 namespace VECTOR {
 
@@ -28,7 +28,8 @@ namespace VECTOR {
         AudioManager() = default;
         ~AudioManager() = default;
 
-        std::unique_ptr<AudioAPI> m_API;
+        std::unordered_map<std::string, Mix_Chunk*> m_Sounds;
+        std::unordered_map<std::string, Mix_Music*> m_Music;
     };
 
 } // namespace VECTOR

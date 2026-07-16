@@ -1,4 +1,4 @@
-#include "Game/Systems/CameraSystem.hpp"
+#include "CameraSystem.hpp"
 #include "Engine/ECS/Components.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <btBulletDynamicsCommon.h>
@@ -29,9 +29,9 @@ namespace Game {
             if (cam.pitch < -89.0f) cam.pitch = -89.0f;
 
             // FOV adjustments
-            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::Up))
+            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_UP))
                 cam.fov -= 30.0f * deltaTime;
-            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::Down))
+            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_DOWN))
                 cam.fov += 30.0f * deltaTime;
 
             if (cam.fov < 10.0f) cam.fov = 10.0f;
@@ -52,13 +52,13 @@ namespace Game {
             float velocityMag = m_MovementSpeed;
             glm::vec3 moveDir(0.0f);
 
-            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::W))
+            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_W))
                 moveDir += cam.front;
-            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::S))
+            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_S))
                 moveDir -= cam.front;
-            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::A))
+            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_A))
                 moveDir -= cam.right;
-            if (m_InputManager->IsKeyPressed(VECTOR::KeyCode::D))
+            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_D))
                 moveDir += cam.right;
 
             // Flatten movement direction on Y axis to prevent flying
@@ -83,4 +83,3 @@ namespace Game {
     }
 
 } // namespace Game
-

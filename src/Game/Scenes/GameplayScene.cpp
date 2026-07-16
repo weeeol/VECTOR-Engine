@@ -1,5 +1,5 @@
-#include "Game/Scenes/GameplayScene.hpp"
-#include "Game/Scenes/MainMenuScene.hpp"
+#include "GameplayScene.hpp"
+#include "MainMenuScene.hpp"
 #include "Engine/Core/SceneManager.hpp"
 #include "Engine/Input/InputManager.hpp"
 #include "Engine/Graphics/Renderer.hpp"
@@ -16,7 +16,7 @@
 #include "Engine/Graphics/Texture2D.hpp"
 #include "Engine/Graphics/Texture2D.hpp"
 #include "Engine/Audio/AudioManager.hpp"
-
+#include <SDL.h>
 
 namespace Game {
 
@@ -156,8 +156,8 @@ namespace Game {
     }
 
     void GameplayScene::Update(float deltaTime) {
-        bool isPausePressed = m_InputManager->IsKeyPressed(VECTOR::KeyCode::Escape);
-        bool isF3Pressed = m_InputManager->IsKeyPressed(VECTOR::KeyCode::F3);
+        bool isPausePressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_ESCAPE);
+        bool isF3Pressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_F3);
 
         if (isF3Pressed && !m_WasF3Pressed) {
             m_DebugMode = !m_DebugMode;
@@ -246,9 +246,9 @@ namespace Game {
             std::string fpsStr = "FPS: " + std::to_string((int)fps);
             std::string posStr = "Pos: " + std::to_string(camT.position.x) + ", " + std::to_string(camT.position.y) + ", " + std::to_string(camT.position.z);
             
-            int cpuCount = 0; // SDL_GetCPUCount removed to decouple SDL
-            int ramMB = 0; // SDL_GetSystemRAM removed to decouple SDL
-            std::string sysStr = "Hardware debug info disabled";
+            int cpuCount = SDL_GetCPUCount();
+            int ramMB = SDL_GetSystemRAM();
+            std::string sysStr = "CPU Cores: " + std::to_string(cpuCount) + " | RAM: " + std::to_string(ramMB) + " MB";
             
             renderer->DrawUIText(fpsStr, 10, 10, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
             renderer->DrawUIText(posStr, 10, 30, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
@@ -296,4 +296,3 @@ namespace Game {
     }
 
 }
-

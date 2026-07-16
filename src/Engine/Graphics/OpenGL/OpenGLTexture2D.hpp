@@ -8,7 +8,6 @@ namespace VECTOR {
     class OpenGLTexture2D : public Texture2D {
     public:
         OpenGLTexture2D(const std::string& path);
-        OpenGLTexture2D(const void* pixels, int width, int height);
         virtual ~OpenGLTexture2D();
 
         virtual void Bind(unsigned int slot = 0) const override;

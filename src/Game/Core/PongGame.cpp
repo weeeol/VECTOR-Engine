@@ -1,4 +1,4 @@
-#include "Game/Core/PongGame.hpp"
+#include "PongGame.hpp"
 #include "Game/Scenes/MainMenuScene.hpp"
 #include "Game/Scenes/GameplayScene.hpp"
 #include "Engine/Core/SceneManager.hpp"
@@ -52,4 +52,3 @@ namespace Game {
 VECTOR::Application* VECTOR::CreateApplication() {
     return new Game::PongGame("VECTOR Engine 3D", 1280, 720);
 }
-

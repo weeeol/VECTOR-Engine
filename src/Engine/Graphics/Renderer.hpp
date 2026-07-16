@@ -1,18 +1,17 @@
 #pragma once
 
 #include <string>
+#include <SDL.h>
+#include <SDL_ttf.h>
 #include <unordered_map>
-#include <memory>
-#include <glm/glm.hpp>
 
-#include "Engine/Core/Window.hpp"
-#include "Engine/Graphics/RendererAPI.hpp"
-#include "Engine/Graphics/Shader.hpp"
-#include "Engine/Graphics/Mesh.hpp"
-#include "Engine/Graphics/Texture2D.hpp"
-#include "Engine/Graphics/Buffer.hpp"
-#include "Engine/Graphics/VertexArray.hpp"
-#include "Engine/Graphics/Framebuffer.hpp"
+#include <GL/glew.h>
+#include <SDL_opengl.h>
+#include <glm/glm.hpp>
+#include <memory>
+#include "Shader.hpp"
+#include "Mesh.hpp"
+#include "Texture2D.hpp"
 
 namespace VECTOR {
 
@@ -42,7 +41,7 @@ namespace VECTOR {
         void DrawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
         void DrawText(const std::string& text, int x, int y, uint8_t r, uint8_t g, uint8_t b, int fontSize = 24);
 
-        Window* GetWindow() const { return m_Window.get(); }
+        SDL_Window* GetWindow() const { return m_Window; }
 
         // New Multi-Pass Rendering Methods
         void BeginShadowPass();
@@ -54,9 +53,8 @@ namespace VECTOR {
         void SetUnlitMode(bool unlit) { m_UnlitMode = unlit; }
 
     private:
-        std::unique_ptr<Window> m_Window;
-        std::unique_ptr<RendererAPI> m_RendererAPI;
-
+        SDL_Window* m_Window;
+        SDL_GLContext m_GLContext;
         std::shared_ptr<Shader> m_DefaultShader;
         std::shared_ptr<Shader> m_DepthShader;
         std::shared_ptr<Shader> m_PostProcessShader;
@@ -67,28 +65,30 @@ namespace VECTOR {
         glm::mat4 m_ViewMatrix;
         glm::mat4 m_ProjectionMatrix;
         glm::mat4 m_LightSpaceMatrix;
-        // Framebuffers
-        std::shared_ptr<Framebuffer> m_ShadowMapFramebuffer;
+        
+        // FBOs
+        unsigned int m_DepthMapFBO;
+        unsigned int m_DepthMapTexture;
         const unsigned int SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
 
-        std::shared_ptr<Framebuffer> m_PostProcessFramebuffer;
-        Framebuffer* m_ActiveFBO = nullptr;
+        unsigned int m_PostProcessFBO;
+        unsigned int m_PostProcessTexture;
+        unsigned int m_PostProcessRBO;
 
-        std::shared_ptr<VertexArray> m_ScreenQuadVertexArray;
+        unsigned int m_ScreenQuadVAO, m_ScreenQuadVBO;
         
         void SetupFBOs();
         void SetupScreenQuad();
 
         // 2D Rendering
         std::shared_ptr<Shader> m_2DShader;
-        std::shared_ptr<VertexArray> m_QuadVertexArray;
+        unsigned int m_QuadVAO, m_QuadVBO;
         int m_Width, m_Height;
         struct TextTexture {
-            std::shared_ptr<Texture2D> texture;
+            unsigned int id;
             int w, h;
         };
         std::unordered_map<std::string, TextTexture> m_TextTextureCache;
     };
 
 } // namespace VECTOR
-

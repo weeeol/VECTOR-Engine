@@ -1,4 +1,3 @@
-#include <SDL.h>
 #include "Engine/Core/Application.hpp"
 #include <memory>
 

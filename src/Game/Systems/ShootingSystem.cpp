@@ -1,4 +1,4 @@
-#include "Game/Systems/ShootingSystem.hpp"
+#include "ShootingSystem.hpp"
 #include "Engine/ECS/Components.hpp"
 #include "Engine/Graphics/Mesh.hpp"
 #include <iostream>
@@ -18,7 +18,7 @@ namespace Game {
             m_ShootCooldown -= deltaTime;
         }
 
-        if (m_InputManager->IsMouseButtonPressed(VECTOR::MouseButton::Left) && m_ShootCooldown <= 0.0f) { // Left click
+        if (m_InputManager->IsMouseButtonPressed(1) && m_ShootCooldown <= 0.0f) { // Left click
             m_ShootCooldown = 0.5f;
 
             // Find camera
@@ -70,4 +70,3 @@ namespace Game {
     }
 
 } // namespace Game
-

@@ -32,59 +32,23 @@ set(VECTOR_SOURCES
     src/Engine/Core/Logger.cpp
     src/Engine/Core/ResourceManager.cpp
     src/Engine/Core/SceneManager.cpp
-    src/Engine/Core/Window.cpp
-    src/Engine/Core/SDLWindow.cpp
     src/Engine/Graphics/RendererAPI.cpp
     src/Engine/Graphics/Renderer.cpp
     src/Engine/Graphics/Shader.cpp
     src/Engine/Graphics/Mesh.cpp
     src/Engine/Graphics/Texture2D.cpp
-    src/Engine/Graphics/Buffer.cpp
-    src/Engine/Graphics/VertexArray.cpp
-    src/Engine/Graphics/Framebuffer.cpp
-    src/Engine/Graphics/OpenGL/OpenGLContext.cpp
-    src/Engine/Graphics/OpenGL/OpenGLRendererAPI.cpp
-    src/Engine/Graphics/OpenGL/OpenGLShader.cpp
     src/Engine/Graphics/OpenGL/OpenGLTexture2D.cpp
-    src/Engine/Graphics/OpenGL/OpenGLBuffer.cpp
-    src/Engine/Graphics/OpenGL/OpenGLVertexArray.cpp
-    src/Engine/Graphics/OpenGL/OpenGLFramebuffer.cpp
     src/Engine/Input/InputManager.cpp
     src/Engine/Audio/AudioManager.cpp
-    src/Engine/Audio/AudioAPI.cpp
-    src/Engine/Audio/SDLMixerBackend.cpp
     src/Engine/Events/EventBus.cpp
     src/Engine/Physics/BulletPhysicsSystem.cpp
     src/Engine/UI/UISystem.cpp
 )
 
-option(VECTOR_USE_DIRECTX "Use DirectX 12 instead of OpenGL" OFF)
-
-if(WIN32)
-    list(APPEND VECTOR_SOURCES
-        src/Engine/Core/Win32Window.cpp
-        src/Engine/Audio/XAudio2Backend.cpp
-        src/Engine/Graphics/DirectX/DirectX12Context.cpp
-        src/Engine/Graphics/DirectX/DirectX12RendererAPI.cpp
-        src/Engine/Graphics/DirectX/DirectX12Shader.cpp
-        src/Engine/Graphics/DirectX/DirectX12Texture2D.cpp
-        src/Engine/Graphics/DirectX/DirectX12Buffer.cpp
-        src/Engine/Graphics/DirectX/DirectX12VertexArray.cpp
-        src/Engine/Graphics/DirectX/DirectX12Framebuffer.cpp
-    )
-endif()
-
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
 target_include_directories(VECTOR PUBLIC src ${VECTOR_SDL_INCLUDES} ${BULLET_ROOT_DIR}/${BULLET_INCLUDE_DIRS})
 target_link_directories(VECTOR PUBLIC ${BULLET_ROOT_DIR}/${BULLET_LIBRARY_DIRS})
 target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES})
-
-if(WIN32)
-    target_link_libraries(VECTOR PUBLIC d3d12 dxgi d3dcompiler xaudio2_8 ole32)
-    if(VECTOR_USE_DIRECTX)
-        target_compile_definitions(VECTOR PUBLIC VECTOR_BUILD_DIRECTX)
-    endif()
-endif()
 
 # ==============================================================================
 # PONG GAME EXECUTABLE

@@ -1,4 +1,4 @@
-#include "Game/Systems/GameSystems.hpp"
+#include "GameSystems.hpp"
 
 namespace Game {
     // Empty for now

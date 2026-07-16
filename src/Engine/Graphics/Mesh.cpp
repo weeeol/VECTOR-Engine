@@ -1,14 +1,5 @@
-#include "Engine/Graphics/Mesh.hpp"
-#include "Engine/Graphics/VertexArray.hpp"
-#include "Engine/Graphics/Buffer.hpp"
-#include "Engine/Graphics/RendererAPI.hpp"
-
-// Optional for fallback direct API calls, but we should avoid it.
-#include <GL/glew.h> 
-
-#ifdef VECTOR_BUILD_DIRECTX
-#include "Engine/Graphics/DirectX/DirectX12Context.hpp"
-#endif
+#include "Mesh.hpp"
+#include <GL/glew.h>
 
 namespace VECTOR {
 
@@ -17,39 +8,45 @@ namespace VECTOR {
     }
 
     Mesh::~Mesh() {
+        glDeleteVertexArrays(1, &m_VAO);
+        glDeleteBuffers(1, &m_VBO);
+        glDeleteBuffers(1, &m_EBO);
     }
 
     void Mesh::SetupMesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices) {
         m_IndexCount = static_cast<int>(indices.size());
 
-        m_VertexArray.reset(VertexArray::Create());
+        glGenVertexArrays(1, &m_VAO);
+        glGenBuffers(1, &m_VBO);
+        glGenBuffers(1, &m_EBO);
 
-        std::shared_ptr<VertexBuffer> vertexBuffer;
-        vertexBuffer.reset(VertexBuffer::Create(vertices.data(), static_cast<uint32_t>(vertices.size() * sizeof(Vertex))));
+        glBindVertexArray(m_VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
 
-        std::shared_ptr<IndexBuffer> indexBuffer;
-        indexBuffer.reset(IndexBuffer::Create(indices.data(), static_cast<uint32_t>(indices.size())));
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
 
-        m_VertexArray->AddVertexBuffer(vertexBuffer);
-        m_VertexArray->SetIndexBuffer(indexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
+
+        // Vertex Positions
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+        
+        // Vertex Normals
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Normal));
+        
+        // Vertex Texture Coords
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords));
+
+        glBindVertexArray(0);
     }
 
     void Mesh::Draw() const {
-#ifdef VECTOR_BUILD_DIRECTX
-        m_VertexArray->Bind();
-        auto context = VECTOR::DirectX12Context::Get();
-        if (context) {
-            auto cmdList = context->GetCommandList();
-            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            cmdList->DrawIndexedInstanced(m_IndexCount, 1, 0, 0, 0);
-        }
-#else
-        if (RendererAPI::GetAPI() == RendererAPI::API::OpenGL) {
-            m_VertexArray->Bind();
-            glDrawElements(GL_TRIANGLES, m_IndexCount, GL_UNSIGNED_INT, 0);
-            m_VertexArray->Unbind();
-        }
-#endif
+        glBindVertexArray(m_VAO);
+        glDrawElements(GL_TRIANGLES, m_IndexCount, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
     }
 
     std::shared_ptr<Mesh> Mesh::CreateCube() {
@@ -104,4 +101,3 @@ namespace VECTOR {
     }
 
 } // namespace VECTOR
-

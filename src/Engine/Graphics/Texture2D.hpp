@@ -17,7 +17,6 @@ namespace VECTOR {
         virtual int GetHeight() const = 0;
 
         static std::shared_ptr<Texture2D> Create(const std::string& path);
-        static std::shared_ptr<Texture2D> CreateFromPixels(const void* pixels, int width, int height);
     };
 
 } // namespace VECTOR
