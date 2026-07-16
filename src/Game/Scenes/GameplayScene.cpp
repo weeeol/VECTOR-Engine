@@ -1,5 +1,5 @@
-#include "GameplayScene.hpp"
-#include "MainMenuScene.hpp"
+#include "Game/Scenes/GameplayScene.hpp"
+#include "Game/Scenes/MainMenuScene.hpp"
 #include "Engine/Core/SceneManager.hpp"
 #include "Engine/Input/InputManager.hpp"
 #include "Engine/Graphics/Renderer.hpp"
@@ -296,3 +296,4 @@ namespace Game {
     }
 
 }
+

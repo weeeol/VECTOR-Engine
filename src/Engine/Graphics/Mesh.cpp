@@ -1,4 +1,4 @@
-#include "Mesh.hpp"
+#include "Engine/Graphics/Mesh.hpp"
 #include <GL/glew.h>
 
 namespace VECTOR {
@@ -101,3 +101,4 @@ namespace VECTOR {
     }
 
 } // namespace VECTOR
+

@@ -1,4 +1,4 @@
-#include "ShootingSystem.hpp"
+#include "Game/Systems/ShootingSystem.hpp"
 #include "Engine/ECS/Components.hpp"
 #include "Engine/Graphics/Mesh.hpp"
 #include <iostream>
@@ -70,3 +70,4 @@ namespace Game {
     }
 
 } // namespace Game
+

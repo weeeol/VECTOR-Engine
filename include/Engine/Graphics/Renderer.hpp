@@ -9,9 +9,9 @@
 #include <SDL_opengl.h>
 #include <glm/glm.hpp>
 #include <memory>
-#include "Shader.hpp"
-#include "Mesh.hpp"
-#include "Texture2D.hpp"
+#include "Engine/Graphics/Shader.hpp"
+#include "Engine/Graphics/Mesh.hpp"
+#include "Engine/Graphics/Texture2D.hpp"
 
 namespace VECTOR {
 
@@ -92,3 +92,4 @@ namespace VECTOR {
     };
 
 } // namespace VECTOR
+
