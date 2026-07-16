@@ -77,6 +77,13 @@ namespace VECTOR {
     }
 
     void SDLWindow::ProcessEvents(class InputManager* inputManager) {
+        if (inputManager) {
+            bool desiredMode = inputManager->IsRelativeMouseMode();
+            if (SDL_GetRelativeMouseMode() != (desiredMode ? SDL_TRUE : SDL_FALSE)) {
+                SDL_SetRelativeMouseMode(desiredMode ? SDL_TRUE : SDL_FALSE);
+            }
+        }
+
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
@@ -100,6 +107,12 @@ namespace VECTOR {
                     else if (event.key.keysym.scancode == SDL_SCANCODE_F1) key = KeyCode::F1;
                     else if (event.key.keysym.scancode == SDL_SCANCODE_F2) key = KeyCode::F2;
                     else if (event.key.keysym.scancode == SDL_SCANCODE_F3) key = KeyCode::F3;
+                    else if (event.key.keysym.sym >= 'a' && event.key.keysym.sym <= 'z') {
+                        key = (KeyCode)(event.key.keysym.sym - 32);
+                    }
+                    else if (event.key.keysym.sym >= 'A' && event.key.keysym.sym <= 'Z') {
+                        key = (KeyCode)event.key.keysym.sym;
+                    }
                     
                     inputManager->SetKeyState(key, event.type == SDL_KEYDOWN);
                 }

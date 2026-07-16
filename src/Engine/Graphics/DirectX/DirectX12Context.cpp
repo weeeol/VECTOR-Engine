@@ -291,6 +291,9 @@ namespace VECTOR {
             m_CommandAllocator->Reset();
             m_CommandList->Reset(m_CommandAllocator.Get(), nullptr);
         }
+        
+        // Reset CBV ring buffer offset for the next frame
+        m_CbvOffset = 0;
     }
 
     void DirectX12Context::FlushCommandQueue() {
@@ -313,19 +316,27 @@ namespace VECTOR {
     }
 
     void DirectX12Context::AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE& outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE& outGpuHandle, uint32_t& outDescriptorIndex) {
-        if (m_CurrentSrvOffset >= 1024) {
-            VECTOR_LOG_ERROR("DirectX12Context::AllocateDescriptor - Maximum SRV descriptors reached!");
-            return;
+        if (!m_FreeSrvIndices.empty()) {
+            outDescriptorIndex = m_FreeSrvIndices.back();
+            m_FreeSrvIndices.pop_back();
+        } else {
+            if (m_CurrentSrvOffset >= 1024) {
+                VECTOR_LOG_ERROR("DirectX12Context::AllocateDescriptor - Maximum SRV descriptors reached!");
+                return;
+            }
+            outDescriptorIndex = m_CurrentSrvOffset;
+            m_CurrentSrvOffset++;
         }
-        outDescriptorIndex = m_CurrentSrvOffset;
         
         outCpuHandle = m_SrvHeap->GetCPUDescriptorHandleForHeapStart();
         outCpuHandle.ptr += outDescriptorIndex * m_SrvDescriptorSize;
         
         outGpuHandle = m_SrvHeap->GetGPUDescriptorHandleForHeapStart();
         outGpuHandle.ptr += outDescriptorIndex * m_SrvDescriptorSize;
-        
-        m_CurrentSrvOffset++;
+    }
+
+    void DirectX12Context::FreeDescriptor(uint32_t index) {
+        m_FreeSrvIndices.push_back(index);
     }
 
     void DirectX12Context::AllocateRTV(D3D12_CPU_DESCRIPTOR_HANDLE& outCpuHandle, uint32_t& outDescriptorIndex) {

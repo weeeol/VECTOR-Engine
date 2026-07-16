@@ -84,7 +84,7 @@ namespace VECTOR {
         std::shared_ptr<VertexArray> m_QuadVertexArray;
         int m_Width, m_Height;
         struct TextTexture {
-            unsigned int id; // Abstract later
+            std::shared_ptr<Texture2D> texture;
             int w, h;
         };
         std::unordered_map<std::string, TextTexture> m_TextTextureCache;

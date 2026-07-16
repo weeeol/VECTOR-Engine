@@ -76,7 +76,7 @@ namespace VECTOR {
             psoDesc.BlendState.RenderTarget[i] = blendDesc;
         }
 
-        if (vertexSource.find("main2D") != std::string::npos || vertexSource.find("postprocess") != std::string::npos) {
+        if (vertexSource.find("spriteColor") != std::string::npos || vertexSource.find("screenTexture") != std::string::npos) {
             psoDesc.DepthStencilState.DepthEnable = FALSE;
             psoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
         } else {

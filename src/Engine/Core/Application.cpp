@@ -107,15 +107,15 @@ namespace VECTOR {
     }
 
     void Application::ProcessInput() {
+        if (m_InputManager) {
+            m_InputManager->Update();
+        }
+
         if (m_Renderer && m_Renderer->GetWindow()) {
             m_Renderer->GetWindow()->ProcessEvents(m_InputManager.get());
             if (m_Renderer->GetWindow()->ShouldClose()) {
                 Quit();
             }
-        }
-        
-        if (m_InputManager) {
-            m_InputManager->Update();
         }
     }
 

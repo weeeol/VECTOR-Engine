@@ -27,6 +27,7 @@ namespace VECTOR {
         int GetMouseDeltaY() const { return m_MouseDeltaY; }
         
         void SetRelativeMouseMode(bool enable);
+        bool IsRelativeMouseMode() const { return m_RelativeMouseMode; }
         bool IsMouseButtonPressed(MouseButton button) const;
         
         // Check if mouse button was just pressed this frame
@@ -46,6 +47,7 @@ namespace VECTOR {
         int m_MouseY;
         int m_MouseDeltaX;
         int m_MouseDeltaY;
+        bool m_RelativeMouseMode = false;
     };
 
 } // namespace VECTOR

@@ -11,6 +11,7 @@ namespace VECTOR {
     class DirectX12Texture2D : public Texture2D {
     public:
         DirectX12Texture2D(const std::string& path);
+        DirectX12Texture2D(const void* pixels, int width, int height);
         virtual ~DirectX12Texture2D();
 
         virtual void Bind(unsigned int slot = 0) const override;
@@ -24,6 +25,7 @@ namespace VECTOR {
 
     private:
         Microsoft::WRL::ComPtr<ID3D12Resource> m_Texture;
+        Microsoft::WRL::ComPtr<ID3D12Resource> m_UploadBuffer;
         int m_Width, m_Height, m_BPP;
         std::string m_FilePath;
 

@@ -19,6 +19,26 @@ namespace VECTOR {
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 
+    static KeyCode MapWin32Key(WPARAM wParam) {
+        switch (wParam) {
+            case VK_SPACE: return KeyCode::Space;
+            case VK_ESCAPE: return KeyCode::Escape;
+            case VK_RETURN: return KeyCode::Enter;
+            case VK_TAB: return KeyCode::Tab;
+            case VK_RIGHT: return KeyCode::Right;
+            case VK_LEFT: return KeyCode::Left;
+            case VK_DOWN: return KeyCode::Down;
+            case VK_UP: return KeyCode::Up;
+            case VK_F1: return KeyCode::F1;
+            case VK_F2: return KeyCode::F2;
+            case VK_F3: return KeyCode::F3;
+            default:
+                if (wParam >= 'A' && wParam <= 'Z') return (KeyCode)wParam;
+                if (wParam >= '0' && wParam <= '9') return (KeyCode)wParam;
+                return (KeyCode)0;
+        }
+    }
+
     Win32Window::Win32Window(const WindowProps& props) {
         Init(props);
     }
@@ -93,8 +113,10 @@ namespace VECTOR {
             } else if (msg.message == WM_KEYDOWN || msg.message == WM_KEYUP) {
                 if (inputManager) {
                     bool isPressed = (msg.message == WM_KEYDOWN);
-                    KeyCode key = (KeyCode)msg.wParam; // Win32 Virtual Key Codes closely match our ASCII mappings!
-                    inputManager->SetKeyState(key, isPressed);
+                    KeyCode key = MapWin32Key(msg.wParam);
+                    if ((int)key != 0) {
+                        inputManager->SetKeyState(key, isPressed);
+                    }
                 }
             } else if (msg.message == WM_LBUTTONDOWN || msg.message == WM_LBUTTONUP) {
                 if (inputManager) inputManager->SetMouseButtonState(MouseButton::Left, msg.message == WM_LBUTTONDOWN);
@@ -108,19 +130,29 @@ namespace VECTOR {
             DispatchMessage(&msg);
         }
         
-        if (inputManager) {
+        if (inputManager && GetActiveWindow() == m_Window) {
             POINT p;
             GetCursorPos(&p);
-            ScreenToClient(m_Window, &p);
             
-            static int lastX = p.x;
-            static int lastY = p.y;
-            
-            inputManager->SetMouseDelta(p.x - lastX, p.y - lastY);
-            inputManager->SetMousePosition(p.x, p.y);
-            
-            lastX = p.x;
-            lastY = p.y;
+            if (inputManager->IsRelativeMouseMode()) {
+                RECT rect;
+                GetWindowRect(m_Window, &rect);
+                int centerX = rect.left + (rect.right - rect.left) / 2;
+                int centerY = rect.top + (rect.bottom - rect.top) / 2;
+                
+                inputManager->SetMouseDelta(p.x - centerX, p.y - centerY);
+                SetCursorPos(centerX, centerY);
+            } else {
+                ScreenToClient(m_Window, &p);
+                static int lastX = p.x;
+                static int lastY = p.y;
+                
+                inputManager->SetMouseDelta(p.x - lastX, p.y - lastY);
+                inputManager->SetMousePosition(p.x, p.y);
+                
+                lastX = p.x;
+                lastY = p.y;
+            }
         }
     }
 

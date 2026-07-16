@@ -5,6 +5,7 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <cstdint>
+#include <vector>
 
 // Forward declaration of Windows HWND since we don't want to include Windows.h everywhere
 struct HWND__;
@@ -41,6 +42,7 @@ namespace VECTOR {
 
         // Returns a CPU and GPU handle for a new SRV/CBV descriptor, and increments the offset
         void AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE& outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE& outGpuHandle, uint32_t& outDescriptorIndex);
+        void FreeDescriptor(uint32_t index);
 
         // Descriptor allocation for RTV and DSV
         void AllocateRTV(D3D12_CPU_DESCRIPTOR_HANDLE& outCpuHandle, uint32_t& outDescriptorIndex);
@@ -78,6 +80,7 @@ namespace VECTOR {
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_SrvHeap;
         uint32_t m_SrvDescriptorSize;
         uint32_t m_CurrentSrvOffset = 0;
+        std::vector<uint32_t> m_FreeSrvIndices;
 
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_DsvHeap;
         uint32_t m_DsvDescriptorSize;

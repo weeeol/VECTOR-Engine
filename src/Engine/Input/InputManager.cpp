@@ -17,8 +17,8 @@ namespace VECTOR {
     }
 
     void InputManager::SetRelativeMouseMode(bool enable) {
-        // This still requires an external platform call, which will be handled later
-        // via a Window or Platform abstraction call.
+        m_RelativeMouseMode = enable;
+        // In a more complex engine, we might also call Platform::SetCursorHidden(enable); here.
     }
 
     bool InputManager::IsKeyPressed(KeyCode key) const {

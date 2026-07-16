@@ -426,6 +426,14 @@ namespace VECTOR {
         glDisable(GL_DEPTH_TEST);
 #endif
 
+#ifdef VECTOR_BUILD_DIRECTX
+        auto context = DirectX12Context::Get();
+        if (context) {
+            ID3D12DescriptorHeap* descriptorHeaps[] = { context->GetSrvHeap() };
+            context->GetCommandList()->SetDescriptorHeaps(1, descriptorHeaps);
+        }
+#endif
+
         glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
         m_2DShader->SetMat4("projection", projection);
         
@@ -447,8 +455,8 @@ namespace VECTOR {
             }
 
             struct CBV2D {
-                glm::mat4 projection;
                 glm::mat4 model;
+                glm::mat4 projection;
                 glm::vec4 spriteColor;
                 int useTexture;
                 int padding[3];
@@ -477,9 +485,6 @@ namespace VECTOR {
     }
 
     void Renderer::DrawUIText(const std::string& text, int x, int y, const glm::vec4& renderColor, int fontSize) {
-#ifdef VECTOR_BUILD_DIRECTX
-        return;
-#endif
         if (text.empty()) return;
 
         // Use cached texture or create it
@@ -493,9 +498,11 @@ namespace VECTOR {
         TextTexture textTex;
         if (m_TextTextureCache.find(cacheKey) == m_TextTextureCache.end()) {
             if (m_TextTextureCache.size() > 128) {
-                for (auto& pair : m_TextTextureCache) {
-                    glDeleteTextures(1, &pair.second.id);
-                }
+#ifdef VECTOR_BUILD_DIRECTX
+                auto context = DirectX12Context::Get();
+                if (context) context->FlushCommandQueue();
+#endif
+                // Shared pointers will automatically clean up when removed from cache!
                 m_TextTextureCache.clear();
             }
             
@@ -506,64 +513,79 @@ namespace VECTOR {
             SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), color);
             if (!surface) return;
 
-#ifndef VECTOR_BUILD_DIRECTX
-            unsigned int texture;
-            glGenTextures(1, &texture);
-            glBindTexture(GL_TEXTURE_2D, texture);
+            // Convert to a consistent RGBA format for all APIs
+            SDL_Surface* formattedSurface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
+            SDL_FreeSurface(surface);
+            if (!formattedSurface) return;
 
-            int mode = GL_RGB;
-            int format = GL_RGB;
-            if (surface->format->BytesPerPixel == 4) {
-                mode = GL_RGBA;
-                if (surface->format->Rmask == 0x00ff0000) {
-                    format = GL_BGRA;
-                } else {
-                    format = GL_RGBA;
-                }
-            }
-
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-            glPixelStorei(GL_UNPACK_ROW_LENGTH, surface->pitch / surface->format->BytesPerPixel);
-            glTexImage2D(GL_TEXTURE_2D, 0, mode, surface->w, surface->h, 0, format, GL_UNSIGNED_BYTE, surface->pixels);
-            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0); 
-            
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            
-            textTex.id = texture;
-            textTex.w = surface->w;
-            textTex.h = surface->h;
+            textTex.texture = Texture2D::CreateFromPixels(formattedSurface->pixels, formattedSurface->w, formattedSurface->h);
+            textTex.w = formattedSurface->w;
+            textTex.h = formattedSurface->h;
             
             m_TextTextureCache[cacheKey] = textTex;
-            SDL_FreeSurface(surface);
-#endif
+            SDL_FreeSurface(formattedSurface);
         } else {
             textTex = m_TextTextureCache[cacheKey];
         }
 
+        if (!textTex.texture) return;
+
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(x, y, 0.0f));
         model = glm::scale(model, glm::vec3(textTex.w, textTex.h, 1.0f));
-        m_2DShader->SetMat4("model", model);
 
-        // For blended text, spriteColor is usually 1.0f, the color is baked in texture
+#ifdef VECTOR_BUILD_DIRECTX
+        auto context = DirectX12Context::Get();
+        if (context) {
+            auto cmdList = context->GetCommandList();
+            auto dxShader = dynamic_cast<const DirectX12Shader*>(m_2DShader.get());
+            if (dxShader && dxShader->GetPipelineState()) {
+                cmdList->SetPipelineState(dxShader->GetPipelineState());
+                cmdList->SetGraphicsRootSignature(context->GetRootSignature());
+            }
+
+            struct CBV2D {
+                glm::mat4 model;
+                glm::mat4 projection;
+                glm::vec4 spriteColor;
+                int useTexture;
+                int padding[3];
+            } cbvData;
+            
+            glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
+            cbvData.model = glm::transpose(model);
+            cbvData.projection = glm::transpose(projection);
+            cbvData.spriteColor = glm::vec4(1.0f);
+            cbvData.useTexture = 1;
+
+            D3D12_GPU_VIRTUAL_ADDRESS cbvAddress = context->UploadConstantBuffer(&cbvData, sizeof(cbvData));
+            cmdList->SetGraphicsRootConstantBufferView(0, cbvAddress);
+
+            auto dxTexture = dynamic_cast<const DirectX12Texture2D*>(textTex.texture.get());
+            if (dxTexture) {
+                cmdList->SetGraphicsRootDescriptorTable(1, dxTexture->GetGpuDescriptorHandle());
+            } else {
+                cmdList->SetGraphicsRootDescriptorTable(1, context->GetSrvHeap()->GetGPUDescriptorHandleForHeapStart());
+            }
+
+            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            cmdList->DrawInstanced(6, 1, 0, 0);
+        }
+        return;
+#endif
+
+        m_2DShader->SetMat4("model", model);
         m_2DShader->SetVec4("spriteColor", glm::vec4(1.0f));
         m_2DShader->SetInt("useTexture", 1);
 
-#ifndef VECTOR_BUILD_DIRECTX
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, textTex.id);
+        textTex.texture->Bind(0);
         m_2DShader->SetInt("text", 0);
 
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindTexture(GL_TEXTURE_2D, 0);
-#endif
+        textTex.texture->Unbind();
     }
 
     void Renderer::EndUI() {
-#ifdef VECTOR_BUILD_DIRECTX
-        return;
-#endif
         m_QuadVertexArray->Unbind();
 #ifndef VECTOR_BUILD_DIRECTX
         glEnable(GL_DEPTH_TEST);
@@ -600,99 +622,7 @@ namespace VECTOR {
     }
 
     void Renderer::DrawText(const std::string& text, int x, int y, uint8_t r, uint8_t g, uint8_t b, int fontSize) {
-#ifdef VECTOR_BUILD_DIRECTX
-        return;
-#endif
-        if (text.empty()) return;
-
-        std::string cacheKey = text + "_" + std::to_string(r) + "_" + std::to_string(g) + "_" + std::to_string(b) + "_" + std::to_string(fontSize);
-        
-        TextTexture textTex;
-
-        if (m_TextTextureCache.find(cacheKey) == m_TextTextureCache.end()) {
-#ifndef VECTOR_BUILD_DIRECTX
-            if (m_TextTextureCache.size() > 128) {
-                for (auto& pair : m_TextTextureCache) {
-                    glDeleteTextures(1, &pair.second.id);
-                }
-                m_TextTextureCache.clear();
-            }
-#endif
-
-            TTF_Font* font = ResourceManager::Get().GetFont("assets/font.ttf", fontSize);
-            if (!font) return;
-
-            SDL_Color color = {r, g, b, 255};
-            SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), color);
-            if (!surface) return;
-
-#ifndef VECTOR_BUILD_DIRECTX
-            unsigned int texture;
-            glGenTextures(1, &texture);
-            glBindTexture(GL_TEXTURE_2D, texture);
-
-            int mode = GL_RGB;
-            int format = GL_RGB;
-            if (surface->format->BytesPerPixel == 4) {
-                mode = GL_RGBA;
-                if (surface->format->Rmask == 0x00ff0000) {
-                    format = GL_BGRA;
-                } else {
-                    format = GL_RGBA;
-                }
-            }
-
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-            glPixelStorei(GL_UNPACK_ROW_LENGTH, surface->pitch / surface->format->BytesPerPixel);
-
-            glTexImage2D(GL_TEXTURE_2D, 0, mode, surface->w, surface->h, 0, format, GL_UNSIGNED_BYTE, surface->pixels);
-            
-            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0); // reset
-            
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            
-            textTex.id = texture;
-            textTex.w = surface->w;
-            textTex.h = surface->h;
-            
-            m_TextTextureCache[cacheKey] = textTex;
-            
-            glBindTexture(GL_TEXTURE_2D, 0);
-            SDL_FreeSurface(surface);
-#endif
-        } else {
-            textTex = m_TextTextureCache[cacheKey];
-        }
-
-        m_2DShader->Bind();
-#ifndef VECTOR_BUILD_DIRECTX
-        glDisable(GL_DEPTH_TEST);
-#endif
-
-        glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
-        m_2DShader->SetMat4("projection", projection);
-
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(x, y, 0.0f));
-        model = glm::scale(model, glm::vec3(textTex.w, textTex.h, 1.0f));
-        m_2DShader->SetMat4("model", model);
-
-        m_2DShader->SetVec4("spriteColor", glm::vec4(1.0f));
-        m_2DShader->SetInt("useTexture", 1);
-
-#ifndef VECTOR_BUILD_DIRECTX
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, textTex.id);
-        m_2DShader->SetInt("text", 0);
-
-        m_QuadVertexArray->Bind();
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        m_QuadVertexArray->Unbind();
-
-        glEnable(GL_DEPTH_TEST);
-        glBindTexture(GL_TEXTURE_2D, 0);
-#endif
+        VECTOR_LOG_WARN("Legacy DrawText called! Use DrawUIText instead.");
     }
 
 } // namespace VECTOR
