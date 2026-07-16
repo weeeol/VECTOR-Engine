@@ -1,6 +1,8 @@
 #include "ShootingSystem.hpp"
 #include "Engine/ECS/Components.hpp"
 #include "Engine/Graphics/Mesh.hpp"
+#include "Engine/Graphics/Material.hpp"
+#include "Engine/Core/ResourceManager.hpp"
 #include <iostream>
 
 namespace Game {
@@ -8,6 +10,11 @@ namespace Game {
     ShootingSystem::ShootingSystem(VECTOR::InputManager* inputManager, VECTOR::BulletPhysicsSystem* physicsSys) 
         : m_InputManager(inputManager), m_PhysicsSystem(physicsSys) {
         m_BulletMesh = VECTOR::Mesh::CreateCube();
+
+        // Create a reusable material for all bullets
+        m_BulletMaterial = std::make_shared<VECTOR::Material>();
+        m_BulletMaterial->shader = VECTOR::ResourceManager::Get().GetShader("Default3D");
+        m_BulletMaterial->albedoColor = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f); // Yellow
     }
 
     ShootingSystem::~ShootingSystem() {
@@ -38,12 +45,15 @@ namespace Game {
             t.scale = glm::vec3(0.5f);
             registry.AddComponent(bullet, t);
             
-            // Bullet visual size 0.5
-            registry.AddComponent(bullet, VECTOR::RenderComponent{glm::vec4(1.0f, 1.0f, 0.0f, 1.0f)}); // Yellow
+            // Bullet visual — uses shared bullet material
+            registry.AddComponent(bullet, VECTOR::RenderComponent(m_BulletMaterial));
             
             VECTOR::MeshComponent m;
             m.mesh = m_BulletMesh;
             registry.AddComponent(bullet, m);
+            
+            // Add point light to bullet
+            registry.AddComponent(bullet, VECTOR::PointLightComponent(glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 5.0f));
             
             // Physical sphere
             btCollisionShape* colShape = new btSphereShape(btScalar(0.5));

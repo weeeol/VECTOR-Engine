@@ -5,7 +5,7 @@
 #include "Engine/Input/InputManager.hpp"
 #include "Engine/Physics/BulletPhysicsSystem.hpp"
 
-namespace VECTOR { class Mesh; }
+namespace VECTOR { class Mesh; class Material; }
 
 namespace Game {
 
@@ -21,6 +21,8 @@ namespace Game {
         VECTOR::BulletPhysicsSystem* m_PhysicsSystem;
         float m_ShootCooldown = 0.0f;
         std::shared_ptr<VECTOR::Mesh> m_BulletMesh;
+        std::shared_ptr<VECTOR::Material> m_BulletMaterial;
     };
 
 } // namespace Game
+

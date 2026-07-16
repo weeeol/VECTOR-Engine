@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <glm/glm.hpp>
+#include "Frustum.hpp"
 
 namespace VECTOR {
 
@@ -24,9 +25,12 @@ namespace VECTOR {
 
         static std::shared_ptr<Mesh> CreateCube();
 
+        const AABB& GetAABB() const { return m_AABB; }
+
     private:
         unsigned int m_VAO, m_VBO, m_EBO;
         int m_IndexCount;
+        AABB m_AABB;
 
         void SetupMesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices);
     };

@@ -12,6 +12,7 @@
 
 namespace VECTOR {
     class InputManager;
+    class Material;
 }
 
 namespace Game {
@@ -28,6 +29,9 @@ namespace Game {
     private:
         void GenerateArena();
         void CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const glm::vec3& color, bool isEnemy = false);
+
+        /** @brief Create a Material with the given color using the default shader. */
+        std::shared_ptr<VECTOR::Material> CreateColorMaterial(const glm::vec3& color);
 
         int m_Width;
         int m_Height;
@@ -49,5 +53,8 @@ namespace Game {
         bool m_WasF3Pressed = false;
         
         std::shared_ptr<VECTOR::Mesh> m_CubeMesh;
+
+        // Unlit material for objects that shouldn't receive lighting (sun)
+        std::shared_ptr<VECTOR::Material> m_UnlitMaterial;
     };
 }

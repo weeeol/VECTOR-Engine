@@ -41,6 +41,18 @@ namespace VECTOR {
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords));
 
         glBindVertexArray(0);
+
+        // Calculate AABB
+        if (!vertices.empty()) {
+            glm::vec3 minAABB = vertices[0].Position;
+            glm::vec3 maxAABB = vertices[0].Position;
+            for (const auto& v : vertices) {
+                minAABB = glm::min(minAABB, v.Position);
+                maxAABB = glm::max(maxAABB, v.Position);
+            }
+            m_AABB.center = (minAABB + maxAABB) * 0.5f;
+            m_AABB.extents = (maxAABB - minAABB) * 0.5f;
+        }
     }
 
     void Mesh::Draw() const {

@@ -37,6 +37,10 @@ set(VECTOR_SOURCES
     src/Engine/Graphics/Shader.cpp
     src/Engine/Graphics/Mesh.cpp
     src/Engine/Graphics/Texture2D.cpp
+    src/Engine/Graphics/Frustum.cpp
+    src/Engine/Graphics/Material.cpp
+    src/Engine/Graphics/RenderQueue.cpp
+    src/Engine/Graphics/UniformBufferObject.cpp
     src/Engine/Graphics/OpenGL/OpenGLTexture2D.cpp
     src/Engine/Input/InputManager.cpp
     src/Engine/Audio/AudioManager.cpp

@@ -3,17 +3,18 @@
 #include "Engine/Core/SceneManager.hpp"
 #include "Engine/Input/InputManager.hpp"
 #include "Engine/Graphics/Renderer.hpp"
+#include "Engine/Graphics/Material.hpp"
 #include "Engine/Events/EventBus.hpp"
 #include "Game/Events/GameEvents.hpp"
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Core/Application.hpp"
+#include "Engine/Core/ResourceManager.hpp"
 #include "Engine/ECS/Components.hpp"
 #include "Engine/ECS/UIComponents.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <GL/glew.h>
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/Shader.hpp"
-#include "Engine/Graphics/Texture2D.hpp"
 #include "Engine/Graphics/Texture2D.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include <SDL.h>
@@ -28,6 +29,8 @@ namespace Game {
         m_Registry.RegisterComponent<VECTOR::RenderComponent>();
         m_Registry.RegisterComponent<VECTOR::MeshComponent>();
         m_Registry.RegisterComponent<VECTOR::CameraComponent>();
+        m_Registry.RegisterComponent<VECTOR::PointLightComponent>();
+        m_Registry.RegisterComponent<VECTOR::DirectionalLightComponent>();
         m_Registry.RegisterComponent<AIComponent>(); // Reusing AIComponent for enemies
 
         auto physSys = std::make_unique<VECTOR::BulletPhysicsSystem>();
@@ -38,6 +41,12 @@ namespace Game {
         m_Systems.push_back(std::make_unique<ShootingSystem>(m_InputManager, m_PhysicsSystem));
 
         m_CubeMesh = VECTOR::Mesh::CreateCube();
+
+        // Create unlit material for objects like the sun
+        m_UnlitMaterial = std::make_shared<VECTOR::Material>();
+        m_UnlitMaterial->shader = VECTOR::ResourceManager::Get().GetShader("Default3D");
+        m_UnlitMaterial->isUnlit = true;
+        m_UnlitMaterial->albedoColor = glm::vec4(1.0f, 1.0f, 0.8f, 1.0f);
 
         // UI Registry Setup
         m_UIRegistry.RegisterComponent<VECTOR::UIRectComponent>();
@@ -78,6 +87,13 @@ namespace Game {
 
     GameplayScene::~GameplayScene() {
         m_InputManager->SetRelativeMouseMode(false);
+    }
+
+    std::shared_ptr<VECTOR::Material> GameplayScene::CreateColorMaterial(const glm::vec3& color) {
+        auto mat = std::make_shared<VECTOR::Material>();
+        mat->shader = VECTOR::ResourceManager::Get().GetShader("Default3D");
+        mat->albedoColor = glm::vec4(color, 1.0f);
+        return mat;
     }
 
     void GameplayScene::GenerateArena() {
@@ -121,9 +137,18 @@ namespace Game {
         t.scale = scale;
         m_Registry.AddComponent(entity, t);
 
-        VECTOR::RenderComponent r;
-        r.color = glm::vec4(color, 1.0f);
-        m_Registry.AddComponent(entity, r);
+        auto mat = CreateColorMaterial(color);
+        // Make heavy targets shiny and brightly lit!
+        if (mass == 100.0f) {
+            mat->albedoColor = glm::vec4(color * 2.0f, 1.0f);
+            mat->specularStrength = 1.0f;
+            mat->shininess = 64.0f;
+            m_Registry.AddComponent(entity, VECTOR::PointLightComponent(color, 2.0f, 15.0f));
+        } else if (mass == 10.0f) {
+            m_Registry.AddComponent(entity, VECTOR::PointLightComponent(color, 1.0f, 10.0f));
+        }
+
+        m_Registry.AddComponent(entity, VECTOR::RenderComponent(mat));
 
         VECTOR::MeshComponent m;
         m.mesh = m_CubeMesh;
@@ -188,27 +213,34 @@ namespace Game {
         
         renderer->SetViewProjection(camT.position, view, projection);
 
-        // Helper lambda to render all scene meshes
-        auto renderMeshes = [&](VECTOR::Shader* overrideShader) {
-            m_Registry.View<VECTOR::TransformComponent, VECTOR::MeshComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
-                auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
-                auto& m = m_Registry.GetComponent<VECTOR::MeshComponent>(entity);
-                auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
+        // Submit Directional Light
+        glm::vec3 sunDir = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.3f));
+        renderer->SetDirectionalLight(sunDir, glm::vec3(0.9f, 0.9f, 0.8f), 0.8f);
 
-                glm::mat4 model = glm::mat4(1.0f);
-                model = glm::translate(model, t.position);
-                model = model * glm::mat4_cast(t.rotation);
-                model = glm::scale(model, t.scale);
+        // Submit Point Lights
+        m_Registry.View<VECTOR::TransformComponent, VECTOR::PointLightComponent>([&](VECTOR::Entity entity) {
+            auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+            auto& l = m_Registry.GetComponent<VECTOR::PointLightComponent>(entity);
+            renderer->SubmitPointLight(t.position, l.radius, l.color, l.intensity);
+        });
 
-                glm::vec4 color(r.color.r, r.color.g, r.color.b, r.color.a);
-                
-                renderer->DrawMesh(m.mesh.get(), overrideShader ? overrideShader : r.shader.get(), r.texture.get(), model, color);
-            });
-        };
+        // Submit all renderable entities to the render queue
+        m_Registry.View<VECTOR::TransformComponent, VECTOR::MeshComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
+            auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+            auto& m = m_Registry.GetComponent<VECTOR::MeshComponent>(entity);
+            auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
+
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, t.position);
+            model = model * glm::mat4_cast(t.rotation);
+            model = glm::scale(model, t.scale);
+
+            renderer->SubmitMesh(m.mesh.get(), r.material.get(), model);
+        });
 
         // PASS 1: SHADOW MAP
         renderer->BeginShadowPass();
-        renderMeshes(renderer->GetDepthShader());
+        renderer->FlushShadowPass();
 
         // PASS 2: MAIN POST-PROCESS FBO
         renderer->BeginMainPass();
@@ -220,10 +252,9 @@ namespace Game {
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
 
-        renderMeshes(nullptr); // Uses default or component shaders
+        renderer->FlushMainPass();
 
-        // Explicitly draw the sun without shadows
-        glm::vec3 sunDir = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.3f));
+        // Draw the sun (unlit) directly via legacy path for simplicity
         glm::mat4 sunModel = glm::mat4(1.0f);
         sunModel = glm::translate(sunModel, sunDir * 80.0f);
         sunModel = glm::scale(sunModel, glm::vec3(10.0f, 10.0f, 10.0f));
@@ -232,7 +263,6 @@ namespace Game {
         renderer->SetUnlitMode(false);
 
         // PASS 3: POST PROCESS SCREEN QUAD
-        // Make sure polygon mode is filled before drawing full screen quad!
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         renderer->EndPostProcessPass();
 
@@ -250,14 +280,17 @@ namespace Game {
             int ramMB = SDL_GetSystemRAM();
             std::string sysStr = "CPU Cores: " + std::to_string(cpuCount) + " | RAM: " + std::to_string(ramMB) + " MB";
             
+            std::string drawStr = "Draw Calls: " + std::to_string(renderer->GetDrawCallCount());
+
             renderer->DrawUIText(fpsStr, 10, 10, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
             renderer->DrawUIText(posStr, 10, 30, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
             renderer->DrawUIText(sysStr, 10, 50, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
+            renderer->DrawUIText(drawStr, 10, 70, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
             
             const GLubyte* rendererStr = glGetString(GL_RENDERER);
             if (rendererStr) {
                 std::string gpuStr = "GPU: " + std::string(reinterpret_cast<const char*>(rendererStr));
-                renderer->DrawUIText(gpuStr, 10, 70, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
+                renderer->DrawUIText(gpuStr, 10, 90, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
             }
         }
 

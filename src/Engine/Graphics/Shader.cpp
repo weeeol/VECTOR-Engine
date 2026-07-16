@@ -52,6 +52,10 @@ namespace VECTOR {
         glUniform1f(GetUniformLocation(name), value);
     }
 
+    void Shader::SetVec2(const std::string& name, const glm::vec2& value) const {
+        glUniform2fv(GetUniformLocation(name), 1, glm::value_ptr(value));
+    }
+
     void Shader::SetVec3(const std::string& name, const glm::vec3& value) const {
         glUniform3fv(GetUniformLocation(name), 1, glm::value_ptr(value));
     }
@@ -65,10 +69,14 @@ namespace VECTOR {
     }
 
     int Shader::GetUniformLocation(const std::string& name) const {
-        int location = glGetUniformLocation(m_ProgramID, name.c_str());
-        if (location == -1) {
-            VECTOR_LOG_WARN("Uniform '" + name + "' doesn't exist!");
+        if (m_UniformLocationCache.find(name) != m_UniformLocationCache.end()) {
+            return m_UniformLocationCache[name];
         }
+
+        int location = glGetUniformLocation(m_ProgramID, name.c_str());
+        // Warning removed: missing uniforms are safely optimized out by OpenGL.
+        
+        m_UniformLocationCache[name] = location;
         return location;
     }
 

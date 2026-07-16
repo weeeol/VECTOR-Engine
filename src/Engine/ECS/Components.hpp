@@ -2,10 +2,14 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <stdint.h>
+#include <memory>
 
 class btRigidBody;
 
 namespace VECTOR {
+
+    class Material;
+
     struct TransformComponent {
         glm::vec3 position;
         glm::quat rotation;
@@ -20,12 +24,10 @@ namespace VECTOR {
     };
 
     struct RenderComponent {
-        std::shared_ptr<class Shader> shader;
-        std::shared_ptr<class Texture2D> texture;
-        glm::vec4 color;
+        std::shared_ptr<Material> material;
 
-        RenderComponent() : color(1.0f) {}
-        RenderComponent(const glm::vec4& c) : color(c) {}
+        RenderComponent() = default;
+        RenderComponent(std::shared_ptr<Material> mat) : material(std::move(mat)) {}
     };
 
     struct MeshComponent {
@@ -42,4 +44,24 @@ namespace VECTOR {
         
         CameraComponent() : front(0,0,-1), up(0,1,0), right(1,0,0), yaw(-90.0f), pitch(0.0f), fov(45.0f) {}
     };
+
+    struct PointLightComponent {
+        glm::vec3 color{1.0f, 1.0f, 1.0f};
+        float intensity{1.0f};
+        float radius{10.0f};
+
+        PointLightComponent() = default;
+        PointLightComponent(const glm::vec3& c, float i, float r)
+            : color(c), intensity(i), radius(r) {}
+    };
+
+    struct DirectionalLightComponent {
+        glm::vec3 color{1.0f, 1.0f, 1.0f};
+        float intensity{1.0f};
+
+        DirectionalLightComponent() = default;
+        DirectionalLightComponent(const glm::vec3& c, float i)
+            : color(c), intensity(i) {}
+    };
+
 }
