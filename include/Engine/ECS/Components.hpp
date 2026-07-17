@@ -20,7 +20,10 @@ namespace VECTOR {
     };
 
     struct RigidBodyComponent {
-        ::btRigidBody* body;
+        std::shared_ptr<::btRigidBody> body;
+        
+        RigidBodyComponent() = default;
+        RigidBodyComponent(std::shared_ptr<::btRigidBody> b) : body(std::move(b)) {}
     };
 
     struct RenderComponent {

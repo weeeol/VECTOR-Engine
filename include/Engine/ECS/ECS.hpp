@@ -21,55 +21,68 @@ namespace VECTOR {
     template<typename T>
     class ComponentArray : public IComponentArray {
     public:
+        ComponentArray() {
+            std::fill_n(m_EntityToIndex, MAX_ENTITIES, (size_t)-1);
+        }
+
         void InsertData(Entity entity, T component) {
-            assert(m_EntityToIndexMap.find(entity) == m_EntityToIndexMap.end() && "Component added to same entity more than once.");
+            assert(entity < MAX_ENTITIES && m_EntityToIndex[entity] == (size_t)-1 && "Component added to same entity more than once or entity out of bounds.");
             size_t newIndex = m_Size;
-            m_EntityToIndexMap[entity] = newIndex;
-            m_IndexToEntityMap[newIndex] = entity;
+            m_EntityToIndex[entity] = newIndex;
+            m_IndexToEntity[newIndex] = entity;
             m_ComponentArray[newIndex] = component;
             m_Size++;
         }
 
         void RemoveData(Entity entity) {
-            assert(m_EntityToIndexMap.find(entity) != m_EntityToIndexMap.end() && "Removing non-existent component.");
-            size_t indexOfRemovedEntity = m_EntityToIndexMap[entity];
+            assert(entity < MAX_ENTITIES && m_EntityToIndex[entity] != (size_t)-1 && "Removing non-existent component.");
+            size_t indexOfRemovedEntity = m_EntityToIndex[entity];
             size_t indexOfLastElement = m_Size - 1;
-            m_ComponentArray[indexOfRemovedEntity] = m_ComponentArray[indexOfLastElement];
+            
+            if (indexOfRemovedEntity != indexOfLastElement) {
+                m_ComponentArray[indexOfRemovedEntity] = std::move(m_ComponentArray[indexOfLastElement]);
 
-            Entity entityOfLastElement = m_IndexToEntityMap[indexOfLastElement];
-            m_EntityToIndexMap[entityOfLastElement] = indexOfRemovedEntity;
-            m_IndexToEntityMap[indexOfRemovedEntity] = entityOfLastElement;
+                Entity entityOfLastElement = m_IndexToEntity[indexOfLastElement];
+                m_EntityToIndex[entityOfLastElement] = indexOfRemovedEntity;
+                m_IndexToEntity[indexOfRemovedEntity] = entityOfLastElement;
+            }
 
-            m_EntityToIndexMap.erase(entity);
-            m_IndexToEntityMap.erase(indexOfLastElement);
+            m_EntityToIndex[entity] = (size_t)-1;
             m_Size--;
         }
 
         T& GetData(Entity entity) {
-            assert(m_EntityToIndexMap.find(entity) != m_EntityToIndexMap.end() && "Retrieving non-existent component.");
-            return m_ComponentArray[m_EntityToIndexMap[entity]];
+            assert(entity < MAX_ENTITIES && m_EntityToIndex[entity] != (size_t)-1 && "Retrieving non-existent component.");
+            return m_ComponentArray[m_EntityToIndex[entity]];
         }
 
         void EntityDestroyed(Entity entity) override {
-            if (m_EntityToIndexMap.find(entity) != m_EntityToIndexMap.end()) {
+            if (entity < MAX_ENTITIES && m_EntityToIndex[entity] != (size_t)-1) {
                 RemoveData(entity);
             }
         }
         
         bool HasData(Entity entity) const {
-            return m_EntityToIndexMap.find(entity) != m_EntityToIndexMap.end();
+            return entity < MAX_ENTITIES && m_EntityToIndex[entity] != (size_t)-1;
         }
 
         void Clear() override {
-            m_EntityToIndexMap.clear();
-            m_IndexToEntityMap.clear();
+            std::fill_n(m_EntityToIndex, MAX_ENTITIES, (size_t)-1);
             m_Size = 0;
+        }
+
+        const Entity* GetDenseEntityArray() const {
+            return m_IndexToEntity;
+        }
+
+        size_t GetSize() const {
+            return m_Size;
         }
 
     private:
         T m_ComponentArray[MAX_ENTITIES];
-        std::unordered_map<Entity, size_t> m_EntityToIndexMap;
-        std::unordered_map<size_t, Entity> m_IndexToEntityMap;
+        size_t m_EntityToIndex[MAX_ENTITIES];
+        Entity m_IndexToEntity[MAX_ENTITIES];
         size_t m_Size = 0;
     };
 
@@ -89,7 +102,11 @@ namespace VECTOR {
                 pair.second->EntityDestroyed(entity);
             }
             auto it = std::find(m_ActiveEntities.begin(), m_ActiveEntities.end(), entity);
-            if (it != m_ActiveEntities.end()) m_ActiveEntities.erase(it);
+            if (it != m_ActiveEntities.end()) {
+                // Swap and pop for faster removal
+                std::swap(*it, m_ActiveEntities.back());
+                m_ActiveEntities.pop_back();
+            }
         }
 
         void Clear() {
@@ -109,7 +126,7 @@ namespace VECTOR {
 
         template<typename T>
         void AddComponent(Entity entity, T component) {
-            GetComponentArray<T>()->InsertData(entity, component);
+            GetComponentArray<T>()->InsertData(entity, std::move(component));
         }
 
         template<typename T>
@@ -124,16 +141,24 @@ namespace VECTOR {
 
         template<typename T>
         bool HasComponent(Entity entity) {
-            // Check if registered
             std::type_index typeName = std::type_index(typeid(T));
             if (m_ComponentArrays.find(typeName) == m_ComponentArrays.end()) return false;
             return GetComponentArray<T>()->HasData(entity);
         }
 
-        template<typename... Components, typename Func>
+        template<typename T, typename... Rest, typename Func>
         void View(Func func) {
-            for (Entity entity : m_ActiveEntities) {
-                if ((HasComponent<Components>(entity) && ...)) {
+            auto firstArray = GetComponentArray<T>();
+            const Entity* entities = firstArray->GetDenseEntityArray();
+            size_t size = firstArray->GetSize();
+            
+            for (size_t i = 0; i < size; ++i) {
+                Entity entity = entities[i];
+                if constexpr (sizeof...(Rest) > 0) {
+                    if ((HasComponent<Rest>(entity) && ...)) {
+                        func(entity);
+                    }
+                } else {
                     func(entity);
                 }
             }

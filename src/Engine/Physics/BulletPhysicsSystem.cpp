@@ -20,6 +20,13 @@ namespace VECTOR {
     }
 
     BulletPhysicsSystem::~BulletPhysicsSystem() {
+        if (m_DynamicsWorld) {
+            int remaining = m_DynamicsWorld->getNumCollisionObjects();
+            if (remaining > 0) {
+                // Should not happen if ECS components cleaned up properly
+                // But if it does, log or handle
+            }
+        }
     }
 
     void BulletPhysicsSystem::Update(Registry& registry, float deltaTime) {

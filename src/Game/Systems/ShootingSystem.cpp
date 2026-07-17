@@ -74,8 +74,18 @@ namespace Game {
             btVector3 velocity = btVector3(camC.front.x, camC.front.y, camC.front.z) * 50.0f;
             body->setLinearVelocity(velocity);
             
+            auto deleter = [world = m_PhysicsSystem->GetWorld()](btRigidBody* rb) {
+                if (world && rb) world->removeRigidBody(rb);
+                if (rb) {
+                    if (rb->getMotionState()) delete rb->getMotionState();
+                    if (rb->getCollisionShape()) delete rb->getCollisionShape();
+                    delete rb;
+                }
+            };
+            std::shared_ptr<btRigidBody> bodyPtr(body, deleter);
+
             m_PhysicsSystem->GetWorld()->addRigidBody(body);
-            registry.AddComponent(bullet, VECTOR::RigidBodyComponent{body});
+            registry.AddComponent(bullet, VECTOR::RigidBodyComponent{bodyPtr});
         }
     }
 

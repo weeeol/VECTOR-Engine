@@ -193,6 +193,7 @@ namespace Game {
 
     GameplayScene::~GameplayScene() {
         m_InputManager->SetRelativeMouseMode(false);
+        m_Registry.Clear();
     }
 
     // CreateColorMaterial removed
@@ -219,8 +220,18 @@ namespace Game {
         // lock rotations
         playerBody->setAngularFactor(btVector3(0,0,0));
         
+        auto deleter = [world = m_PhysicsSystem->GetWorld()](btRigidBody* rb) {
+            if (world && rb) world->removeRigidBody(rb);
+            if (rb) {
+                if (rb->getMotionState()) delete rb->getMotionState();
+                if (rb->getCollisionShape()) delete rb->getCollisionShape();
+                delete rb;
+            }
+        };
+        std::shared_ptr<btRigidBody> bodyPtr(playerBody, deleter);
+
         m_PhysicsSystem->GetWorld()->addRigidBody(playerBody);
-        m_Registry.AddComponent(m_Player, VECTOR::RigidBodyComponent{playerBody});
+        m_Registry.AddComponent(m_Player, VECTOR::RigidBodyComponent{bodyPtr});
 
         // Floor
         CreateCube(glm::vec3(0, -1, 0), glm::vec3(50, 1, 50), 0.0f, "assets/materials/floor.vmat");
@@ -266,8 +277,17 @@ namespace Game {
         btRigidBody* body = new btRigidBody(rbInfo);
         body->setFriction(0.8f); // Added friction
         
+        auto deleter = [world = m_PhysicsSystem->GetWorld()](btRigidBody* rb) {
+            if (world && rb) world->removeRigidBody(rb);
+            if (rb) {
+                if (rb->getMotionState()) delete rb->getMotionState();
+                if (rb->getCollisionShape()) delete rb->getCollisionShape();
+                delete rb;
+            }
+        };
+        std::shared_ptr<btRigidBody> bodyPtr(body, deleter);
         m_PhysicsSystem->GetWorld()->addRigidBody(body);
-        m_Registry.AddComponent(entity, VECTOR::RigidBodyComponent{body});
+        m_Registry.AddComponent(entity, VECTOR::RigidBodyComponent{bodyPtr});
 
         if (isEnemy) {
             m_Registry.AddComponent(entity, AIComponent{AIDifficulty::Medium, AIState::Tracking, 0.0f, 0.2f, 0.0f});
