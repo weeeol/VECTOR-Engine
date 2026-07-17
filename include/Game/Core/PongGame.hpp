@@ -14,9 +14,14 @@ namespace Game {
         void OnInit() override;
         void Update(float deltaTime) override;
         void Render() override;
+        void OnImGuiRender() override;
 
     private:
         void SetupEventSubscriptions();
+
+        int m_PlayerScore = 0;
+        int m_OpponentScore = 0;
+        bool m_ShowDebugUI = false;
     };
 
 } // namespace Game

@@ -1,3 +1,7 @@
+#include <imgui.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <backends/imgui_impl_sdlrenderer3.h>
+
 #include "Engine/Core/Application.hpp"
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Core/ResourceManager.hpp"
@@ -48,6 +52,16 @@ namespace VECTOR {
         // Initialize InputManager
         m_InputManager = std::make_unique<InputManager>();
 
+        // Initialize ImGui
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        ImGui::StyleColorsDark();
+
+        ImGui_ImplSDL3_InitForSDLRenderer(m_Renderer->GetSDLWindow(), m_Renderer->GetSDLRenderer());
+        ImGui_ImplSDLRenderer3_Init(m_Renderer->GetSDLRenderer());
+
         m_IsRunning = true;
         
         OnInit();
@@ -84,6 +98,11 @@ namespace VECTOR {
 
             ProcessInput();
 
+            // Start ImGui frame
+            ImGui_ImplSDLRenderer3_NewFrame();
+            ImGui_ImplSDL3_NewFrame();
+            ImGui::NewFrame();
+
             // Fixed time-step update loop
             while (accumulator >= targetFrameTime) {
                 Update(targetFrameTime / 1000.0f); // Convert back to seconds for logic
@@ -94,6 +113,17 @@ namespace VECTOR {
             }
 
             Render();
+
+            // Render ImGui
+            OnImGuiRender();
+            SceneManager::Get().OnImGuiRender();
+            ImGui::Render();
+            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_Renderer->GetSDLRenderer());
+
+            // Present the frame
+            if (m_Renderer) {
+                m_Renderer->Present();
+            }
             frameCount++;
 
             Uint64 currentTicks = SDL_GetTicks();
@@ -110,6 +140,11 @@ namespace VECTOR {
     }
 
     void Application::Shutdown() {
+        // Shutdown ImGui
+        ImGui_ImplSDLRenderer3_Shutdown();
+        ImGui_ImplSDL3_Shutdown();
+        ImGui::DestroyContext();
+
         SceneManager::Get().Clear();
         
         if (m_Renderer) {
@@ -129,9 +164,14 @@ namespace VECTOR {
         
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            ImGui_ImplSDL3_ProcessEvent(&event);
             if (event.type == SDL_EVENT_QUIT) {
                 Quit();
             }
+            // ImGui wants to capture mouse/keyboard?
+            ImGuiIO& io = ImGui::GetIO();
+            bool blockInput = false;
+            // For now, let's just pass events. In a full engine you'd check io.WantCaptureMouse.
             if (m_InputManager) {
                 m_InputManager->ProcessEvent(event);
             }

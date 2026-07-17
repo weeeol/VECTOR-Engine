@@ -24,6 +24,26 @@ endif()
 
 find_package(box2d CONFIG REQUIRED)
 
+# ==============================================================================
+# DEAR IMGUI
+# ==============================================================================
+include(FetchContent)
+FetchContent_Declare(
+    imgui
+    URL https://github.com/ocornut/imgui/archive/refs/heads/docking.zip
+)
+FetchContent_MakeAvailable(imgui)
+
+set(IMGUI_SOURCES
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp
+)
+
 set(VECTOR_SOURCES
     src/Engine/Core/Application.cpp
     src/Engine/Core/Logger.cpp
@@ -40,10 +60,11 @@ set(VECTOR_SOURCES
     src/Engine/UI/UIButton.cpp
     src/Engine/UI/UIManager.cpp
     src/Engine/UI/UISlider.cpp
+    ${IMGUI_SOURCES}
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
-target_include_directories(VECTOR PUBLIC include ${VECTOR_SDL_INCLUDES})
+target_include_directories(VECTOR PUBLIC include ${VECTOR_SDL_INCLUDES} ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} box2d::box2d)
 
 # ==============================================================================

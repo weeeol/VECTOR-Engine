@@ -47,6 +47,7 @@ namespace VECTOR {
         virtual void OnInit() {}
         virtual void Update(float deltaTime);
         virtual void Render();
+        virtual void OnImGuiRender() {}
 
         std::string m_Title;
         int m_Width;

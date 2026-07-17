@@ -35,6 +35,7 @@ namespace VECTOR {
 
         // Render the active scene
         void Render(Renderer* renderer);
+        void OnImGuiRender();
 
     private:
         SceneManager() = default;

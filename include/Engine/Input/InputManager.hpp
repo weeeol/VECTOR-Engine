@@ -23,6 +23,7 @@ namespace VECTOR {
         // Check if a specific key is currently held down
         // SDL_Scancode is used (e.g., SDL_SCANCODE_W, SDL_SCANCODE_UP)
         bool IsKeyPressed(SDL_Scancode key) const;
+        bool IsKeyJustPressed(SDL_Scancode key) const;
 
         // Mouse input
         int GetMouseX() const { return (int)m_MouseX; }
@@ -38,6 +39,7 @@ namespace VECTOR {
         float m_MouseX;
         float m_MouseY;
         bool m_MouseJustPressed[6];
+        bool m_KeyJustPressed[SDL_SCANCODE_COUNT];
     };
 
 } // namespace VECTOR

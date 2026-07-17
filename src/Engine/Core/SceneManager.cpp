@@ -50,4 +50,10 @@ namespace VECTOR {
         }
     }
 
+    void SceneManager::OnImGuiRender() {
+        if (!m_Scenes.empty()) {
+            m_Scenes.back()->OnImGuiRender();
+        }
+    }
+
 } // namespace VECTOR

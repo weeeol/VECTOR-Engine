@@ -5,6 +5,7 @@
 #include "Game/Events/GameEvents.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include "Engine/Core/Logger.hpp"
+#include <imgui.h>
 
 namespace Game {
 
@@ -37,15 +38,24 @@ namespace Game {
     }
 
     void PongGame::Update(float deltaTime) {
+        if (m_InputManager->IsKeyJustPressed(SDL_SCANCODE_F3)) {
+            m_ShowDebugUI = !m_ShowDebugUI;
+        }
         VECTOR::SceneManager::Get().Update(deltaTime);
     }
 
     void PongGame::Render() {
         m_Renderer->Clear(0, 0, 0, 255);
-        
         VECTOR::SceneManager::Get().Render(m_Renderer.get());
-        
-        m_Renderer->Present();
+    }
+
+    void PongGame::OnImGuiRender() {
+        if (m_ShowDebugUI) {
+            ImGui::Begin("Engine Status");
+            float fps = VECTOR::Application::Get().GetFPS();
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", fps > 0.0f ? (1000.0f / fps) : 0.0f, fps);
+            ImGui::End();
+        }
     }
 
 } // namespace Game

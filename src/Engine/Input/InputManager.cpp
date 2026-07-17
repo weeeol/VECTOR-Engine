@@ -6,6 +6,7 @@ namespace VECTOR {
         // Initialize keyboard state pointer
         m_KeyboardState = SDL_GetKeyboardState(nullptr);
         for(int i=0; i<6; ++i) m_MouseJustPressed[i] = false;
+        for(int i=0; i<SDL_SCANCODE_COUNT; ++i) m_KeyJustPressed[i] = false;
     }
 
     InputManager::~InputManager() {
@@ -20,6 +21,10 @@ namespace VECTOR {
             if (e.button.button < 6) {
                 m_MouseJustPressed[e.button.button] = true;
             }
+        } else if (e.type == SDL_EVENT_KEY_DOWN) {
+            if (!e.key.repeat && e.key.scancode < SDL_SCANCODE_COUNT) {
+                m_KeyJustPressed[e.key.scancode] = true;
+            }
         }
     }
 
@@ -29,11 +34,19 @@ namespace VECTOR {
 
     void InputManager::ClearJustPressed() {
         for(int i=0; i<6; ++i) m_MouseJustPressed[i] = false;
+        for(int i=0; i<SDL_SCANCODE_COUNT; ++i) m_KeyJustPressed[i] = false;
     }
 
     bool InputManager::IsKeyPressed(SDL_Scancode key) const {
         if (m_KeyboardState) {
             return m_KeyboardState[key] == 1;
+        }
+        return false;
+    }
+
+    bool InputManager::IsKeyJustPressed(SDL_Scancode key) const {
+        if (key < SDL_SCANCODE_COUNT) {
+            return m_KeyJustPressed[key];
         }
         return false;
     }
