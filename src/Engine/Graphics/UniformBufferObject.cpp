@@ -7,14 +7,12 @@
 namespace VECTOR {
 
     void UniformBuffer::BindShaderBlock(uint32_t shaderProgramID, const char* blockName, uint32_t bindingPoint) {
-        // This is still using OpenGL directly! Let's handle this in the RendererAPI or OpenGLRenderer?
-        // Wait, the plan says abstract UniformBufferObject. 
-        // BindShaderBlock takes a shaderProgramID. This is tied to OpenGL.
-        // Let's implement it with a check if OpenGL for now.
         if (RendererAPI::GetAPI() == RendererAPI::API::OpenGL) {
             GLuint blockIndex = glGetUniformBlockIndex(shaderProgramID, blockName);
             if (blockIndex != GL_INVALID_INDEX) {
                 glUniformBlockBinding(shaderProgramID, blockIndex, bindingPoint);
+            } else {
+                VECTOR_LOG_WARN(std::string("Shader block not found: ") + blockName + " in shader program " + std::to_string(shaderProgramID));
             }
         }
     }

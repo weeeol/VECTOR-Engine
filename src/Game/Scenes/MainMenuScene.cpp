@@ -92,7 +92,7 @@ namespace Game {
 
             VECTOR::Entity volSlider = m_Registry.CreateEntity();
             m_Registry.AddComponent(volSlider, VECTOR::UIRectComponent(startX, startY + 200, btnWidth, 20, glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f)));
-            m_Registry.AddComponent(volSlider, VECTOR::UISliderComponent(0.5f, [](float val) {
+            m_Registry.AddComponent(volSlider, VECTOR::UISliderComponent(VECTOR::AudioManager::Get().GetMusicVolume(), [](float val) {
                 VECTOR::AudioManager::Get().SetMusicVolume(val);
             }));
         } else if (m_State == MainMenuState::Settings) {

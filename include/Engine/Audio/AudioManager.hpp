@@ -23,6 +23,7 @@ namespace VECTOR {
         void PlayMusic(const std::string& filepath, int loops = -1);
         void StopMusic();
         void SetMusicVolume(float volume);
+        float GetMusicVolume() const { return m_MusicVolume; }
 
     private:
         AudioManager() = default;
@@ -32,6 +33,7 @@ namespace VECTOR {
         MIX_Track* m_MusicTrack = nullptr;
         std::unordered_map<std::string, MIX_Audio*> m_Sounds;
         std::unordered_map<std::string, MIX_Audio*> m_Music;
+        float m_MusicVolume = 0.5f;
     };
 
 } // namespace VECTOR

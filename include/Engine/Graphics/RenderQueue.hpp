@@ -47,6 +47,7 @@ namespace VECTOR {
          * After flushing, the queue is cleared.
          */
         void SortAndFlush();
+        void SortAndFlushGBuffer(class Shader* gBufferShader);
 
         /**
          * @brief Clear all queued commands without executing them.

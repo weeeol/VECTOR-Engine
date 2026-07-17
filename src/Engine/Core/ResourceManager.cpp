@@ -116,10 +116,15 @@ namespace VECTOR {
                 if (iss >> r >> g >> b >> a) {
                     mat->albedoColor = glm::vec4(r, g, b, a);
                 }
+            } else if (key == "roughness") {
+                mat->roughness = std::stof(value);
+            } else if (key == "metallic") {
+                mat->metallic = std::stof(value);
             } else if (key == "specularStrength") {
-                mat->specularStrength = std::stof(value);
+                mat->roughness = 1.0f - std::stof(value);
             } else if (key == "shininess") {
-                mat->shininess = std::stof(value);
+                float shin = std::stof(value);
+                mat->roughness = std::sqrt(2.0f / (shin + 2.0f));
             } else if (key == "isUnlit") {
                 mat->isUnlit = (value == "true" || value == "1");
             } else if (key == "diffuseTexture") {

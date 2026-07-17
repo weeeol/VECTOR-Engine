@@ -18,6 +18,7 @@
 #include "Engine/Graphics/Texture2D.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include <SDL3/SDL.h>
+#include <imgui.h>
 
 namespace Game {
 
@@ -37,7 +38,10 @@ namespace Game {
         m_PhysicsSystem = physSys.get();
         m_Systems.push_back(std::move(physSys));
 
-        m_Systems.push_back(std::make_unique<CameraSystem>(m_InputManager));
+        auto camSys = std::make_unique<CameraSystem>(m_InputManager);
+        m_CameraSystem = camSys.get();
+        m_Systems.push_back(std::move(camSys));
+
         m_Systems.push_back(std::make_unique<ShootingSystem>(m_InputManager, m_PhysicsSystem));
 
         m_CubeMesh = VECTOR::Mesh::CreateCube();
@@ -126,7 +130,7 @@ namespace Game {
 
             VECTOR::Entity volSlider = m_UIRegistry.CreateEntity();
             m_UIRegistry.AddComponent(volSlider, VECTOR::UIRectComponent(m_Width - 250, 50, 200, 20, glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f)));
-            m_UIRegistry.AddComponent(volSlider, VECTOR::UISliderComponent(0.5f, [](float val) {
+            m_UIRegistry.AddComponent(volSlider, VECTOR::UISliderComponent(VECTOR::AudioManager::Get().GetMusicVolume(), [](float val) {
                 VECTOR::AudioManager::Get().SetMusicVolume(val);
             }));
 
@@ -308,14 +312,19 @@ namespace Game {
         }
         m_WasF3Pressed = isF3Pressed;
 
+        bool targetRelative = !m_DebugMode && m_State == GameState::Playing;
+        static bool lastRelative = true;
+        if (targetRelative != lastRelative) {
+            m_InputManager->SetRelativeMouseMode(targetRelative);
+            lastRelative = targetRelative;
+        }
+
         if (isEscapePressed && !m_WasEscapePressed) {
             if (m_State == GameState::Playing) {
                 m_State = GameState::Paused;
-                m_InputManager->SetRelativeMouseMode(false);
                 CreateUI();
             } else if (m_State == GameState::Paused) {
                 m_State = GameState::Playing;
-                m_InputManager->SetRelativeMouseMode(true);
             } else if (m_State == GameState::Settings) {
                 m_State = GameState::Paused;
                 CreateUI();
@@ -403,26 +412,7 @@ namespace Game {
         // Crosshair
         renderer->DrawUIRect(m_Width / 2 - 2, m_Height / 2 - 2, 4, 4, glm::vec4(1.0f, 1.0f, 1.0f, 200/255.0f));
 
-        if (m_DebugMode) {
-            float fps = VECTOR::Application::Get().GetFPS();
-            
-            std::string fpsStr = "FPS: " + std::to_string((int)fps);
-            std::string posStr = "Pos: " + std::to_string(camT.position.x) + ", " + std::to_string(camT.position.y) + ", " + std::to_string(camT.position.z);
-            
-            int cpuCount = SDL_GetNumLogicalCPUCores();
-            int ramMB = SDL_GetSystemRAM();
-            std::string sysStr = "CPU Cores: " + std::to_string(cpuCount) + " | RAM: " + std::to_string(ramMB) + " MB";
-            
-            std::string drawStr = "Draw Calls: " + std::to_string(renderer->GetDrawCallCount());
-
-            renderer->DrawUIText(fpsStr, 10, 10, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
-            renderer->DrawUIText(posStr, 10, 30, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
-            renderer->DrawUIText(sysStr, 10, 50, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
-            renderer->DrawUIText(drawStr, 10, 70, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
-            
-            std::string gpuStr = "GPU: " + renderer->GetRendererInfo();
-            renderer->DrawUIText(gpuStr, 10, 90, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
-        }
+        // Raw text debug info has been migrated to the Dear ImGui Debugger window.
 
         if (m_State != GameState::Playing) {
             renderer->DrawUIRect(0, 0, m_Width, m_Height, glm::vec4(0.0f, 0.0f, 0.0f, 150/255.0f)); // Dark overlay
@@ -460,6 +450,38 @@ namespace Game {
             });
         }
         renderer->EndUI();
+
+        // Render Dear ImGui Debug HUD
+        if (m_DebugMode) {
+            ImGui::Begin("VECTOR Engine Debugger", &m_DebugMode);
+            
+            if (ImGui::CollapsingHeader("System Info", ImGuiTreeNodeFlags_DefaultOpen)) {
+                float fps = VECTOR::Application::Get().GetFPS();
+                ImGui::Text("FPS: %.1f (%.3f ms/frame)", fps, fps > 0.0f ? 1000.0f / fps : 0.0f);
+                ImGui::Text("Draw Calls: %u", renderer->GetDrawCallCount());
+                ImGui::Text("GPU: %s", renderer->GetRendererInfo().c_str());
+                ImGui::Text("CPU Cores: %d", SDL_GetNumLogicalCPUCores());
+                ImGui::Text("System RAM: %d MB", SDL_GetSystemRAM());
+            }
+
+            if (m_CameraSystem && ImGui::CollapsingHeader("Player & Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::Text("Position: X:%.2f, Y:%.2f, Z:%.2f", camT.position.x, camT.position.y, camT.position.z);
+                ImGui::Text("Front: X:%.2f, Y:%.2f, Z:%.2f", camC.front.x, camC.front.y, camC.front.z);
+                ImGui::SliderFloat("FOV", &camC.fov, 10.0f, 120.0f, "%.1f");
+                ImGui::SliderFloat("Camera Speed", &m_CameraSystem->m_MovementSpeed, 1.0f, 50.0f, "%.1f");
+                ImGui::SliderFloat("Mouse Sensitivity", &m_CameraSystem->m_MouseSensitivity, 0.01f, 1.0f, "%.2f");
+            }
+
+            if (m_PhysicsSystem && ImGui::CollapsingHeader("Physics System", ImGuiTreeNodeFlags_DefaultOpen)) {
+                btVector3 grav = m_PhysicsSystem->GetWorld()->getGravity();
+                float gravityY = grav.getY();
+                if (ImGui::SliderFloat("Gravity Y", &gravityY, -30.0f, 30.0f, "%.1f")) {
+                    m_PhysicsSystem->GetWorld()->setGravity(btVector3(0, gravityY, 0));
+                }
+            }
+
+            ImGui::End();
+        }
     }
 
 }

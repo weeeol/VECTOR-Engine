@@ -9,6 +9,13 @@
     "opengl",
     "glew",
     "glm",
-    "bullet3"
+    "bullet3",
+    {
+      "name": "imgui",
+      "features": [
+        "sdl3-binding",
+        "opengl3-binding"
+      ]
+    }
   ]
 }

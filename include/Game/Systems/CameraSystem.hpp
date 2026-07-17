@@ -14,10 +14,11 @@ namespace Game {
 
         void Update(VECTOR::Registry& registry, float deltaTime) override;
 
-    private:
-        VECTOR::InputManager* m_InputManager;
         float m_MouseSensitivity = 0.1f;
         float m_MovementSpeed = 10.0f;
+
+    private:
+        VECTOR::InputManager* m_InputManager;
     };
 
 } // namespace Game

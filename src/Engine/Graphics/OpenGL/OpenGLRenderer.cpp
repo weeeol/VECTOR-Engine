@@ -3,6 +3,9 @@
 #include "Engine/Core/ResourceManager.hpp"
 #include <iostream>
 #include <glm/gtc/type_ptr.hpp>
+#include <imgui.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_opengl3.h>
 
 namespace VECTOR {
 
@@ -70,16 +73,21 @@ namespace VECTOR {
         m_BloomDownsampleShader = ResourceManager::Get().LoadShader("BloomDown", "assets/engine/shaders/postprocess.vert", "assets/engine/shaders/bloom_downsample.frag");
         m_BloomUpsampleShader = ResourceManager::Get().LoadShader("BloomUp", "assets/engine/shaders/postprocess.vert", "assets/engine/shaders/bloom_upsample.frag");
         m_UIShader = ResourceManager::Get().LoadShader("Default2D", "assets/engine/shaders/main2D.vert", "assets/engine/shaders/main2D.frag");
+        m_GBufferShader = ResourceManager::Get().LoadShader("GBuffer", "assets/engine/shaders/gbuffer.vert", "assets/engine/shaders/gbuffer.frag");
+        m_DeferredLightShader = ResourceManager::Get().LoadShader("DeferredLight", "assets/engine/shaders/deferred_light.vert", "assets/engine/shaders/deferred_light.frag");
 
         VECTOR_LOG_INFO("Setting up UBO...");
         m_PerFrameUBO = UniformBuffer::Create(static_cast<uint32_t>(sizeof(PerFrameData)), 0);
 
         UniformBuffer::BindShaderBlock(m_DefaultShader->GetID(), "PerFrameData", 0);
         UniformBuffer::BindShaderBlock(m_DepthShader->GetID(), "PerFrameData", 0);
+        UniformBuffer::BindShaderBlock(m_GBufferShader->GetID(), "PerFrameData", 0);
+        UniformBuffer::BindShaderBlock(m_DeferredLightShader->GetID(), "PerFrameData", 0);
 
         VECTOR_LOG_INFO("Setting up Light UBO...");
         m_LightUBO = UniformBuffer::Create(static_cast<uint32_t>(sizeof(LightUBOData)), 1);
         UniformBuffer::BindShaderBlock(m_DefaultShader->GetID(), "LightDataBlock", 1);
+        UniformBuffer::BindShaderBlock(m_DeferredLightShader->GetID(), "LightDataBlock", 1);
 
         m_LightData.numPointLights = 0;
         m_LightData.dirLight.colorAndIntensity = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -98,6 +106,7 @@ namespace VECTOR {
         SetupDepthFBO();
         SetupPostProcessFBO();
         SetupBloomFBOs();
+        SetupGBufferFBO();
         SetupScreenQuad();
 
         float vertices[] = {
@@ -125,11 +134,32 @@ namespace VECTOR {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
 
+        // Setup Dear ImGui context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+
+        // Setup Platform/Renderer backends
+        ImGui_ImplSDL3_InitForOpenGL(m_Window, m_GLContext);
+        ImGui_ImplOpenGL3_Init("#version 330 core");
+
         VECTOR_LOG_INFO("Renderer initialized successfully.");
         return true;
     }
 
     void OpenGLRenderer::Shutdown() {
+        // Cleanup Dear ImGui
+        if (ImGui::GetCurrentContext()) {
+            ImGui_ImplOpenGL3_Shutdown();
+            ImGui_ImplSDL3_Shutdown();
+            ImGui::DestroyContext();
+        }
+
         m_LightUBO.reset();
         m_PerFrameUBO.reset();
 
@@ -148,12 +178,21 @@ namespace VECTOR {
         if (m_ScreenQuadVAO) glDeleteVertexArrays(1, &m_ScreenQuadVAO);
         if (m_ScreenQuadVBO) glDeleteBuffers(1, &m_ScreenQuadVBO);
 
+        if (m_GBufferFBO) glDeleteFramebuffers(1, &m_GBufferFBO);
+        if (m_GPosition) glDeleteTextures(1, &m_GPosition);
+        if (m_GNormal) glDeleteTextures(1, &m_GNormal);
+        if (m_GAlbedo) glDeleteTextures(1, &m_GAlbedo);
+        if (m_GMetallicRoughnessAO) glDeleteTextures(1, &m_GMetallicRoughnessAO);
+        if (m_GBufferRBO) glDeleteRenderbuffers(1, &m_GBufferRBO);
+
         if (m_UIQuadVAO) glDeleteVertexArrays(1, &m_UIQuadVAO);
         if (m_UIQuadVBO) glDeleteBuffers(1, &m_UIQuadVBO);
         m_DefaultShader.reset();
         m_DepthShader.reset();
         m_PostProcessShader.reset();
         m_UIShader.reset();
+        m_GBufferShader.reset();
+        m_DeferredLightShader.reset();
 
         for (auto& pair : m_TextTextureCache) {
             glDeleteTextures(1, &pair.second.id);
@@ -277,6 +316,68 @@ namespace VECTOR {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
+    void OpenGLRenderer::SetupGBufferFBO() {
+        if (m_GBufferFBO) {
+            glDeleteFramebuffers(1, &m_GBufferFBO);
+            glDeleteTextures(1, &m_GPosition);
+            glDeleteTextures(1, &m_GNormal);
+            glDeleteTextures(1, &m_GAlbedo);
+            glDeleteTextures(1, &m_GMetallicRoughnessAO);
+            glDeleteRenderbuffers(1, &m_GBufferRBO);
+        }
+
+        glGenFramebuffers(1, &m_GBufferFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_GBufferFBO);
+
+        // 1. Position color buffer
+        glGenTextures(1, &m_GPosition);
+        glBindTexture(GL_TEXTURE_2D, m_GPosition);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_Width, m_Height, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_GPosition, 0);
+
+        // 2. Normal color buffer
+        glGenTextures(1, &m_GNormal);
+        glBindTexture(GL_TEXTURE_2D, m_GNormal);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_Width, m_Height, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_GNormal, 0);
+
+        // 3. Albedo + Specular/Unlit color buffer (RGB: albedo, A: isUnlit)
+        glGenTextures(1, &m_GAlbedo);
+        glBindTexture(GL_TEXTURE_2D, m_GAlbedo);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_Width, m_Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_GAlbedo, 0);
+
+        // 4. Metallic + Roughness + AO color buffer (R: metallic, G: roughness, B: AO)
+        glGenTextures(1, &m_GMetallicRoughnessAO);
+        glBindTexture(GL_TEXTURE_2D, m_GMetallicRoughnessAO);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_Width, m_Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, m_GMetallicRoughnessAO, 0);
+
+        // Color attachments list
+        unsigned int attachments[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
+        glDrawBuffers(4, attachments);
+
+        // Depth buffer
+        glGenRenderbuffers(1, &m_GBufferRBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, m_GBufferRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, m_Width, m_Height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, m_GBufferRBO);
+
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            VECTOR_LOG_ERROR("GBuffer Framebuffer not complete!");
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
     void OpenGLRenderer::RecreateScreenFBOs() {
         if (m_PostProcessFBO) {
             glDeleteFramebuffers(1, &m_PostProcessFBO);
@@ -291,6 +392,7 @@ namespace VECTOR {
         }
         SetupPostProcessFBO();
         SetupBloomFBOs();
+        SetupGBufferFBO();
     }
 
     void OpenGLRenderer::SetupBloomFBOs() {
@@ -456,13 +558,14 @@ namespace VECTOR {
     }
 
     void OpenGLRenderer::BeginMainPass() {
+        glDisable(GL_BLEND);
         glCullFace(GL_BACK);
         glViewport(0, 0, m_Width, m_Height);
-        glBindFramebuffer(GL_FRAMEBUFFER, m_PostProcessFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_GBufferFBO);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, m_DepthMapTexture);
+        
+        glEnable(GL_DEPTH_TEST);
     }
 
     void OpenGLRenderer::FlushMainPass() {
@@ -473,10 +576,54 @@ namespace VECTOR {
         m_PerFrameUBO->Bind();
         m_LightUBO->Bind();
 
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, m_DepthMapTexture);
+        // 1. Geometry Pass: Render to G-Buffer
+        glEnable(GL_DEPTH_TEST);
+        m_MainQueue.SortAndFlushGBuffer(m_GBufferShader.get());
 
-        m_MainQueue.SortAndFlush();
+        // 2. Deferred Lighting Pass: Render fullscreen quad with G-Buffer to PostProcess HDR buffer
+        glBindFramebuffer(GL_FRAMEBUFFER, m_PostProcessFBO);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+
+        if (m_WireframeEnabled) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
+
+        m_DeferredLightShader->Bind();
+
+        // Bind G-buffer textures
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_GPosition);
+        m_DeferredLightShader->SetInt("gPosition", 0);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, m_GNormal);
+        m_DeferredLightShader->SetInt("gNormal", 1);
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, m_GAlbedo);
+        m_DeferredLightShader->SetInt("gAlbedo", 2);
+
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, m_GMetallicRoughnessAO);
+        m_DeferredLightShader->SetInt("gMetallicRoughnessAO", 3);
+
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, m_DepthMapTexture);
+        m_DeferredLightShader->SetInt("shadowMap", 4);
+
+        // Render full screen quad
+        glBindVertexArray(m_ScreenQuadVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+
+        if (m_WireframeEnabled) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
+
+        glEnable(GL_DEPTH_TEST);
+
         m_LastFrameDrawCalls += m_MainQueue.GetLastDrawCallCount();
     }
 
@@ -487,6 +634,10 @@ namespace VECTOR {
         glViewport(0, 0, m_Width, m_Height); 
         glDisable(GL_DEPTH_TEST);
         glClear(GL_COLOR_BUFFER_BIT);
+
+        if (m_WireframeEnabled) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
 
         m_PostProcessShader->Bind();
         m_PostProcessShader->SetInt("screenTexture", 0);
@@ -503,6 +654,10 @@ namespace VECTOR {
         glBindVertexArray(m_ScreenQuadVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
+
+        if (m_WireframeEnabled) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
 
         glEnable(GL_DEPTH_TEST);
     }
@@ -609,7 +764,19 @@ namespace VECTOR {
         glEnable(GL_DEPTH_TEST);
     }
 
+    void OpenGLRenderer::BeginImGuiFrame() {
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+    }
+
+    void OpenGLRenderer::EndImGuiFrame() {
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    }
+
     void OpenGLRenderer::SetWireframeMode(bool enabled) {
+        m_WireframeEnabled = enabled;
         if (enabled) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         } else {

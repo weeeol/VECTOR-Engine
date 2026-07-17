@@ -12,8 +12,8 @@ namespace VECTOR {
 
             // Material-specific uniforms
             shader->SetVec4("material.albedoColor", albedoColor);
-            shader->SetFloat("material.specularStrength", specularStrength);
-            shader->SetFloat("material.shininess", shininess);
+            shader->SetFloat("material.roughness", roughness);
+            shader->SetFloat("material.metallic", metallic);
             shader->SetInt("material.isUnlit", isUnlit ? 1 : 0);
 
             if (albedoTexture) {

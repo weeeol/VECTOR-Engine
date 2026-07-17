@@ -38,6 +38,9 @@ namespace VECTOR {
         virtual void DrawUIText(const std::string& text, int x, int y, const glm::vec4& color, int fontSize = 24) = 0;
         virtual void EndUI() = 0;
 
+        virtual void BeginImGuiFrame() = 0;
+        virtual void EndImGuiFrame() = 0;
+
         virtual SDL_Window* GetWindow() const = 0;
 
         // Multi-Pass Rendering Methods

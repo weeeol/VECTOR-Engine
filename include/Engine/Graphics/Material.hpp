@@ -30,9 +30,9 @@ namespace VECTOR {
         // Base color (multiplied with texture if present)
         glm::vec4 albedoColor = glm::vec4(1.0f);
 
-        // Lighting parameters
-        float specularStrength = 0.5f;
-        float shininess = 32.0f;
+        // Lighting parameters (PBR)
+        float roughness = 0.5f;
+        float metallic = 0.0f;
 
         // If true, skip lighting calculations entirely
         bool isUnlit = false;

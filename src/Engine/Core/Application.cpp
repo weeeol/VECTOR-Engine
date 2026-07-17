@@ -4,6 +4,7 @@
 #include "Engine/Audio/AudioManager.hpp"
 #include "Engine/Core/SceneManager.hpp"
 #include <SDL3/SDL.h>
+#include <imgui_impl_sdl3.h>
 
 namespace VECTOR {
 
@@ -138,6 +139,7 @@ namespace VECTOR {
     void Application::ProcessInput() {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            ImGui_ImplSDL3_ProcessEvent(&event);
             if (event.type == SDL_EVENT_QUIT) {
                 Quit();
             }

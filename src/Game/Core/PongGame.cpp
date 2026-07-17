@@ -50,7 +50,11 @@ namespace Game {
     void PongGame::Render() {
         m_Renderer->Clear(0, 0, 0, 255);
         
+        m_Renderer->BeginImGuiFrame();
+        
         VECTOR::SceneManager::Get().Render(m_Renderer.get());
+        
+        m_Renderer->EndImGuiFrame();
         
         m_Renderer->Present();
     }

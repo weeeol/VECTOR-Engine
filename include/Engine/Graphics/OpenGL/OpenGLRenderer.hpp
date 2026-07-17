@@ -44,6 +44,9 @@ namespace VECTOR {
         void DrawUIText(const std::string& text, int x, int y, const glm::vec4& color, int fontSize = 24) override;
         void EndUI() override;
 
+        void BeginImGuiFrame() override;
+        void EndImGuiFrame() override;
+
         SDL_Window* GetWindow() const override { return m_Window; }
 
         void BeginShadowPass() override;
@@ -70,6 +73,7 @@ namespace VECTOR {
         std::shared_ptr<Shader> m_PostProcessShader;
         
         bool m_UnlitMode = false;
+        bool m_WireframeEnabled = false;
 
         glm::vec3 m_ViewPos;
         glm::mat4 m_ViewMatrix;
@@ -85,10 +89,21 @@ namespace VECTOR {
         unsigned int m_PostProcessTexture;
         unsigned int m_PostProcessRBO;
 
+        // G-Buffer FBO & Textures
+        unsigned int m_GBufferFBO = 0;
+        unsigned int m_GPosition = 0;
+        unsigned int m_GNormal = 0;
+        unsigned int m_GAlbedo = 0;
+        unsigned int m_GMetallicRoughnessAO = 0;
+        unsigned int m_GBufferRBO = 0;
+        std::shared_ptr<Shader> m_GBufferShader;
+        std::shared_ptr<Shader> m_DeferredLightShader;
+
         unsigned int m_ScreenQuadVAO, m_ScreenQuadVBO;
         
         void SetupDepthFBO();
         void SetupPostProcessFBO();
+        void SetupGBufferFBO();
         void RecreateScreenFBOs();
         void SetupScreenQuad();
 

@@ -48,6 +48,7 @@ namespace Game {
 
         std::vector<std::unique_ptr<VECTOR::System>> m_Systems;
         VECTOR::BulletPhysicsSystem* m_PhysicsSystem = nullptr;
+        CameraSystem* m_CameraSystem = nullptr;
 
         VECTOR::Registry m_UIRegistry;
         std::unique_ptr<VECTOR::UISystem> m_UISystem;

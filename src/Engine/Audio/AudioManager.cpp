@@ -81,6 +81,7 @@ namespace VECTOR {
     void AudioManager::SetMusicVolume(float volume) {
         if (volume < 0.0f) volume = 0.0f;
         if (volume > 1.0f) volume = 1.0f;
+        m_MusicVolume = volume;
         if (m_MusicTrack) {
             MIX_SetTrackGain(m_MusicTrack, volume);
         }

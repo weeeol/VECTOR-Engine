@@ -21,6 +21,7 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Bullet CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 set(VECTOR_SOURCES
     src/Engine/Core/Application.cpp
     src/Engine/Core/Logger.cpp
@@ -50,7 +51,7 @@ set(VECTOR_SOURCES
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
 target_include_directories(VECTOR PUBLIC include src ${VECTOR_SDL_INCLUDES} ${BULLET_ROOT_DIR}/${BULLET_INCLUDE_DIRS})
 target_link_directories(VECTOR PUBLIC ${BULLET_ROOT_DIR}/${BULLET_LIBRARY_DIRS})
-target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES})
+target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES} imgui::imgui)
 
 # ==============================================================================
 # PONG GAME EXECUTABLE
