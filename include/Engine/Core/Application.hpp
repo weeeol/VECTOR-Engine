@@ -31,6 +31,10 @@ namespace VECTOR {
         float GetFPS() const { return m_CurrentFPS; }
         Renderer* GetRenderer() const { return m_Renderer.get(); }
 
+        int GetWidth() const { return m_Width; }
+        int GetHeight() const { return m_Height; }
+        void SetDimensions(int width, int height) { m_Width = width; m_Height = height; }
+
     private:
         // Initialize subsystems (SDL, Renderer, Window, etc.)
         bool Initialize();

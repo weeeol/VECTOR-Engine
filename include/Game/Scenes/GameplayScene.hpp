@@ -74,6 +74,7 @@ namespace Game {
         float m_ShakeTimer = 0.0f;
         float m_ShakeMagnitude = 0.0f;
         float m_BackgroundOffset = 0.0f;
+        float m_GameOverTimer = 0.0f;
 
         // Post-Processing
         std::unique_ptr<VECTOR::Texture> m_SceneTexture;

@@ -56,7 +56,7 @@ namespace Game {
         // Player 1
         m_Player1 = m_Registry.CreateEntity();
         m_Registry.AddComponent(m_Player1, VECTOR::TransformComponent{{30.0f, height / 2.0f - 50.0f}});
-        m_Registry.AddComponent(m_Player1, VECTOR::RenderComponent{20.0f, 100.0f, 255, 255, 255, 255});
+        m_Registry.AddComponent(m_Player1, VECTOR::RenderComponent{20.0f, 100.0f, 60, 200, 255, 255});
         m_Registry.AddComponent(m_Player1, PlayerInputComponent{SDL_SCANCODE_W, SDL_SCANCODE_S});
         b2BodyId p1Body = CreateBox(30.0f + 10.0f, height / 2.0f, 20.0f, 100.0f, b2_kinematicBody, 1.0f, 0.0f, 1.0f, false, (void*)4);
         m_Registry.AddComponent(m_Player1, VECTOR::RigidBodyComponent{p1Body});
@@ -64,7 +64,7 @@ namespace Game {
         // Player 2
         m_Player2 = m_Registry.CreateEntity();
         m_Registry.AddComponent(m_Player2, VECTOR::TransformComponent{{width - 50.0f, height / 2.0f - 50.0f}});
-        m_Registry.AddComponent(m_Player2, VECTOR::RenderComponent{20.0f, 100.0f, 255, 255, 255, 255});
+        m_Registry.AddComponent(m_Player2, VECTOR::RenderComponent{20.0f, 100.0f, 255, 140, 50, 255});
         m_Registry.AddComponent(m_Player2, AIComponent{aiDifficulty, AIState::Idle, 0.0f, 0.2f, height / 2.0f});
         b2BodyId p2Body = CreateBox(width - 50.0f + 10.0f, height / 2.0f, 20.0f, 100.0f, b2_kinematicBody, 1.0f, 0.0f, 1.0f, false, (void*)4);
         m_Registry.AddComponent(m_Player2, VECTOR::RigidBodyComponent{p2Body});
@@ -138,6 +138,7 @@ namespace Game {
         m_WasF3Pressed = isF3Pressed;
 
         if (m_State == GameState::GameOver) {
+            m_GameOverTimer += deltaTime;
             // Check for space or escape to return to main menu
             if (m_InputManager->IsKeyPressed(SDL_SCANCODE_SPACE) || m_InputManager->IsKeyPressed(SDL_SCANCODE_ESCAPE)) {
                 auto menuScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager);
@@ -254,16 +255,16 @@ namespace Game {
         int offsetX = 0;
         int offsetY = 0;
         if (m_ShakeTimer > 0.0f) {
-            offsetX = (rand() % (int)m_ShakeMagnitude * 2) - m_ShakeMagnitude;
-            offsetY = (rand() % (int)m_ShakeMagnitude * 2) - m_ShakeMagnitude;
+            offsetX = (rand() % (int)m_ShakeMagnitude * 2) - (int)m_ShakeMagnitude;
+            offsetY = (rand() % (int)m_ShakeMagnitude * 2) - (int)m_ShakeMagnitude;
         }
 
         // Draw Dynamic Background Grid
         for (int x = (int)m_BackgroundOffset; x < m_Width; x += 60) {
-            renderer->DrawRect(x + offsetX, 0 + offsetY, 2, m_Height, 20, 20, 50, 100);
+            renderer->DrawRect(x + offsetX, 0 + offsetY, 1, m_Height, 15, 15, 40, 70);
         }
         for (int y = (int)m_BackgroundOffset; y < m_Height; y += 60) {
-            renderer->DrawRect(0 + offsetX, y + offsetY, m_Width, 2, 20, 20, 50, 100);
+            renderer->DrawRect(0 + offsetX, y + offsetY, m_Width, 1, 15, 15, 40, 70);
         }
 
         m_TrailEmitter.Render(renderer, offsetX, offsetY);
@@ -296,28 +297,98 @@ namespace Game {
                 int drawY = (int)transform.position.y - (drawHeight - (int)r.height) / 2 + offsetY;
                 sprite.animator->Render(renderer, drawX, drawY, drawWidth, drawHeight);
             } else {
-                renderer->DrawRect((int)transform.position.x + offsetX, (int)transform.position.y + offsetY, (int)r.width, (int)r.height, r.r, r.g, r.b, r.a);
+                // Draw paddle glow (larger, low-alpha rect behind the paddle)
+                int px = (int)transform.position.x + offsetX;
+                int py = (int)transform.position.y + offsetY;
+                int pw = (int)r.width;
+                int ph = (int)r.height;
+                renderer->DrawRect(px - 4, py - 4, pw + 8, ph + 8, r.r, r.g, r.b, 40);
+                renderer->DrawRect(px - 2, py - 2, pw + 4, ph + 4, r.r, r.g, r.b, 80);
+                // Draw the paddle itself
+                renderer->DrawRect(px, py, pw, ph, r.r, r.g, r.b, r.a);
             }
         });
 
-        for (int y = 0; y < m_Height; y += 30) renderer->DrawRect(m_Width / 2 - 2 + offsetX, y + offsetY, 4, 15, 255, 255, 255, 100);
-        renderer->DrawText(std::to_string(m_Score1), m_Width / 2 - 50 + offsetX, 20 + offsetY, 255, 255, 255, 48);
-        renderer->DrawText(std::to_string(m_Score2), m_Width / 2 + 20 + offsetX, 20 + offsetY, 255, 255, 255, 48);
+        // --- Center line with glow ---
+        // Glow layer (wider, lower alpha)
+        for (int y = 0; y < m_Height; y += 30) {
+            renderer->DrawRect(m_Width / 2 - 4 + offsetX, y + offsetY, 8, 15, 255, 255, 255, 30);
+        }
+        // Main dashed line
+        for (int y = 0; y < m_Height; y += 30) {
+            renderer->DrawRect(m_Width / 2 - 2 + offsetX, y + offsetY, 4, 15, 255, 255, 255, 120);
+        }
 
+        // --- Scores with glow ---
+        std::string scoreStr1 = std::to_string(m_Score1);
+        std::string scoreStr2 = std::to_string(m_Score2);
+        int s1x = m_Width / 4 - 15 + offsetX;
+        int s2x = 3 * m_Width / 4 - 15 + offsetX;
+        int sy = 30 + offsetY;
+        // Glow layers (cyan for P1, orange for P2)
+        renderer->DrawText(scoreStr1, s1x - 2, sy - 2, 60, 200, 255, 48);
+        renderer->DrawText(scoreStr1, s1x + 2, sy + 2, 60, 200, 255, 48);
+        renderer->DrawText(scoreStr1, s1x, sy, 255, 255, 255, 48);
+        renderer->DrawText(scoreStr2, s2x - 2, sy - 2, 255, 140, 50, 48);
+        renderer->DrawText(scoreStr2, s2x + 2, sy + 2, 255, 140, 50, 48);
+        renderer->DrawText(scoreStr2, s2x, sy, 255, 255, 255, 48);
+
+        // --- Game Over screen ---
         if (m_State == GameState::GameOver) {
+            // Dark overlay
+            renderer->DrawRect(0, 0, m_Width, m_Height, 0, 0, 0, 180);
+
             std::string winText = (m_Winner == 1) ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!";
-            renderer->DrawText(winText, m_Width / 2 - 140 + offsetX, m_Height / 2 - 50 + offsetY, 255, 215, 0, 48);
-            renderer->DrawText("Press SPACE to return", m_Width / 2 - 130 + offsetX, m_Height / 2 + 10 + offsetY, 200, 200, 200, 24);
+            int wtx = m_Width / 2 - 140 + offsetX;
+            int wty = m_Height / 2 - 60 + offsetY;
+
+            // Gold glow behind winner text
+            renderer->DrawRect(wtx - 20, wty - 10, 320, 50, 255, 200, 0, 25);
+            renderer->DrawRect(wtx - 10, wty - 5, 300, 40, 255, 200, 0, 15);
+
+            // Flickering win text
+            float flicker = 0.7f + 0.3f * std::sin(m_GameOverTimer * 4.0f);
+            Uint8 flickerAlpha = (Uint8)(255.0f * flicker);
+            // Glow layers
+            renderer->DrawText(winText, wtx - 2, wty - 2, 255, 180, 0, 48);
+            renderer->DrawText(winText, wtx + 2, wty + 2, 255, 180, 0, 48);
+            // Main text
+            renderer->DrawText(winText, wtx, wty, 255, 215, 0, 48);
+
+            // Final score
+            std::string finalScore = std::to_string(m_Score1) + " - " + std::to_string(m_Score2);
+            renderer->DrawText(finalScore, m_Width / 2 - 40 + offsetX, m_Height / 2 + 5 + offsetY, 220, 220, 220, 32);
+
+            // Return hint
+            float hintPulse = 0.5f + 0.5f * std::sin(m_GameOverTimer * 2.5f);
+            Uint8 hintAlpha = (Uint8)(200.0f * hintPulse);
+            renderer->DrawText("Press SPACE to return", m_Width / 2 - 130 + offsetX, m_Height / 2 + 50 + offsetY, hintAlpha, hintAlpha, hintAlpha, 24);
         } else if (m_IsPaused) {
-            renderer->DrawRect(0, 0, m_Width, m_Height, 0, 0, 0, 200); // Translucent overlay
-            
-            // Draw a panel for the pause menu
-            renderer->DrawRect(m_Width / 2 - 150, m_Height / 2 - 100, 300, 250, 40, 40, 50, 230); // Panel
-            
-            renderer->DrawText("PAUSED", m_Width / 2 - 60, m_Height / 2 - 80, 255, 255, 255, 48);
-            renderer->DrawText("Volume", m_Width / 2 - 40, m_Height / 2 - 10, 200, 200, 200, 24);
+            // Translucent overlay
+            renderer->DrawRect(0, 0, m_Width, m_Height, 0, 0, 0, 200);
+
+            // Panel with border
+            int panelX = m_Width / 2 - 160;
+            int panelY = m_Height / 2 - 110;
+            int panelW = 320;
+            int panelH = 270;
+            // Outer glow border
+            renderer->DrawRect(panelX - 2, panelY - 2, panelW + 4, panelH + 4, 0, 140, 200, 60);
+            // Panel background
+            renderer->DrawRect(panelX, panelY, panelW, panelH, 25, 25, 35, 240);
+
+            // Title
+            renderer->DrawText("PAUSED", m_Width / 2 - 60, panelY + 15, 255, 255, 255, 48);
+            // Underline separator
+            renderer->DrawRect(panelX + 30, panelY + 65, panelW - 60, 2, 0, 180, 255, 100);
+            renderer->DrawRect(panelX + 60, panelY + 69, panelW - 120, 1, 0, 180, 255, 40);
+
+            renderer->DrawText("Volume", m_Width / 2 - 35, m_Height / 2 - 10, 200, 200, 220, 24);
             
             m_PauseMenuUI.Render(renderer);
+
+            // Resume hint
+            renderer->DrawText("Press P to Resume", m_Width / 2 - 105, panelY + panelH - 35, 120, 120, 140, 20);
         }
 
         // Post-Processing: Render Target to Screen
@@ -328,12 +399,12 @@ namespace Game {
         // CRT Scanline Effect (draw semi-transparent black lines)
         renderer->SetRenderDrawBlendMode(SDL_BLENDMODE_BLEND);
         for (int y = 0; y < m_Height; y += 4) {
-            renderer->DrawRect(0, y, m_Width, 2, 0, 0, 0, 60);
+            renderer->DrawRect(0, y, m_Width, 2, 0, 0, 0, 50);
         }
 
         // High Score Overlay
-        renderer->DrawText("Player High Score: " + std::to_string(m_HighScorePlayer), 10, 10, 150, 150, 150, 24);
-        renderer->DrawText("AI High Score: " + std::to_string(m_HighScoreAI), m_Width - 300, 10, 150, 150, 150, 24);
+        renderer->DrawText("Best: " + std::to_string(m_HighScorePlayer), 10, 10, 100, 100, 120, 20);
+        renderer->DrawText("AI Best: " + std::to_string(m_HighScoreAI), m_Width - 180, 10, 100, 100, 120, 20);
     }
 
     void GameplayScene::ResetGame() {

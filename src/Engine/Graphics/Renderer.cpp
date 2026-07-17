@@ -118,4 +118,34 @@ namespace VECTOR {
         SDL_SetRenderDrawBlendMode(m_Renderer, mode);
     }
 
+    void Renderer::SetBorderless(bool borderless) {
+        if (!m_Window) return;
+        if (borderless) {
+            SDL_SetWindowBordered(m_Window, false);
+            // Get display bounds to fill the screen
+            SDL_DisplayID displayId = SDL_GetDisplayForWindow(m_Window);
+            if (displayId) {
+                const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(displayId);
+                if (mode) {
+                    SDL_SetWindowSize(m_Window, mode->w, mode->h);
+                    SDL_SetWindowPosition(m_Window, 0, 0);
+                }
+            }
+        } else {
+            SDL_SetWindowBordered(m_Window, true);
+            // Restore to a reasonable centered position
+            int w, h;
+            SDL_GetWindowSize(m_Window, &w, &h);
+            SDL_SetWindowPosition(m_Window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+        }
+        VECTOR_LOG_INFO(std::string("Window mode set to: ") + (borderless ? "Borderless" : "Windowed"));
+    }
+
+    void Renderer::SetResolution(int width, int height) {
+        if (!m_Window) return;
+        SDL_SetWindowSize(m_Window, width, height);
+        SDL_SetWindowPosition(m_Window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+        VECTOR_LOG_INFO("Resolution set to: " + std::to_string(width) + "x" + std::to_string(height));
+    }
+
 } // namespace VECTOR

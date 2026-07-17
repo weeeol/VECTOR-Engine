@@ -1,5 +1,5 @@
 #include "Game/Core/PongGame.hpp"
-#include "Game/Scenes/MainMenuScene.hpp"
+#include "Game/Scenes/SplashScene.hpp"
 #include "Engine/Core/SceneManager.hpp"
 #include "Engine/Events/EventBus.hpp"
 #include "Game/Events/GameEvents.hpp"
@@ -18,12 +18,10 @@ namespace Game {
     void PongGame::OnInit() {
         VECTOR_LOG_INFO("PongGame::OnInit() started");
         // Push initial scene
-        auto initialScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager.get());
-        VECTOR_LOG_INFO("Pushing MainMenuScene");
+        auto initialScene = std::make_unique<SplashScene>(m_Width, m_Height, m_InputManager.get());
+        VECTOR_LOG_INFO("Pushing SplashScene");
         VECTOR::SceneManager::Get().PushScene(std::move(initialScene));
-        VECTOR_LOG_INFO("MainMenuScene Pushed");
-
-        VECTOR::AudioManager::Get().PlayMusic("assets/bgm.wav");
+        VECTOR_LOG_INFO("SplashScene Pushed");
 
         SetupEventSubscriptions();
     }

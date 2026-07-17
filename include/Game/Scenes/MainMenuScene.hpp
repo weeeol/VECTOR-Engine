@@ -12,7 +12,7 @@ namespace VECTOR {
 
 namespace Game {
 
-    enum class MenuState { SelectingMode, SelectingDifficulty };
+    enum class MenuState { SelectingMode, SelectingDifficulty, Settings };
 
     class MainMenuScene : public VECTOR::Scene {
     public:
@@ -26,6 +26,7 @@ namespace Game {
     private:
         void CreateModeUI();
         void CreateDifficultyUI();
+        void CreateSettingsUI();
 
         int m_Width;
         int m_Height;
@@ -36,6 +37,14 @@ namespace Game {
         MenuState m_State;
         GameMode m_SelectedMode;
         AIDifficulty m_SelectedDifficulty;
+
+        float m_TitleTimer = 0.0f;
+        float m_GridOffset = 0.0f;
+
+        // Settings state
+        bool m_IsBorderless = false;
+        int m_ResolutionIndex = 0; // Index into resolution presets
+        bool m_WasEscPressed = false;
     };
 
 } // namespace Game

@@ -49,6 +49,11 @@ namespace VECTOR {
         void SetRenderDrawBlendMode(SDL_BlendMode mode);
 
         SDL_Renderer* GetSDLRenderer() const { return m_Renderer; }
+        SDL_Window* GetSDLWindow() const { return m_Window; }
+
+        // Window management
+        void SetBorderless(bool borderless);
+        void SetResolution(int width, int height);
 
     private:
         SDL_Window* m_Window;
