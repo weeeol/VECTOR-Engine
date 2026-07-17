@@ -1,64 +1,21 @@
 #include "Engine/Graphics/Mesh.hpp"
-#include <GL/glew.h>
+#include "Engine/Graphics/RendererAPI.hpp"
+#include "Engine/Graphics/OpenGL/OpenGLMesh.hpp"
+#include "Engine/Core/Logger.hpp"
 
 namespace VECTOR {
 
-    Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices) {
-        SetupMesh(vertices, indices);
-    }
-
-    Mesh::~Mesh() {
-        glDeleteVertexArrays(1, &m_VAO);
-        glDeleteBuffers(1, &m_VBO);
-        glDeleteBuffers(1, &m_EBO);
-    }
-
-    void Mesh::SetupMesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices) {
-        m_IndexCount = static_cast<int>(indices.size());
-
-        glGenVertexArrays(1, &m_VAO);
-        glGenBuffers(1, &m_VBO);
-        glGenBuffers(1, &m_EBO);
-
-        glBindVertexArray(m_VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
-
-        // Vertex Positions
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-        
-        // Vertex Normals
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Normal));
-        
-        // Vertex Texture Coords
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords));
-
-        glBindVertexArray(0);
-
-        // Calculate AABB
-        if (!vertices.empty()) {
-            glm::vec3 minAABB = vertices[0].Position;
-            glm::vec3 maxAABB = vertices[0].Position;
-            for (const auto& v : vertices) {
-                minAABB = glm::min(minAABB, v.Position);
-                maxAABB = glm::max(maxAABB, v.Position);
-            }
-            m_AABB.center = (minAABB + maxAABB) * 0.5f;
-            m_AABB.extents = (maxAABB - minAABB) * 0.5f;
+    std::shared_ptr<Mesh> Mesh::Create(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices) {
+        switch (RendererAPI::GetAPI()) {
+            case RendererAPI::API::None:
+                VECTOR_LOG_ERROR("RendererAPI::None is currently not supported!");
+                return nullptr;
+            case RendererAPI::API::OpenGL:
+                return std::make_shared<OpenGLMesh>(vertices, indices);
         }
-    }
 
-    void Mesh::Draw() const {
-        glBindVertexArray(m_VAO);
-        glDrawElements(GL_TRIANGLES, m_IndexCount, GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
+        VECTOR_LOG_ERROR("Unknown RendererAPI!");
+        return nullptr;
     }
 
     std::shared_ptr<Mesh> Mesh::CreateCube() {
@@ -109,7 +66,7 @@ namespace VECTOR {
             20, 21, 22,     22, 23, 20  // Top
         };
 
-        return std::make_shared<Mesh>(vertices, indices);
+        return Create(vertices, indices);
     }
 
 } // namespace VECTOR

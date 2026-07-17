@@ -1,6 +1,6 @@
 #pragma once
 
-#include <GL/glew.h>
+#include <memory>
 #include <glm/glm.hpp>
 #include <cstdint>
 
@@ -50,45 +50,20 @@ namespace VECTOR {
 
     /**
      * @class UniformBuffer
-     * @brief Manages a GL Uniform Buffer Object for uploading structured data to shaders.
-     * 
-     * Bind this UBO to a binding point (e.g., 0) and declare a matching uniform block
-     * in GLSL with `layout(std140, binding = 0)`.
+     * @brief Manages a Uniform Buffer Object for uploading structured data to shaders.
      */
     class UniformBuffer {
     public:
-        UniformBuffer(uint32_t size, uint32_t bindingPoint);
-        ~UniformBuffer();
+        virtual ~UniformBuffer() = default;
 
-        UniformBuffer(const UniformBuffer&) = delete;
-        UniformBuffer& operator=(const UniformBuffer&) = delete;
+        virtual void SetData(const void* data, uint32_t size, uint32_t offset = 0) = 0;
+        virtual void Bind() const = 0;
+        virtual void Unbind() const = 0;
 
-        /**
-         * @brief Upload data to the UBO. Size must match the buffer size.
-         */
-        void SetData(const void* data, uint32_t size, uint32_t offset = 0);
+        virtual uint32_t GetBindingPoint() const = 0;
 
-        /**
-         * @brief Bind the UBO to its binding point.
-         */
-        void Bind() const;
-
-        /**
-         * @brief Unbind the UBO.
-         */
-        void Unbind() const;
-
-        uint32_t GetBindingPoint() const { return m_BindingPoint; }
-
-        /**
-         * @brief Bind a shader's uniform block to this UBO's binding point.
-         * Call this once per shader that uses the uniform block.
-         */
         static void BindShaderBlock(uint32_t shaderProgramID, const char* blockName, uint32_t bindingPoint);
-
-    private:
-        GLuint m_UBO = 0;
-        uint32_t m_BindingPoint = 0;
+        static std::unique_ptr<UniformBuffer> Create(uint32_t size, uint32_t bindingPoint);
     };
 
 } // namespace VECTOR

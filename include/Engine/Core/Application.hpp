@@ -31,6 +31,9 @@ namespace VECTOR {
         float GetFPS() const { return m_CurrentFPS; }
         Renderer* GetRenderer() const { return m_Renderer.get(); }
 
+        void SetResolution(int width, int height);
+        void SetFullscreen(bool fullscreen, bool borderless);
+
     private:
         // Initialize subsystems (SDL, Renderer, Window, etc.)
         bool Initialize();

@@ -2,38 +2,29 @@
 
 #include <string>
 #include <memory>
-#include <unordered_map>
 #include <glm/glm.hpp>
 
 namespace VECTOR {
 
     class Shader {
     public:
-        Shader(const std::string& vertexSource, const std::string& fragmentSource);
-        ~Shader();
+        virtual ~Shader() = default;
 
-        void Bind() const;
-        void Unbind() const;
+        virtual void Bind() const = 0;
+        virtual void Unbind() const = 0;
 
-        void SetInt(const std::string& name, int value) const;
-        void SetFloat(const std::string& name, float value) const;
-        void SetVec2(const std::string& name, const glm::vec2& value) const;
-        void SetVec3(const std::string& name, const glm::vec3& value) const;
-        void SetVec4(const std::string& name, const glm::vec4& value) const;
-        void SetMat4(const std::string& name, const glm::mat4& value) const;
+        virtual void SetInt(const std::string& name, int value) const = 0;
+        virtual void SetFloat(const std::string& name, float value) const = 0;
+        virtual void SetVec2(const std::string& name, const glm::vec2& value) const = 0;
+        virtual void SetVec3(const std::string& name, const glm::vec3& value) const = 0;
+        virtual void SetVec4(const std::string& name, const glm::vec4& value) const = 0;
+        virtual void SetMat4(const std::string& name, const glm::mat4& value) const = 0;
 
-        unsigned int GetID() const { return m_ProgramID; }
+        virtual unsigned int GetID() const = 0;
 
         // Utility to load from file
         static std::shared_ptr<Shader> CreateFromFile(const std::string& vertexPath, const std::string& fragmentPath);
         static std::shared_ptr<Shader> CreateFromSource(const std::string& vertexSrc, const std::string& fragmentSrc);
-
-    private:
-        unsigned int m_ProgramID;
-        mutable std::unordered_map<std::string, int> m_UniformLocationCache;
-
-        unsigned int CompileShader(unsigned int type, const std::string& source);
-        int GetUniformLocation(const std::string& name) const;
     };
 
 } // namespace VECTOR

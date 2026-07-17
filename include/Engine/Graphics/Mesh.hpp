@@ -15,24 +15,15 @@ namespace VECTOR {
 
     class Mesh {
     public:
-        Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices);
-        ~Mesh();
+        virtual ~Mesh() = default;
 
-        void Draw() const;
+        virtual void Draw() const = 0;
 
-        unsigned int GetVAO() const { return m_VAO; }
-        int GetIndexCount() const { return m_IndexCount; }
+        virtual int GetIndexCount() const = 0;
+        virtual const AABB& GetAABB() const = 0;
 
+        static std::shared_ptr<Mesh> Create(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices);
         static std::shared_ptr<Mesh> CreateCube();
-
-        const AABB& GetAABB() const { return m_AABB; }
-
-    private:
-        unsigned int m_VAO, m_VBO, m_EBO;
-        int m_IndexCount;
-        AABB m_AABB;
-
-        void SetupMesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices);
     };
 
 } // namespace VECTOR

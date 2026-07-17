@@ -12,17 +12,17 @@
 #include "Engine/ECS/Components.hpp"
 #include "Engine/ECS/UIComponents.hpp"
 #include <glm/gtc/matrix_transform.hpp>
-#include <GL/glew.h>
+// #include <GL/glew.h> Removed
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/Shader.hpp"
 #include "Engine/Graphics/Texture2D.hpp"
 #include "Engine/Audio/AudioManager.hpp"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 namespace Game {
 
     GameplayScene::GameplayScene(int width, int height, VECTOR::InputManager* inputManager, AIDifficulty aiDifficulty)
-        : m_Width(width), m_Height(height), m_InputManager(inputManager), m_IsPaused(false), m_WasPausePressed(false)
+        : m_Width(width), m_Height(height), m_InputManager(inputManager)
     {
         m_Registry.RegisterComponent<VECTOR::TransformComponent>();
         m_Registry.RegisterComponent<VECTOR::RigidBodyComponent>();
@@ -56,33 +56,139 @@ namespace Game {
 
         m_UISystem = std::make_unique<VECTOR::UISystem>(m_InputManager);
 
-        // Pause Menu UI
-        VECTOR::Entity mainMenuBtn = m_UIRegistry.CreateEntity();
-        m_UIRegistry.AddComponent(mainMenuBtn, VECTOR::UIRectComponent(width / 2 - 100, height / 2 + 50, 200, 50, glm::vec4(50/255.0f, 100/255.0f, 50/255.0f, 1.0f)));
-        m_UIRegistry.AddComponent(mainMenuBtn, VECTOR::UITextComponent("Main Menu", 24, glm::vec4(1.0f)));
-        
-        auto& textC = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(mainMenuBtn);
-        textC.offsetX = 100 - (std::string("Main Menu").length() * 6);
-        textC.offsetY = 25 - 12;
-
-        m_UIRegistry.AddComponent(mainMenuBtn, VECTOR::UIButtonComponent(
-            glm::vec4(50/255.0f, 100/255.0f, 50/255.0f, 1.0f),
-            glm::vec4(100/255.0f, 200/255.0f, 100/255.0f, 1.0f),
-            [this]() {
-                auto menuScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager);
-                VECTOR::SceneManager::Get().ChangeScene(std::move(menuScene));
-            }
-        ));
-
-        VECTOR::Entity volSlider = m_UIRegistry.CreateEntity();
-        m_UIRegistry.AddComponent(volSlider, VECTOR::UIRectComponent(width - 250, 50, 200, 20, glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f)));
-        m_UIRegistry.AddComponent(volSlider, VECTOR::UISliderComponent(0.5f, [](float val) {
-            VECTOR::AudioManager::Get().SetMusicVolume(val);
-        }));
+        CreateUI();
 
         GenerateArena();
 
         m_InputManager->SetRelativeMouseMode(true);
+    }
+
+    void GameplayScene::ClearUI() {
+        m_UIRegistry.Clear();
+    }
+
+    void GameplayScene::OnResize(int width, int height) {
+        m_Width = width;
+        m_Height = height;
+        CreateUI();
+    }
+
+    void GameplayScene::CreateUI() {
+        ClearUI();
+        
+        int btnWidth = 200;
+        int btnHeight = 40;
+        int startX = m_Width / 2 - btnWidth / 2;
+        int startY = m_Height / 2 - 20;
+
+        if (m_State == GameState::Paused) {
+            VECTOR::Entity resumeBtn = m_UIRegistry.CreateEntity();
+            m_UIRegistry.AddComponent(resumeBtn, VECTOR::UIRectComponent(startX, startY - 50, btnWidth, btnHeight, glm::vec4(50/255.0f, 100/255.0f, 50/255.0f, 1.0f)));
+            m_UIRegistry.AddComponent(resumeBtn, VECTOR::UITextComponent("Resume", 24, glm::vec4(1.0f)));
+            auto& textR = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(resumeBtn);
+            textR.offsetX = (btnWidth / 2) - (std::string("Resume").length() * 6);
+            textR.offsetY = (btnHeight / 2) - 12;
+            m_UIRegistry.AddComponent(resumeBtn, VECTOR::UIButtonComponent(
+                glm::vec4(50/255.0f, 100/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 200/255.0f, 100/255.0f, 1.0f),
+                [this]() {
+                    m_State = GameState::Playing;
+                    m_InputManager->SetRelativeMouseMode(true);
+                }
+            ));
+
+            VECTOR::Entity settingsBtn = m_UIRegistry.CreateEntity();
+            m_UIRegistry.AddComponent(settingsBtn, VECTOR::UIRectComponent(startX, startY + 10, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 100/255.0f, 1.0f)));
+            m_UIRegistry.AddComponent(settingsBtn, VECTOR::UITextComponent("Settings", 24, glm::vec4(1.0f)));
+            auto& sText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(settingsBtn);
+            sText.offsetX = (btnWidth / 2) - (std::string("Settings").length() * 6);
+            sText.offsetY = (btnHeight / 2) - 12;
+            m_UIRegistry.AddComponent(settingsBtn, VECTOR::UIButtonComponent(
+                glm::vec4(50/255.0f, 50/255.0f, 100/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 200/255.0f, 1.0f),
+                [this]() {
+                    m_State = GameState::Settings;
+                    m_NeedsUIRefresh = true;
+                }
+            ));
+
+            VECTOR::Entity mainMenuBtn = m_UIRegistry.CreateEntity();
+            m_UIRegistry.AddComponent(mainMenuBtn, VECTOR::UIRectComponent(startX, startY + 70, btnWidth, btnHeight, glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
+            m_UIRegistry.AddComponent(mainMenuBtn, VECTOR::UITextComponent("Main Menu", 24, glm::vec4(1.0f)));
+            auto& textC = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(mainMenuBtn);
+            textC.offsetX = (btnWidth / 2) - (std::string("Main Menu").length() * 6);
+            textC.offsetY = (btnHeight / 2) - 12;
+            m_UIRegistry.AddComponent(mainMenuBtn, VECTOR::UIButtonComponent(
+                glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(200/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+                [this]() {
+                    auto menuScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager);
+                    VECTOR::SceneManager::Get().ChangeScene(std::move(menuScene));
+                }
+            ));
+
+            VECTOR::Entity volSlider = m_UIRegistry.CreateEntity();
+            m_UIRegistry.AddComponent(volSlider, VECTOR::UIRectComponent(m_Width - 250, 50, 200, 20, glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f)));
+            m_UIRegistry.AddComponent(volSlider, VECTOR::UISliderComponent(0.5f, [](float val) {
+                VECTOR::AudioManager::Get().SetMusicVolume(val);
+            }));
+
+        } else if (m_State == GameState::Settings) {
+            VECTOR::Entity res1 = m_UIRegistry.CreateEntity();
+            m_UIRegistry.AddComponent(res1, VECTOR::UIRectComponent(startX, startY, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
+            m_UIRegistry.AddComponent(res1, VECTOR::UITextComponent("1280x720", 24, glm::vec4(1.0f)));
+            auto& r1Text = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(res1);
+            r1Text.offsetX = (btnWidth / 2) - (std::string("1280x720").length() * 6);
+            r1Text.offsetY = (btnHeight / 2) - 12;
+            m_UIRegistry.AddComponent(res1, VECTOR::UIButtonComponent(
+                glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+                []() { VECTOR::Application::Get().SetResolution(1280, 720); }
+            ));
+
+            VECTOR::Entity res2 = m_UIRegistry.CreateEntity();
+            m_UIRegistry.AddComponent(res2, VECTOR::UIRectComponent(startX, startY + 60, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
+            m_UIRegistry.AddComponent(res2, VECTOR::UITextComponent("1920x1080", 24, glm::vec4(1.0f)));
+            auto& r2Text = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(res2);
+            r2Text.offsetX = (btnWidth / 2) - (std::string("1920x1080").length() * 6);
+            r2Text.offsetY = (btnHeight / 2) - 12;
+            m_UIRegistry.AddComponent(res2, VECTOR::UIButtonComponent(
+                glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+                []() { VECTOR::Application::Get().SetResolution(1920, 1080); }
+            ));
+
+            VECTOR::Entity fsWin = m_UIRegistry.CreateEntity();
+            m_UIRegistry.AddComponent(fsWin, VECTOR::UIRectComponent(startX - 110, startY + 120, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
+            m_UIRegistry.AddComponent(fsWin, VECTOR::UITextComponent("Windowed", 24, glm::vec4(1.0f)));
+            auto& fswText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(fsWin);
+            fswText.offsetX = (btnWidth / 2) - (std::string("Windowed").length() * 6);
+            fswText.offsetY = (btnHeight / 2) - 12;
+            m_UIRegistry.AddComponent(fsWin, VECTOR::UIButtonComponent(
+                glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+                []() { VECTOR::Application::Get().SetFullscreen(false, false); }
+            ));
+
+            VECTOR::Entity fsB = m_UIRegistry.CreateEntity();
+            m_UIRegistry.AddComponent(fsB, VECTOR::UIRectComponent(startX + 110, startY + 120, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
+            m_UIRegistry.AddComponent(fsB, VECTOR::UITextComponent("Borderless", 24, glm::vec4(1.0f)));
+            auto& fsbText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(fsB);
+            fsbText.offsetX = (btnWidth / 2) - (std::string("Borderless").length() * 6);
+            fsbText.offsetY = (btnHeight / 2) - 12;
+            m_UIRegistry.AddComponent(fsB, VECTOR::UIButtonComponent(
+                glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+                []() { VECTOR::Application::Get().SetFullscreen(true, true); }
+            ));
+
+            VECTOR::Entity backBtn = m_UIRegistry.CreateEntity();
+            m_UIRegistry.AddComponent(backBtn, VECTOR::UIRectComponent(startX, startY + 180, btnWidth, btnHeight, glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
+            m_UIRegistry.AddComponent(backBtn, VECTOR::UITextComponent("Back", 24, glm::vec4(1.0f)));
+            auto& bText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(backBtn);
+            bText.offsetX = (btnWidth / 2) - (std::string("Back").length() * 6);
+            bText.offsetY = (btnHeight / 2) - 12;
+            m_UIRegistry.AddComponent(backBtn, VECTOR::UIButtonComponent(
+                glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(200/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+                [this]() {
+                    m_State = GameState::Paused;
+                    m_NeedsUIRefresh = true;
+                }
+            ));
+        }
     }
 
     GameplayScene::~GameplayScene() {
@@ -174,7 +280,7 @@ namespace Game {
     }
 
     void GameplayScene::Update(float deltaTime) {
-        bool isPausePressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_ESCAPE);
+        bool isEscapePressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_ESCAPE);
         bool isF3Pressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_F3);
 
         if (isF3Pressed && !m_WasF3Pressed) {
@@ -182,14 +288,27 @@ namespace Game {
         }
         m_WasF3Pressed = isF3Pressed;
 
-        if (isPausePressed && !m_WasPausePressed) {
-            m_IsPaused = !m_IsPaused;
-            m_InputManager->SetRelativeMouseMode(!m_IsPaused);
+        if (isEscapePressed && !m_WasEscapePressed) {
+            if (m_State == GameState::Playing) {
+                m_State = GameState::Paused;
+                m_InputManager->SetRelativeMouseMode(false);
+                CreateUI();
+            } else if (m_State == GameState::Paused) {
+                m_State = GameState::Playing;
+                m_InputManager->SetRelativeMouseMode(true);
+            } else if (m_State == GameState::Settings) {
+                m_State = GameState::Paused;
+                CreateUI();
+            }
         }
-        m_WasPausePressed = isPausePressed;
+        m_WasEscapePressed = isEscapePressed;
 
-        if (m_IsPaused) {
+        if (m_State != GameState::Playing) {
             m_UISystem->Update(m_UIRegistry, deltaTime);
+            if (m_NeedsUIRefresh) {
+                CreateUI();
+                m_NeedsUIRefresh = false;
+            }
         } else {
             for (auto& system : m_Systems) {
                 system->Update(m_Registry, deltaTime);
@@ -252,16 +371,12 @@ namespace Game {
         renderer->BeginMainPass();
         renderer->Clear(135, 206, 235); // Sky blue
         
-        if (m_DebugMode) {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        } else {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        }
+        renderer->SetWireframeMode(m_DebugMode);
 
         renderer->FlushMainPass();
 
         // PASS 3: POST PROCESS SCREEN QUAD
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        renderer->SetWireframeMode(false);
         renderer->EndPostProcessPass();
 
         renderer->BeginUI();
@@ -274,7 +389,7 @@ namespace Game {
             std::string fpsStr = "FPS: " + std::to_string((int)fps);
             std::string posStr = "Pos: " + std::to_string(camT.position.x) + ", " + std::to_string(camT.position.y) + ", " + std::to_string(camT.position.z);
             
-            int cpuCount = SDL_GetCPUCount();
+            int cpuCount = SDL_GetNumLogicalCPUCores();
             int ramMB = SDL_GetSystemRAM();
             std::string sysStr = "CPU Cores: " + std::to_string(cpuCount) + " | RAM: " + std::to_string(ramMB) + " MB";
             
@@ -285,17 +400,18 @@ namespace Game {
             renderer->DrawUIText(sysStr, 10, 50, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
             renderer->DrawUIText(drawStr, 10, 70, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
             
-            const GLubyte* rendererStr = glGetString(GL_RENDERER);
-            if (rendererStr) {
-                std::string gpuStr = "GPU: " + std::string(reinterpret_cast<const char*>(rendererStr));
-                renderer->DrawUIText(gpuStr, 10, 90, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
-            }
+            std::string gpuStr = "GPU: " + renderer->GetRendererInfo();
+            renderer->DrawUIText(gpuStr, 10, 90, glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), 18);
         }
 
-        if (m_IsPaused) {
+        if (m_State != GameState::Playing) {
             renderer->DrawUIRect(0, 0, m_Width, m_Height, glm::vec4(0.0f, 0.0f, 0.0f, 150/255.0f)); // Dark overlay
-            renderer->DrawUIText("PAUSED", m_Width / 2 - 80, m_Height / 2 - 50, glm::vec4(1.0f), 48);
-            renderer->DrawUIText("Volume", m_Width - 250, 30, glm::vec4(200/255.0f, 200/255.0f, 200/255.0f, 1.0f), 18);
+            if (m_State == GameState::Paused) {
+                renderer->DrawUIText("PAUSED", m_Width / 2 - 80, m_Height / 2 - 120, glm::vec4(1.0f), 48);
+                renderer->DrawUIText("Volume", m_Width - 250, 30, glm::vec4(200/255.0f, 200/255.0f, 200/255.0f, 1.0f), 18);
+            } else if (m_State == GameState::Settings) {
+                renderer->DrawUIText("Settings", m_Width / 2 - 80, m_Height / 2 - 120, glm::vec4(1.0f), 48);
+            }
             
             // Render ECS UI
             m_UIRegistry.View<VECTOR::UIRectComponent>([&](VECTOR::Entity entity) {

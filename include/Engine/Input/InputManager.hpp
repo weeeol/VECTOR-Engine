@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include <unordered_map>
 
 namespace VECTOR {
@@ -22,10 +22,10 @@ namespace VECTOR {
         bool IsKeyPressed(SDL_Scancode key) const;
 
         // Mouse input
-        int GetMouseX() const { return m_MouseX; }
-        int GetMouseY() const { return m_MouseY; }
-        int GetMouseDeltaX() const { return m_MouseDeltaX; }
-        int GetMouseDeltaY() const { return m_MouseDeltaY; }
+        float GetMouseX() const { return m_MouseX; }
+        float GetMouseY() const { return m_MouseY; }
+        float GetMouseDeltaX() const { return m_MouseDeltaX; }
+        float GetMouseDeltaY() const { return m_MouseDeltaY; }
         
         void SetRelativeMouseMode(bool enable);
         bool IsMouseButtonPressed(int button) const; // Use SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT, etc.
@@ -34,13 +34,13 @@ namespace VECTOR {
         bool IsMouseButtonJustPressed(int button) const;
 
     private:
-        const Uint8* m_KeyboardState;
+        const bool* m_KeyboardState;
         Uint32 m_MouseState;
         Uint32 m_PrevMouseState;
-        int m_MouseX;
-        int m_MouseY;
-        int m_MouseDeltaX;
-        int m_MouseDeltaY;
+        float m_MouseX;
+        float m_MouseY;
+        float m_MouseDeltaX;
+        float m_MouseDeltaY;
     };
 
 } // namespace VECTOR

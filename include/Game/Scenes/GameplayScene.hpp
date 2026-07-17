@@ -23,12 +23,21 @@ namespace Game {
         ~GameplayScene() override;
 
         void OnEnter() override;
+        void OnResize(int width, int height) override;
         void Update(float deltaTime) override;
         void Render(VECTOR::Renderer* renderer) override;
 
     private:
         void GenerateArena();
         void CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy = false);
+        void CreateUI();
+        void ClearUI();
+
+        enum class GameState {
+            Playing,
+            Paused,
+            Settings
+        };
 
         int m_Width;
         int m_Height;
@@ -43,8 +52,9 @@ namespace Game {
         VECTOR::Registry m_UIRegistry;
         std::unique_ptr<VECTOR::UISystem> m_UISystem;
 
-        bool m_IsPaused;
-        bool m_WasPausePressed;
+        GameState m_State = GameState::Playing;
+        bool m_WasEscapePressed = false;
+        bool m_NeedsUIRefresh = false;
         
         bool m_DebugMode = false;
         bool m_WasF3Pressed = false;

@@ -1,6 +1,6 @@
 #include "Engine/Graphics/Texture.hpp"
 #include "Engine/Graphics/Renderer.hpp"
-#include <SDL_image.h>
+#include <SDL3_image/SDL_image.h>
 #include "Engine/Core/Logger.hpp"
 
 namespace VECTOR {
@@ -10,12 +10,12 @@ namespace VECTOR {
     {
         SDL_Surface* surface = IMG_Load(filepath.c_str());
         if (!surface) {
-            VECTOR_LOG_ERROR(std::string("Failed to load image: ") + filepath + ". IMG_Error: " + IMG_GetError());
+            VECTOR_LOG_ERROR(std::string("Failed to load image: ") + filepath + ". SDL_Error: " + SDL_GetError());
             return;
         }
 
         // Enable transparency for pure black (0, 0, 0)
-        SDL_SetColorKey(surface, SDL_TRUE, SDL_MapRGB(surface->format, 0, 0, 0));
+        SDL_SetSurfaceColorKey(surface, true, SDL_MapRGB(SDL_GetPixelFormatDetails(surface->format), nullptr, 0, 0, 0));
 
         m_Texture = SDL_CreateTextureFromSurface(renderer->GetSDLRenderer(), surface);
         if (!m_Texture) {
@@ -25,7 +25,7 @@ namespace VECTOR {
             m_Height = surface->h;
         }
 
-        SDL_FreeSurface(surface);
+        SDL_DestroySurface(surface);
     }
 
     Texture::~Texture() {

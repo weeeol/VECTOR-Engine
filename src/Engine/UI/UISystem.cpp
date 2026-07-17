@@ -21,7 +21,7 @@ namespace VECTOR {
             btn.isHovered = (mx >= rect.x && mx <= rect.x + rect.width &&
                              my >= rect.y && my <= rect.y + rect.height);
 
-            if (btn.isHovered && isPressedNow && !btn.wasPressed) {
+            if (btn.isHovered && !isPressedNow && btn.wasPressed) {
                 if (btn.onClick) {
                     btn.onClick();
                 }

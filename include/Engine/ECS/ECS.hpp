@@ -15,6 +15,7 @@ namespace VECTOR {
     public:
         virtual ~IComponentArray() = default;
         virtual void EntityDestroyed(Entity entity) = 0;
+        virtual void Clear() = 0;
     };
 
     template<typename T>
@@ -59,6 +60,12 @@ namespace VECTOR {
             return m_EntityToIndexMap.find(entity) != m_EntityToIndexMap.end();
         }
 
+        void Clear() override {
+            m_EntityToIndexMap.clear();
+            m_IndexToEntityMap.clear();
+            m_Size = 0;
+        }
+
     private:
         T m_ComponentArray[MAX_ENTITIES];
         std::unordered_map<Entity, size_t> m_EntityToIndexMap;
@@ -87,7 +94,9 @@ namespace VECTOR {
 
         void Clear() {
             m_ActiveEntities.clear();
-            m_ComponentArrays.clear();
+            for (auto const& pair : m_ComponentArrays) {
+                pair.second->Clear();
+            }
             m_NextEntity = 0;
         }
 

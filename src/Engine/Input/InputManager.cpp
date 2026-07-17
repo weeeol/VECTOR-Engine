@@ -1,10 +1,12 @@
 #include "Engine/Input/InputManager.hpp"
-
+#include "Engine/Core/Application.hpp"
+#include "Engine/Graphics/Renderer.hpp"
 namespace VECTOR {
 
-    InputManager::InputManager() : m_MouseState(0), m_PrevMouseState(0), m_MouseX(0), m_MouseY(0), m_MouseDeltaX(0), m_MouseDeltaY(0) {
+    InputManager::InputManager() : m_MouseState(0), m_PrevMouseState(0), m_MouseX(0.0f), m_MouseY(0.0f), m_MouseDeltaX(0.0f), m_MouseDeltaY(0.0f) {
         // Initialize keyboard state pointer
-        m_KeyboardState = SDL_GetKeyboardState(nullptr);
+        int numkeys;
+        m_KeyboardState = SDL_GetKeyboardState(&numkeys);
     }
 
     InputManager::~InputManager() {
@@ -17,7 +19,13 @@ namespace VECTOR {
     }
 
     void InputManager::SetRelativeMouseMode(bool enable) {
-        SDL_SetRelativeMouseMode(enable ? SDL_TRUE : SDL_FALSE);
+        SDL_Window* window = nullptr;
+        if (Application::Get().GetRenderer()) {
+            window = Application::Get().GetRenderer()->GetWindow();
+        }
+        if (window) {
+            SDL_SetWindowRelativeMouseMode(window, enable);
+        }
     }
 
     bool InputManager::IsKeyPressed(SDL_Scancode key) const {
@@ -28,12 +36,12 @@ namespace VECTOR {
     }
 
     bool InputManager::IsMouseButtonPressed(int button) const {
-        return (m_MouseState & SDL_BUTTON(button)) != 0;
+        return (m_MouseState & SDL_BUTTON_MASK(button)) != 0;
     }
     
     bool InputManager::IsMouseButtonJustPressed(int button) const {
-        bool isPressedNow = (m_MouseState & SDL_BUTTON(button)) != 0;
-        bool wasPressedBefore = (m_PrevMouseState & SDL_BUTTON(button)) != 0;
+        bool isPressedNow = (m_MouseState & SDL_BUTTON_MASK(button)) != 0;
+        bool wasPressedBefore = (m_PrevMouseState & SDL_BUTTON_MASK(button)) != 0;
         return isPressedNow && !wasPressedBefore;
     }
 

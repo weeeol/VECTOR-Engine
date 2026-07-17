@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL_mixer.h>
+#include <SDL3_mixer/SDL_mixer.h>
 #include <string>
 #include <unordered_map>
 
@@ -28,8 +28,10 @@ namespace VECTOR {
         AudioManager() = default;
         ~AudioManager() = default;
 
-        std::unordered_map<std::string, Mix_Chunk*> m_Sounds;
-        std::unordered_map<std::string, Mix_Music*> m_Music;
+        MIX_Mixer* m_Mixer = nullptr;
+        MIX_Track* m_MusicTrack = nullptr;
+        std::unordered_map<std::string, MIX_Audio*> m_Sounds;
+        std::unordered_map<std::string, MIX_Audio*> m_Music;
     };
 
 } // namespace VECTOR

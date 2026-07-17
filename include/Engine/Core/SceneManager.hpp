@@ -36,6 +36,9 @@ namespace VECTOR {
         // Render the active scene
         void Render(Renderer* renderer);
 
+        // Propagate resize event
+        void OnResize(int width, int height);
+
     private:
         SceneManager() = default;
         ~SceneManager() = default;

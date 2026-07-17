@@ -1,7 +1,7 @@
 #include "Engine/Graphics/OpenGL/OpenGLTexture2D.hpp"
 #include "Engine/Core/Logger.hpp"
 #include <GL/glew.h>
-#include <SDL_image.h>
+#include <SDL3_image/SDL_image.h>
 
 namespace VECTOR {
 
@@ -10,7 +10,7 @@ namespace VECTOR {
     {
         SDL_Surface* surface = IMG_Load(path.c_str());
         if (!surface) {
-            VECTOR_LOG_ERROR("Failed to load texture: " + path + " - " + IMG_GetError());
+            VECTOR_LOG_ERROR("Failed to load texture: " + path + " - " + SDL_GetError());
             return;
         }
 
@@ -19,17 +19,18 @@ namespace VECTOR {
 
         int mode = GL_RGB;
         int format = GL_RGB;
+        const SDL_PixelFormatDetails* fmt_details = SDL_GetPixelFormatDetails(surface->format);
 
-        if (surface->format->BytesPerPixel == 4) {
+        if (fmt_details->bytes_per_pixel == 4) {
             mode = GL_RGBA;
-            if (surface->format->Rmask == 0x00ff0000) {
+            if (fmt_details->Rmask == 0x00ff0000) {
                 format = GL_BGRA;
             } else {
                 format = GL_RGBA;
             }
-        } else if (surface->format->BytesPerPixel == 3) {
+        } else if (fmt_details->bytes_per_pixel == 3) {
             mode = GL_RGB;
-            if (surface->format->Rmask == 0x00ff0000) {
+            if (fmt_details->Rmask == 0x00ff0000) {
                 format = GL_BGR;
             } else {
                 format = GL_RGB;
@@ -40,7 +41,7 @@ namespace VECTOR {
         glBindTexture(GL_TEXTURE_2D, m_RendererID);
 
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, surface->pitch / surface->format->BytesPerPixel);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, surface->pitch / fmt_details->bytes_per_pixel);
 
         glTexImage2D(GL_TEXTURE_2D, 0, mode, m_Width, m_Height, 0, format, GL_UNSIGNED_BYTE, surface->pixels);
         
@@ -52,7 +53,7 @@ namespace VECTOR {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
         glBindTexture(GL_TEXTURE_2D, 0);
-        SDL_FreeSurface(surface);
+        SDL_DestroySurface(surface);
     }
 
     OpenGLTexture2D::~OpenGLTexture2D() {

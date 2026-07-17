@@ -50,4 +50,10 @@ namespace VECTOR {
         }
     }
 
+    void SceneManager::OnResize(int width, int height) {
+        if (!m_Scenes.empty()) {
+            m_Scenes.back()->OnResize(width, height);
+        }
+    }
+
 } // namespace VECTOR

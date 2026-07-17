@@ -3,7 +3,7 @@
 #include "Engine/Core/ResourceManager.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include "Engine/Core/SceneManager.hpp"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 namespace VECTOR {
 
@@ -26,7 +26,7 @@ namespace VECTOR {
     bool Application::Initialize() {
         Logger::Init();
 
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0) {
+        if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
             std::string error = std::string("SDL could not initialize! SDL_Error: ") + SDL_GetError();
             VECTOR_LOG_ERROR(error);
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Initialization Error", error.c_str(), nullptr);
@@ -40,7 +40,7 @@ namespace VECTOR {
         }
 
         // Initialize Window and Renderer
-        m_Renderer = std::make_unique<Renderer>();
+        m_Renderer = Renderer::Create();
         if (!m_Renderer->Initialize(m_Title, m_Width, m_Height)) {
             std::string error = "Renderer failed to initialize";
             VECTOR_LOG_ERROR(error);
@@ -70,7 +70,7 @@ namespace VECTOR {
         Uint64 previousTime = SDL_GetPerformanceCounter();
         float accumulator = 0.0f;
         Uint32 frameCount = 0;
-        Uint32 fpsTimer = SDL_GetTicks();
+        Uint64 fpsTimer = SDL_GetTicks();
 
         while (m_IsRunning) {
             Uint64 currentTime = SDL_GetPerformanceCounter();
@@ -94,7 +94,7 @@ namespace VECTOR {
             Render();
             frameCount++;
 
-            Uint32 currentTicks = SDL_GetTicks();
+            Uint64 currentTicks = SDL_GetTicks();
             if (currentTicks - fpsTimer >= 1000) {
                 m_CurrentFPS = frameCount;
                 frameCount = 0;
@@ -105,6 +105,21 @@ namespace VECTOR {
 
     void Application::Quit() {
         m_IsRunning = false;
+    }
+
+    void Application::SetResolution(int width, int height) {
+        m_Width = width;
+        m_Height = height;
+        if (m_Renderer) {
+            m_Renderer->SetResolution(width, height);
+        }
+        SceneManager::Get().OnResize(width, height);
+    }
+
+    void Application::SetFullscreen(bool fullscreen, bool borderless) {
+        if (m_Renderer) {
+            m_Renderer->SetFullscreen(fullscreen, borderless);
+        }
     }
 
     void Application::Shutdown() {
@@ -123,7 +138,7 @@ namespace VECTOR {
     void Application::ProcessInput() {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
+            if (event.type == SDL_EVENT_QUIT) {
                 Quit();
             }
         }

@@ -18,11 +18,18 @@ namespace Game {
         ~MainMenuScene() override = default;
 
         void OnEnter() override;
+        void OnResize(int width, int height) override;
         void Update(float deltaTime) override;
         void Render(VECTOR::Renderer* renderer) override;
 
+        enum class MainMenuState {
+            Main,
+            Settings
+        };
+
     private:
         void CreateUI();
+        void ClearUI();
 
         int m_Width;
         int m_Height;
@@ -30,6 +37,8 @@ namespace Game {
         VECTOR::Registry m_Registry;
         std::unique_ptr<VECTOR::UISystem> m_UISystem;
         
+        MainMenuState m_State = MainMenuState::Main;
+        bool m_NeedsUIRefresh = false;
         AIDifficulty m_SelectedDifficulty;
     };
 

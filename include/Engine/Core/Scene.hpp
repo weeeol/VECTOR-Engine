@@ -10,6 +10,7 @@ namespace VECTOR {
 
         virtual void OnEnter() {}
         virtual void OnExit() {}
+        virtual void OnResize(int width, int height) {}
 
         virtual void Update(float deltaTime) = 0;
         virtual void Render(Renderer* renderer) = 0;

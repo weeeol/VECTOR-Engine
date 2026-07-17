@@ -1,43 +1,35 @@
 #include "Engine/Graphics/UniformBufferObject.hpp"
+#include "Engine/Graphics/RendererAPI.hpp"
+#include "Engine/Graphics/OpenGL/OpenGLUniformBuffer.hpp"
 #include "Engine/Core/Logger.hpp"
+#include <GL/glew.h>
 
 namespace VECTOR {
 
-    UniformBuffer::UniformBuffer(uint32_t size, uint32_t bindingPoint)
-        : m_BindingPoint(bindingPoint)
-    {
-        glGenBuffers(1, &m_UBO);
-        glBindBuffer(GL_UNIFORM_BUFFER, m_UBO);
-        glBufferData(GL_UNIFORM_BUFFER, size, nullptr, GL_DYNAMIC_DRAW);
-        glBindBufferBase(GL_UNIFORM_BUFFER, m_BindingPoint, m_UBO);
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    }
-
-    UniformBuffer::~UniformBuffer() {
-        if (m_UBO) {
-            glDeleteBuffers(1, &m_UBO);
-        }
-    }
-
-    void UniformBuffer::SetData(const void* data, uint32_t size, uint32_t offset) {
-        glBindBuffer(GL_UNIFORM_BUFFER, m_UBO);
-        glBufferSubData(GL_UNIFORM_BUFFER, offset, size, data);
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    }
-
-    void UniformBuffer::Bind() const {
-        glBindBufferBase(GL_UNIFORM_BUFFER, m_BindingPoint, m_UBO);
-    }
-
-    void UniformBuffer::Unbind() const {
-        glBindBufferBase(GL_UNIFORM_BUFFER, m_BindingPoint, 0);
-    }
-
     void UniformBuffer::BindShaderBlock(uint32_t shaderProgramID, const char* blockName, uint32_t bindingPoint) {
-        GLuint blockIndex = glGetUniformBlockIndex(shaderProgramID, blockName);
-        if (blockIndex != GL_INVALID_INDEX) {
-            glUniformBlockBinding(shaderProgramID, blockIndex, bindingPoint);
+        // This is still using OpenGL directly! Let's handle this in the RendererAPI or OpenGLRenderer?
+        // Wait, the plan says abstract UniformBufferObject. 
+        // BindShaderBlock takes a shaderProgramID. This is tied to OpenGL.
+        // Let's implement it with a check if OpenGL for now.
+        if (RendererAPI::GetAPI() == RendererAPI::API::OpenGL) {
+            GLuint blockIndex = glGetUniformBlockIndex(shaderProgramID, blockName);
+            if (blockIndex != GL_INVALID_INDEX) {
+                glUniformBlockBinding(shaderProgramID, blockIndex, bindingPoint);
+            }
         }
+    }
+
+    std::unique_ptr<UniformBuffer> UniformBuffer::Create(uint32_t size, uint32_t bindingPoint) {
+        switch (RendererAPI::GetAPI()) {
+            case RendererAPI::API::None:
+                VECTOR_LOG_ERROR("RendererAPI::None is currently not supported!");
+                return nullptr;
+            case RendererAPI::API::OpenGL:
+                return std::make_unique<OpenGLUniformBuffer>(size, bindingPoint);
+        }
+
+        VECTOR_LOG_ERROR("Unknown RendererAPI!");
+        return nullptr;
     }
 
 } // namespace VECTOR

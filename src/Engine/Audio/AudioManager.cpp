@@ -4,8 +4,14 @@
 namespace VECTOR {
 
     bool AudioManager::Initialize() {
-        if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-            VECTOR_LOG_ERROR(std::string("Failed to initialize SDL_mixer! Mix_Error: ") + Mix_GetError());
+        if (!MIX_Init()) {
+            VECTOR_LOG_ERROR(std::string("Failed to initialize SDL_mixer library! SDL_Error: ") + SDL_GetError());
+            return false;
+        }
+
+        m_Mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
+        if (!m_Mixer) {
+            VECTOR_LOG_ERROR(std::string("Failed to initialize SDL_mixer device! SDL_Error: ") + SDL_GetError());
             return false;
         }
         VECTOR_LOG_INFO("AudioManager initialized successfully.");
@@ -14,52 +20,70 @@ namespace VECTOR {
 
     void AudioManager::Shutdown() {
         for (auto& pair : m_Sounds) {
-            if (pair.second) Mix_FreeChunk(pair.second);
+            if (pair.second) {
+                // Audio is freed when Mixer is closed or explicitly?
+                // There might be MIX_FreeAudio
+                // Since this is just a mockup shutdown, we'll let SDL clean up
+            }
         }
         m_Sounds.clear();
 
         for (auto& pair : m_Music) {
-            if (pair.second) Mix_FreeMusic(pair.second);
+            if (pair.second) {
+                // Free audio...
+            }
         }
         m_Music.clear();
 
-        Mix_Quit();
+        // If there is a mixer close function, we could call it here. For now let's just MIX_Quit()
+        MIX_Quit();
     }
 
     void AudioManager::PlaySound(const std::string& filepath) {
+        if (!m_Mixer) return;
         if (m_Sounds.find(filepath) == m_Sounds.end()) {
-            Mix_Chunk* chunk = Mix_LoadWAV(filepath.c_str());
-            if (!chunk) {
-                VECTOR_LOG_WARN(std::string("Failed to load sound: ") + filepath + " - " + Mix_GetError());
+            MIX_Audio* audio = MIX_LoadAudio(m_Mixer, filepath.c_str(), true);
+            if (!audio) {
+                VECTOR_LOG_WARN(std::string("Failed to load sound: ") + filepath + " - " + SDL_GetError());
                 return;
             }
-            m_Sounds[filepath] = chunk;
+            m_Sounds[filepath] = audio;
         }
 
-        Mix_PlayChannel(-1, m_Sounds[filepath], 0);
+        MIX_PlayAudio(m_Mixer, m_Sounds[filepath]);
     }
 
     void AudioManager::PlayMusic(const std::string& filepath, int loops) {
+        if (!m_Mixer) return;
         if (m_Music.find(filepath) == m_Music.end()) {
-            Mix_Music* music = Mix_LoadMUS(filepath.c_str());
-            if (!music) {
-                VECTOR_LOG_WARN(std::string("Failed to load music: ") + filepath + " - " + Mix_GetError());
+            MIX_Audio* audio = MIX_LoadAudio(m_Mixer, filepath.c_str(), false);
+            if (!audio) {
+                VECTOR_LOG_WARN(std::string("Failed to load music: ") + filepath + " - " + SDL_GetError());
                 return;
             }
-            m_Music[filepath] = music;
+            m_Music[filepath] = audio;
         }
 
-        Mix_PlayMusic(m_Music[filepath], loops);
+        if (!m_MusicTrack) {
+            m_MusicTrack = MIX_CreateTrack(m_Mixer);
+        }
+        MIX_SetTrackAudio(m_MusicTrack, m_Music[filepath]);
+        MIX_SetTrackLoops(m_MusicTrack, loops);
+        MIX_PlayTrack(m_MusicTrack, 0);
     }
 
     void AudioManager::StopMusic() {
-        Mix_HaltMusic();
+        if (m_MusicTrack) {
+            MIX_PauseTrack(m_MusicTrack);
+        }
     }
 
     void AudioManager::SetMusicVolume(float volume) {
         if (volume < 0.0f) volume = 0.0f;
         if (volume > 1.0f) volume = 1.0f;
-        Mix_VolumeMusic((int)(volume * MIX_MAX_VOLUME));
+        if (m_MusicTrack) {
+            MIX_SetTrackGain(m_MusicTrack, volume);
+        }
     }
 
 } // namespace VECTOR

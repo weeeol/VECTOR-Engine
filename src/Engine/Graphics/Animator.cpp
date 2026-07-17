@@ -1,5 +1,5 @@
 #include "Engine/Graphics/Animator.hpp"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 namespace VECTOR {
 

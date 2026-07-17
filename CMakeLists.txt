@@ -4,24 +4,18 @@ project(PongGame CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Universal SDL2 Resolution: Try find_package first (e.g. for vcpkg/Mac/Linux native), fallback to PkgConfig (MSYS2)
-find_package(SDL2 QUIET)
-find_package(SDL2_ttf QUIET)
-find_package(SDL2_image QUIET)
-find_package(SDL2_mixer QUIET)
+find_package(SDL3 CONFIG REQUIRED)
+find_package(SDL3_ttf CONFIG REQUIRED)
+find_package(SDL3_image CONFIG REQUIRED)
+find_package(SDL3_mixer CONFIG REQUIRED)
 
-if(SDL2_FOUND AND SDL2_ttf_FOUND AND SDL2_image_FOUND AND SDL2_mixer_FOUND)
-    message(STATUS "Found SDL2 via find_package (vcpkg or system config)")
-    set(VECTOR_SDL_LIBS SDL2::SDL2main SDL2::SDL2 SDL2_ttf::SDL2_ttf SDL2_image::SDL2_image SDL2_mixer::SDL2_mixer)
-    set(VECTOR_SDL_INCLUDES "")
-else()
-    message(STATUS "Falling back to PkgConfig for SDL2 resolution (MSYS2/MinGW)")
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(SDL2_PKG REQUIRED sdl2 SDL2_ttf SDL2_image SDL2_mixer)
-    set(VECTOR_SDL_LIBS ${SDL2_PKG_LIBRARIES})
-    set(VECTOR_SDL_INCLUDES ${SDL2_PKG_INCLUDE_DIRS})
-    link_directories(${SDL2_PKG_LIBRARY_DIRS})
-endif()
+set(VECTOR_SDL_LIBS 
+    SDL3::SDL3 
+    SDL3_ttf::SDL3_ttf 
+    $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
+    $<IF:$<TARGET_EXISTS:SDL3_mixer::SDL3_mixer>,SDL3_mixer::SDL3_mixer,SDL3_mixer::SDL3_mixer-static>
+)
+set(VECTOR_SDL_INCLUDES "")
 
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
@@ -42,6 +36,10 @@ set(VECTOR_SOURCES
     src/Engine/Graphics/RenderQueue.cpp
     src/Engine/Graphics/UniformBufferObject.cpp
     src/Engine/Graphics/OpenGL/OpenGLTexture2D.cpp
+    src/Engine/Graphics/OpenGL/OpenGLShader.cpp
+    src/Engine/Graphics/OpenGL/OpenGLMesh.cpp
+    src/Engine/Graphics/OpenGL/OpenGLUniformBuffer.cpp
+    src/Engine/Graphics/OpenGL/OpenGLRenderer.cpp
     src/Engine/Input/InputManager.cpp
     src/Engine/Audio/AudioManager.cpp
     src/Engine/Events/EventBus.cpp
