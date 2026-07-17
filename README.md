@@ -4,7 +4,8 @@
 
 ## Features
 - **Post-Processing & Juice**: Engine support for render targets enables dynamic CRT scanline overlays. Gameplay features impact screen shake, particle explosions, and velocity-based ball squish & stretch.
-- **Save System**: Lightweight persistent data storage (`save.dat`) to track Player and AI High Scores, as well as Audio Volume preferences across sessions.
+- **Save System & Settings**: Lightweight persistent data storage (`save.dat`) to track Player and AI High Scores, Audio Volume preferences, Window Mode (Fullscreen/Borderless), and Resolution across sessions.
+- **Developer Debug Tools**: Full integration of **Dear ImGui**, allowing developers to create custom floating debug panels (press `F3` to toggle the Engine Status & FPS window).
 - **Game Modes**: Play in standard "5 Point Mode" or "Endless Mode".
 - **Dynamic AI Opponent**: Play against a computer-controlled AI with 3 difficulty levels!
 - **Data-Oriented ECS**: A custom Entity-Component System core framework, maximizing cache locality and decoupling logic from data.
@@ -12,8 +13,8 @@
 - **Sprite Animations**: Core `Animator` subsystem for slicing and animating spritesheets.
 - **Physics Engine**: Integrated Box2D v3 for rigid body simulation, collision events, and continuous collision detection (CCD).
 - **Fixed Time-Step**: Physics run at a constant rate regardless of frame rate.
-- **High Definition**: 1280x720 window resolution.
-- **Game States**: Includes Start, Playing, and Paused menus with interactive mouse-driven UI.
+- **High Definition & Polish**: Includes a multi-stage Splash Screen upon boot, slick glowing neon UIs, and dynamic window resizing.
+- **Game States**: Includes Splash, Main Menu, Playing, and Paused menus with interactive mouse-driven UI.
 
 ## Requirements
 
@@ -21,12 +22,14 @@
 * CMake 3.10+
 * SDL3, SDL3_ttf, SDL3_image, and SDL3_mixer development libraries
 * Box2D (v3.0+)
+* *Note: Dear ImGui is automatically fetched by CMake at build time.*
 
 ## Controls
 - **Player 1 (Left)**: `W` (Up) and `S` (Down)
 - **Player 2 (Right)**: Controlled by AI
 - **Pause**: `P` or `ESC`
-- **UI Interaction**: Use the `Mouse` to click buttons (Select Game Mode, Select Difficulty, Adjust Volume).
+- **Toggle Debug UI**: `F3`
+- **UI Interaction**: Use the `Mouse` to click buttons (Select Game Mode, Select Difficulty, Adjust Settings).
 
 ## Building
 
