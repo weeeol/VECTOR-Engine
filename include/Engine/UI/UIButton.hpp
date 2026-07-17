@@ -3,7 +3,7 @@
 #include "Engine/UI/UIElement.hpp"
 #include <string>
 #include <functional>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 namespace VECTOR {
 

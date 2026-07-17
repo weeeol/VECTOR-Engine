@@ -16,7 +16,7 @@ namespace VECTOR {
     }
 
     void InputManager::ProcessEvent(const SDL_Event& e) {
-        if (e.type == SDL_MOUSEBUTTONDOWN) {
+        if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
             if (e.button.button < 6) {
                 m_MouseJustPressed[e.button.button] = true;
             }
@@ -39,7 +39,7 @@ namespace VECTOR {
     }
 
     bool InputManager::IsMouseButtonPressed(int button) const {
-        return (m_MouseState & SDL_BUTTON(button)) != 0;
+        return (m_MouseState & SDL_BUTTON_MASK(button)) != 0;
     }
     
     bool InputManager::IsMouseButtonJustPressed(int button) const {

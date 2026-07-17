@@ -105,7 +105,7 @@ namespace Game {
     b2BodyId GameplayScene::CreateBox(float x, float y, float width, float height, b2BodyType type, float density, float friction, float restitution, bool isSensor, void* userData) {
         b2BodyDef bodyDef = b2DefaultBodyDef();
         bodyDef.type = type;
-        bodyDef.position = (b2Vec2){x / VECTOR::PIXELS_PER_METER, y / VECTOR::PIXELS_PER_METER};
+        bodyDef.position = b2Vec2{x / VECTOR::PIXELS_PER_METER, y / VECTOR::PIXELS_PER_METER};
         bodyDef.userData = userData;
         bodyDef.fixedRotation = true;
         bodyDef.isBullet = (type == b2_dynamicBody);
@@ -137,7 +137,14 @@ namespace Game {
         if (isF3Pressed && !m_WasF3Pressed) m_DebugMode = !m_DebugMode;
         m_WasF3Pressed = isF3Pressed;
 
-        if (m_State == GameState::GameOver) return;
+        if (m_State == GameState::GameOver) {
+            // Check for space or escape to return to main menu
+            if (m_InputManager->IsKeyPressed(SDL_SCANCODE_SPACE) || m_InputManager->IsKeyPressed(SDL_SCANCODE_ESCAPE)) {
+                auto menuScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager);
+                VECTOR::SceneManager::Get().ChangeScene(std::move(menuScene));
+            }
+            return;
+        }
 
         if (isPausePressed && !m_WasPausePressed) m_IsPaused = !m_IsPaused;
         m_WasPausePressed = isPausePressed;
@@ -300,6 +307,7 @@ namespace Game {
         if (m_State == GameState::GameOver) {
             std::string winText = (m_Winner == 1) ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!";
             renderer->DrawText(winText, m_Width / 2 - 140 + offsetX, m_Height / 2 - 50 + offsetY, 255, 215, 0, 48);
+            renderer->DrawText("Press SPACE to return", m_Width / 2 - 130 + offsetX, m_Height / 2 + 10 + offsetY, 200, 200, 200, 24);
         } else if (m_IsPaused) {
             renderer->DrawRect(0, 0, m_Width, m_Height, 0, 0, 0, 200); // Translucent overlay
             
@@ -333,13 +341,13 @@ namespace Game {
         auto& p2RB = m_Registry.GetComponent<VECTOR::RigidBodyComponent>(m_Player2);
         auto& bRB = m_Registry.GetComponent<VECTOR::RigidBodyComponent>(m_Ball);
 
-        b2Body_SetTransform(p1RB.bodyId, (b2Vec2){(30.0f + 10.0f) / VECTOR::PIXELS_PER_METER, (m_Height / 2.0f) / VECTOR::PIXELS_PER_METER}, b2Rot_identity);
-        b2Body_SetTransform(p2RB.bodyId, (b2Vec2){(m_Width - 50.0f + 10.0f) / VECTOR::PIXELS_PER_METER, (m_Height / 2.0f) / VECTOR::PIXELS_PER_METER}, b2Rot_identity);
-        b2Body_SetTransform(bRB.bodyId, (b2Vec2){(m_Width / 2.0f + 7.5f) / VECTOR::PIXELS_PER_METER, (m_Height / 2.0f + 7.5f) / VECTOR::PIXELS_PER_METER}, b2Rot_identity);
+        b2Body_SetTransform(p1RB.bodyId, b2Vec2{(30.0f + 10.0f) / VECTOR::PIXELS_PER_METER, (m_Height / 2.0f) / VECTOR::PIXELS_PER_METER}, b2Rot_identity);
+        b2Body_SetTransform(p2RB.bodyId, b2Vec2{(m_Width - 50.0f + 10.0f) / VECTOR::PIXELS_PER_METER, (m_Height / 2.0f) / VECTOR::PIXELS_PER_METER}, b2Rot_identity);
+        b2Body_SetTransform(bRB.bodyId, b2Vec2{(m_Width / 2.0f + 7.5f) / VECTOR::PIXELS_PER_METER, (m_Height / 2.0f + 7.5f) / VECTOR::PIXELS_PER_METER}, b2Rot_identity);
         
         float dirX = (rand() % 2 == 0) ? -1.0f : 1.0f;
         float dirY = (rand() % 2 == 0) ? -1.0f : 1.0f;
-        b2Body_SetLinearVelocity(bRB.bodyId, (b2Vec2){dirX * 8.0f, dirY * 8.0f});
+        b2Body_SetLinearVelocity(bRB.bodyId, b2Vec2{dirX * 8.0f, dirY * 8.0f});
     }
 
 }

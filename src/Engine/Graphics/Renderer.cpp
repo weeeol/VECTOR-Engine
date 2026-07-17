@@ -2,8 +2,8 @@
 #include "Engine/Graphics/Texture.hpp"
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Core/ResourceManager.hpp"
-#include <SDL_ttf.h>
-#include <SDL_image.h>
+#include <SDL3_ttf/SDL_ttf.h>
+#include <SDL3_image/SDL_image.h>
 
 namespace VECTOR {
 
@@ -16,8 +16,6 @@ namespace VECTOR {
     bool Renderer::Initialize(const std::string& title, int width, int height) {
         m_Window = SDL_CreateWindow(
             title.c_str(),
-            SDL_WINDOWPOS_CENTERED,
-            SDL_WINDOWPOS_CENTERED,
             width,
             height,
             0 // Flags
@@ -29,11 +27,8 @@ namespace VECTOR {
             return false;
         }
 
-        m_Renderer = SDL_CreateRenderer(
-            m_Window,
-            -1,
-            SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
-        );
+        m_Renderer = SDL_CreateRenderer(m_Window, nullptr);
+        SDL_SetRenderVSync(m_Renderer, 1);
 
         if (!m_Renderer) {
             VECTOR_LOG_ERROR(std::string("Failed to create renderer! SDL_Error: ") + SDL_GetError());
@@ -41,16 +36,9 @@ namespace VECTOR {
             return false;
         }
 
-        if (TTF_Init() == -1) {
-            VECTOR_LOG_ERROR(std::string("Failed to initialize SDL_ttf! TTF_Error: ") + TTF_GetError());
+        if (TTF_Init() == false) {
+            VECTOR_LOG_ERROR(std::string("Failed to initialize SDL_ttf! TTF_Error: ") + SDL_GetError());
             SDL_assert(false && "Failed to initialize SDL_ttf");
-            return false;
-        }
-
-        int imgFlags = IMG_INIT_PNG;
-        if (!(IMG_Init(imgFlags) & imgFlags)) {
-            VECTOR_LOG_ERROR(std::string("Failed to initialize SDL_image! IMG_Error: ") + IMG_GetError());
-            SDL_assert(false && "Failed to initialize SDL_image");
             return false;
         }
 
@@ -60,7 +48,6 @@ namespace VECTOR {
 
     void Renderer::Shutdown() {
 
-        IMG_Quit();
         TTF_Quit();
         if (m_Renderer) {
             SDL_DestroyRenderer(m_Renderer);
@@ -82,7 +69,7 @@ namespace VECTOR {
     }
 
     void Renderer::DrawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-        SDL_Rect rect = { x, y, w, h };
+        SDL_FRect rect = { (float)x, (float)y, (float)w, (float)h };
         SDL_SetRenderDrawBlendMode(m_Renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(m_Renderer, r, g, b, a);
         SDL_RenderFillRect(m_Renderer, &rect);
@@ -95,26 +82,26 @@ namespace VECTOR {
 
         SDL_Color color = { r, g, b, 255 };
         // Use Blended instead of Solid for high-quality, anti-aliased text!
-        SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), color);
+        SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), 0, color);
         SDL_Texture* texture = SDL_CreateTextureFromSurface(m_Renderer, surface);
 
-        SDL_Rect destRect = { x, y, surface->w, surface->h };
-        SDL_RenderCopy(m_Renderer, texture, nullptr, &destRect);
+        SDL_FRect destRect = { (float)x, (float)y, (float)surface->w, (float)surface->h };
+        SDL_RenderTexture(m_Renderer, texture, nullptr, &destRect);
 
-        SDL_FreeSurface(surface);
+        SDL_DestroySurface(surface);
         SDL_DestroyTexture(texture);
     }
 
     void Renderer::DrawTexture(Texture* texture, int x, int y, int w, int h) {
         if (!texture || !texture->IsValid()) return;
         
-        SDL_Rect destRect;
-        destRect.x = x;
-        destRect.y = y;
-        destRect.w = (w == -1) ? texture->GetWidth() : w;
-        destRect.h = (h == -1) ? texture->GetHeight() : h;
+        SDL_FRect destRect;
+        destRect.x = (float)x;
+        destRect.y = (float)y;
+        destRect.w = (float)((w == -1) ? texture->GetWidth() : w);
+        destRect.h = (float)((h == -1) ? texture->GetHeight() : h);
 
-        SDL_RenderCopy(m_Renderer, texture->GetSDLTexture(), nullptr, &destRect);
+        SDL_RenderTexture(m_Renderer, texture->GetSDLTexture(), nullptr, &destRect);
     }
 
     void Renderer::SetRenderTarget(Texture* texture) {

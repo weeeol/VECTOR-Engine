@@ -5,7 +5,7 @@ namespace VECTOR {
 
     Box2DPhysicsSystem::Box2DPhysicsSystem() {
         b2WorldDef worldDef = b2DefaultWorldDef();
-        worldDef.gravity = (b2Vec2){0.0f, 0.0f};
+        worldDef.gravity = b2Vec2{0.0f, 0.0f};
         m_WorldId = b2CreateWorld(&worldDef);
     }
 

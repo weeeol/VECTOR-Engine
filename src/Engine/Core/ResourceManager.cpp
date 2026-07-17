@@ -22,7 +22,7 @@ namespace VECTOR {
         if (m_Fonts.find(key) == m_Fonts.end()) {
             TTF_Font* font = TTF_OpenFont(fontPath.c_str(), fontSize);
             if (!font) {
-                VECTOR_LOG_WARN(std::string("Failed to load font: ") + fontPath + "! TTF_Error: " + TTF_GetError());
+                VECTOR_LOG_ERROR(std::string("Failed to load font: ") + fontPath + " - " + SDL_GetError());
                 return nullptr;
             }
             m_Fonts[key] = font;

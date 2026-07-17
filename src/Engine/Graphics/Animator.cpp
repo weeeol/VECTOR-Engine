@@ -1,5 +1,5 @@
 #include "Engine/Graphics/Animator.hpp"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 namespace VECTOR {
 
@@ -23,19 +23,19 @@ namespace VECTOR {
     void Animator::Render(Renderer* renderer, int x, int y, int width, int height) {
         if (!m_Texture || !m_Texture->IsValid()) return;
 
-        SDL_Rect srcRect;
-        srcRect.x = m_CurrentFrame * m_FrameWidth;
-        srcRect.y = 0;
-        srcRect.w = m_FrameWidth;
-        srcRect.h = m_FrameHeight;
+        SDL_FRect srcRect;
+        srcRect.x = (float)(m_CurrentFrame * m_FrameWidth);
+        srcRect.y = 0.0f;
+        srcRect.w = (float)m_FrameWidth;
+        srcRect.h = (float)m_FrameHeight;
 
-        SDL_Rect destRect;
-        destRect.x = x;
-        destRect.y = y;
-        destRect.w = (width == -1) ? m_FrameWidth : width;
-        destRect.h = (height == -1) ? m_FrameHeight : height;
+        SDL_FRect destRect;
+        destRect.x = (float)x;
+        destRect.y = (float)y;
+        destRect.w = (float)((width == -1) ? m_FrameWidth : width);
+        destRect.h = (float)((height == -1) ? m_FrameHeight : height);
 
-        SDL_RenderCopy(renderer->GetSDLRenderer(), m_Texture->GetSDLTexture(), &srcRect, &destRect);
+        SDL_RenderTexture(renderer->GetSDLRenderer(), m_Texture->GetSDLTexture(), &srcRect, &destRect);
     }
 
     void Animator::Play() {

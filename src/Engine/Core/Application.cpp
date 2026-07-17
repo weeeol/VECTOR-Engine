@@ -3,7 +3,7 @@
 #include "Engine/Core/ResourceManager.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include "Engine/Core/SceneManager.hpp"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 namespace VECTOR {
 
@@ -26,7 +26,7 @@ namespace VECTOR {
     bool Application::Initialize() {
         Logger::Init();
 
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0) {
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == false) {
             VECTOR_LOG_ERROR(std::string("SDL could not initialize! SDL_Error: ") + SDL_GetError());
             SDL_assert(false && "SDL failed to initialize");
             return false;
@@ -67,7 +67,7 @@ namespace VECTOR {
         Uint64 previousTime = SDL_GetPerformanceCounter();
         float accumulator = 0.0f;
         Uint32 frameCount = 0;
-        Uint32 fpsTimer = SDL_GetTicks();
+        Uint64 fpsTimer = SDL_GetTicks();
 
         while (m_IsRunning) {
             Uint64 currentTime = SDL_GetPerformanceCounter();
@@ -96,7 +96,7 @@ namespace VECTOR {
             Render();
             frameCount++;
 
-            Uint32 currentTicks = SDL_GetTicks();
+            Uint64 currentTicks = SDL_GetTicks();
             if (currentTicks - fpsTimer >= 1000) {
                 m_CurrentFPS = frameCount;
                 frameCount = 0;
@@ -129,7 +129,7 @@ namespace VECTOR {
         
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
+            if (event.type == SDL_EVENT_QUIT) {
                 Quit();
             }
             if (m_InputManager) {
