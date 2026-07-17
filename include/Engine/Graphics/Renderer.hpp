@@ -9,13 +9,13 @@
 #include <SDL_opengl.h>
 #include <glm/glm.hpp>
 #include <memory>
-#include "Shader.hpp"
-#include "Mesh.hpp"
-#include "Texture2D.hpp"
-#include "Material.hpp"
-#include "RenderQueue.hpp"
-#include "UniformBufferObject.hpp"
-#include "Frustum.hpp"
+#include "Engine/Graphics/Shader.hpp"
+#include "Engine/Graphics/Mesh.hpp"
+#include "Engine/Graphics/Texture2D.hpp"
+#include "Engine/Graphics/Material.hpp"
+#include "Engine/Graphics/RenderQueue.hpp"
+#include "Engine/Graphics/UniformBufferObject.hpp"
+#include "Engine/Graphics/Frustum.hpp"
 
 namespace VECTOR {
 
@@ -47,20 +47,12 @@ namespace VECTOR {
         void SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity);
         void SetDirectionalLight(const glm::vec3& direction, const glm::vec3& color, float intensity);
 
-        /**
-         * @brief Legacy DrawMesh for backward compatibility during transition.
-         * Wraps the old API into the new material-based submit path.
-         */
-        void DrawMesh(const class Mesh* mesh, const class Shader* shader, const class Texture2D* texture, const glm::mat4& model, const glm::vec4& color);
-        
+
         void BeginUI();
         void DrawUIRect(int x, int y, int w, int h, const glm::vec4& color);
         void DrawUIText(const std::string& text, int x, int y, const glm::vec4& color, int fontSize = 24);
         void EndUI();
 
-        // Legacy 2D API (Will be removed later)
-        void DrawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
-        void DrawText(const std::string& text, int x, int y, uint8_t r, uint8_t g, uint8_t b, int fontSize = 24);
 
         SDL_Window* GetWindow() const { return m_Window; }
 
@@ -146,17 +138,17 @@ namespace VECTOR {
         BloomMip m_BloomMips[BLOOM_MIP_COUNT];
 
         float m_BloomThreshold = 1.0f;
-        float m_BloomStrength = 0.3f;
-        float m_Exposure = 1.0f;
+        float m_BloomStrength = 0.5f;
+        float m_Exposure = 1.2f;
         float m_BloomFilterRadius = 0.005f;
 
         void SetupBloomFBOs();
         void RenderBloomPasses();
 
-        // 2D Rendering
-        std::shared_ptr<Shader> m_2DShader;
-        unsigned int m_QuadVAO, m_QuadVBO;
         int m_Width, m_Height;
+        std::shared_ptr<Shader> m_UIShader;
+        unsigned int m_UIQuadVAO, m_UIQuadVBO;
+        
         struct TextTexture {
             unsigned int id;
             int w, h;

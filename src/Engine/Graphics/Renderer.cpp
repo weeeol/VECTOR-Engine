@@ -69,7 +69,7 @@ namespace VECTOR {
         m_PostProcessShader = ResourceManager::Get().LoadShader("PostProcess", "assets/engine/shaders/postprocess.vert", "assets/engine/shaders/postprocess.frag");
         m_BloomDownsampleShader = ResourceManager::Get().LoadShader("BloomDown", "assets/engine/shaders/postprocess.vert", "assets/engine/shaders/bloom_downsample.frag");
         m_BloomUpsampleShader = ResourceManager::Get().LoadShader("BloomUp", "assets/engine/shaders/postprocess.vert", "assets/engine/shaders/bloom_upsample.frag");
-        m_2DShader = ResourceManager::Get().LoadShader("Default2D", "assets/engine/shaders/main2D.vert", "assets/engine/shaders/main2D.frag");
+        m_UIShader = ResourceManager::Get().LoadShader("Default2D", "assets/engine/shaders/main2D.vert", "assets/engine/shaders/main2D.frag");
 
         // Create per-frame UBO at binding point 0
         VECTOR_LOG_INFO("Setting up UBO...");
@@ -116,11 +116,11 @@ namespace VECTOR {
             1.0f, 0.0f, 1.0f, 0.0f
         };
         
-        glGenVertexArrays(1, &m_QuadVAO);
-        glGenBuffers(1, &m_QuadVBO);
+        glGenVertexArrays(1, &m_UIQuadVAO);
+        glGenBuffers(1, &m_UIQuadVBO);
         
-        glBindVertexArray(m_QuadVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, m_QuadVBO);
+        glBindVertexArray(m_UIQuadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, m_UIQuadVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
         
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
@@ -155,12 +155,12 @@ namespace VECTOR {
         if (m_ScreenQuadVAO) glDeleteVertexArrays(1, &m_ScreenQuadVAO);
         if (m_ScreenQuadVBO) glDeleteBuffers(1, &m_ScreenQuadVBO);
 
-        if (m_QuadVAO) glDeleteVertexArrays(1, &m_QuadVAO);
-        if (m_QuadVBO) glDeleteBuffers(1, &m_QuadVBO);
+        if (m_UIQuadVAO) glDeleteVertexArrays(1, &m_UIQuadVAO);
+        if (m_UIQuadVBO) glDeleteBuffers(1, &m_UIQuadVBO);
         m_DefaultShader.reset();
         m_DepthShader.reset();
         m_PostProcessShader.reset();
-        m_2DShader.reset();
+        m_UIShader.reset();
 
         for (auto& pair : m_TextTextureCache) {
             glDeleteTextures(1, &pair.second.id);
@@ -423,48 +423,7 @@ namespace VECTOR {
     // Legacy DrawMesh — wraps old API into new submit path
     // =========================================================================
 
-    void Renderer::DrawMesh(const Mesh* mesh, const Shader* shader, const Texture2D* texture, const glm::mat4& model, const glm::vec4& color) {
-        if (!mesh) return;
-
-        // For the shadow pass: if this is being called with the depth shader, 
-        // handle it directly (legacy path from GameplayScene)
-        if (shader == m_DepthShader.get()) {
-            m_DepthShader->Bind();
-            m_DepthShader->SetMat4("model", model);
-            mesh->Draw();
-            m_DepthShader->Unbind();
-            return;
-        }
-
-        // For the main pass: use the old immediate path for backward compat
-        const Shader* activeShader = shader ? shader : m_DefaultShader.get();
-        activeShader->Bind();
-
-        activeShader->SetMat4("model", model);
-        activeShader->SetVec3("objectColor", glm::vec3(color));
-        activeShader->SetInt("isUnlit", m_UnlitMode ? 1 : 0);
-
-        activeShader->SetInt("shadowMap", 1);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, m_DepthMapTexture);
-        
-        if (texture) {
-            texture->Bind(0);
-            activeShader->SetInt("diffuseTexture", 0);
-            activeShader->SetInt("hasTexture", 1);
-        } else {
-            activeShader->SetInt("hasTexture", 0);
-        }
-
-        mesh->Draw();
-
-        if (texture) {
-            texture->Unbind();
-        }
-        activeShader->Unbind();
-        m_LastFrameDrawCalls++;
-    }
-
+    
     // =========================================================================
     // Multi-pass rendering
     // =========================================================================
@@ -548,23 +507,23 @@ namespace VECTOR {
     // =========================================================================
 
     void Renderer::BeginUI() {
-        m_2DShader->Bind();
+        m_UIShader->Bind();
         glDisable(GL_DEPTH_TEST);
 
         glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
-        m_2DShader->SetMat4("projection", projection);
+        m_UIShader->SetMat4("projection", projection);
         
-        glBindVertexArray(m_QuadVAO);
+        glBindVertexArray(m_UIQuadVAO);
     }
 
     void Renderer::DrawUIRect(int x, int y, int w, int h, const glm::vec4& color) {
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(x, y, 0.0f));
         model = glm::scale(model, glm::vec3(w, h, 1.0f));
-        m_2DShader->SetMat4("model", model);
+        m_UIShader->SetMat4("model", model);
 
-        m_2DShader->SetVec4("spriteColor", color);
-        m_2DShader->SetInt("useTexture", 0);
+        m_UIShader->SetVec4("spriteColor", color);
+        m_UIShader->SetInt("useTexture", 0);
 
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
@@ -630,14 +589,14 @@ namespace VECTOR {
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(x, y, 0.0f));
         model = glm::scale(model, glm::vec3(textTex.w, textTex.h, 1.0f));
-        m_2DShader->SetMat4("model", model);
+        m_UIShader->SetMat4("model", model);
 
-        m_2DShader->SetVec4("spriteColor", glm::vec4(1.0f));
-        m_2DShader->SetInt("useTexture", 1);
+        m_UIShader->SetVec4("spriteColor", glm::vec4(1.0f));
+        m_UIShader->SetInt("useTexture", 1);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textTex.id);
-        m_2DShader->SetInt("text", 0);
+        m_UIShader->SetInt("text", 0);
 
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -652,111 +611,6 @@ namespace VECTOR {
     // Legacy 2D API (unchanged, will be removed later)
     // =========================================================================
 
-    void Renderer::DrawRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-        m_2DShader->Bind();
-        glDisable(GL_DEPTH_TEST);
-
-        glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
-        m_2DShader->SetMat4("projection", projection);
-
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(x, y, 0.0f));
-        model = glm::scale(model, glm::vec3(w, h, 1.0f));
-        m_2DShader->SetMat4("model", model);
-
-        m_2DShader->SetVec4("spriteColor", glm::vec4(r/255.0f, g/255.0f, b/255.0f, a/255.0f));
-        m_2DShader->SetInt("useTexture", 0);
-
-        glBindVertexArray(m_QuadVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
-
-        glEnable(GL_DEPTH_TEST);
-    }
-
-    void Renderer::DrawText(const std::string& text, int x, int y, uint8_t r, uint8_t g, uint8_t b, int fontSize) {
-        if (text.empty()) return;
-
-        std::string cacheKey = text + "_" + std::to_string(r) + "_" + std::to_string(g) + "_" + std::to_string(b) + "_" + std::to_string(fontSize);
-        
-        TextTexture textTex;
-
-        if (m_TextTextureCache.find(cacheKey) == m_TextTextureCache.end()) {
-            if (m_TextTextureCache.size() > 128) {
-                for (auto& pair : m_TextTextureCache) {
-                    glDeleteTextures(1, &pair.second.id);
-                }
-                m_TextTextureCache.clear();
-            }
-
-            TTF_Font* font = ResourceManager::Get().GetFont("assets/font.ttf", fontSize);
-            if (!font) return;
-
-            SDL_Color color = {r, g, b, 255};
-            SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), color);
-            if (!surface) return;
-
-            unsigned int texture;
-            glGenTextures(1, &texture);
-            glBindTexture(GL_TEXTURE_2D, texture);
-
-            int mode = GL_RGB;
-            int format = GL_RGB;
-            if (surface->format->BytesPerPixel == 4) {
-                mode = GL_RGBA;
-                if (surface->format->Rmask == 0x00ff0000) {
-                    format = GL_BGRA;
-                } else {
-                    format = GL_RGBA;
-                }
-            }
-
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-            glPixelStorei(GL_UNPACK_ROW_LENGTH, surface->pitch / surface->format->BytesPerPixel);
-
-            glTexImage2D(GL_TEXTURE_2D, 0, mode, surface->w, surface->h, 0, format, GL_UNSIGNED_BYTE, surface->pixels);
-            
-            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0); // reset
-            
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            
-            textTex.id = texture;
-            textTex.w = surface->w;
-            textTex.h = surface->h;
-            
-            m_TextTextureCache[cacheKey] = textTex;
-            
-            glBindTexture(GL_TEXTURE_2D, 0);
-            SDL_FreeSurface(surface);
-        } else {
-            textTex = m_TextTextureCache[cacheKey];
-        }
-
-        m_2DShader->Bind();
-        glDisable(GL_DEPTH_TEST);
-
-        glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.0f, -1.0f, 1.0f);
-        m_2DShader->SetMat4("projection", projection);
-
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(x, y, 0.0f));
-        model = glm::scale(model, glm::vec3(textTex.w, textTex.h, 1.0f));
-        m_2DShader->SetMat4("model", model);
-
-        m_2DShader->SetVec4("spriteColor", glm::vec4(1.0f));
-        m_2DShader->SetInt("useTexture", 1);
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, textTex.id);
-        m_2DShader->SetInt("text", 0);
-
-        glBindVertexArray(m_QuadVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
-
-        glEnable(GL_DEPTH_TEST);
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
-
+    
+    
 } // namespace VECTOR

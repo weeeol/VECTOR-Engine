@@ -1,4 +1,4 @@
-#include "CameraSystem.hpp"
+#include "Game/Systems/CameraSystem.hpp"
 #include "Engine/ECS/Components.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <btBulletDynamicsCommon.h>

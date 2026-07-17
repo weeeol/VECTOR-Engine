@@ -28,10 +28,7 @@ namespace Game {
 
     private:
         void GenerateArena();
-        void CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const glm::vec3& color, bool isEnemy = false);
-
-        /** @brief Create a Material with the given color using the default shader. */
-        std::shared_ptr<VECTOR::Material> CreateColorMaterial(const glm::vec3& color);
+        void CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy = false);
 
         int m_Width;
         int m_Height;

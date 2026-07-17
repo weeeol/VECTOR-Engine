@@ -3,7 +3,7 @@
 #include <vector>
 #include <memory>
 #include <glm/glm.hpp>
-#include "Frustum.hpp"
+#include "Engine/Graphics/Frustum.hpp"
 
 namespace VECTOR {
 

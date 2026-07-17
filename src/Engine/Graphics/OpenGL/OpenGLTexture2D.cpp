@@ -1,4 +1,4 @@
-#include "OpenGLTexture2D.hpp"
+#include "Engine/Graphics/OpenGL/OpenGLTexture2D.hpp"
 #include "Engine/Core/Logger.hpp"
 #include <GL/glew.h>
 #include <SDL_image.h>

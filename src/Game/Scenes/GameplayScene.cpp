@@ -1,5 +1,5 @@
-#include "GameplayScene.hpp"
-#include "MainMenuScene.hpp"
+#include "Game/Scenes/GameplayScene.hpp"
+#include "Game/Scenes/MainMenuScene.hpp"
 #include "Engine/Core/SceneManager.hpp"
 #include "Engine/Input/InputManager.hpp"
 #include "Engine/Graphics/Renderer.hpp"
@@ -89,12 +89,7 @@ namespace Game {
         m_InputManager->SetRelativeMouseMode(false);
     }
 
-    std::shared_ptr<VECTOR::Material> GameplayScene::CreateColorMaterial(const glm::vec3& color) {
-        auto mat = std::make_shared<VECTOR::Material>();
-        mat->shader = VECTOR::ResourceManager::Get().GetShader("Default3D");
-        mat->albedoColor = glm::vec4(color, 1.0f);
-        return mat;
-    }
+    // CreateColorMaterial removed
 
     void GameplayScene::GenerateArena() {
         // Player Camera
@@ -122,30 +117,28 @@ namespace Game {
         m_Registry.AddComponent(m_Player, VECTOR::RigidBodyComponent{playerBody});
 
         // Floor
-        CreateCube(glm::vec3(0, -1, 0), glm::vec3(50, 1, 50), 0.0f, glm::vec3(0.3f, 0.3f, 0.3f));
+        CreateCube(glm::vec3(0, -1, 0), glm::vec3(50, 1, 50), 0.0f, "assets/materials/floor.vmat");
 
         // Targets with different weights
-        CreateCube(glm::vec3(0, 1, -10), glm::vec3(2, 2, 2), 10.0f, glm::vec3(0.0f, 0.0f, 1.0f)); // Medium
-        CreateCube(glm::vec3(5, 1, -10), glm::vec3(1, 1, 1), 1.0f, glm::vec3(0.0f, 1.0f, 0.0f));  // Light
-        CreateCube(glm::vec3(-5, 1, -10), glm::vec3(3, 3, 3), 100.0f, glm::vec3(1.0f, 0.0f, 0.0f)); // Heavy
+        CreateCube(glm::vec3(0, 1, -10), glm::vec3(2, 2, 2), 10.0f, "assets/materials/medium_target.vmat"); // Medium
+        CreateCube(glm::vec3(5, 1, -10), glm::vec3(1, 1, 1), 1.0f, "assets/materials/light_target.vmat");  // Light
+        CreateCube(glm::vec3(-5, 1, -10), glm::vec3(3, 3, 3), 100.0f, "assets/materials/heavy_target.vmat"); // Heavy
     }
 
-    void GameplayScene::CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const glm::vec3& color, bool isEnemy) {
+    void GameplayScene::CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy) {
         VECTOR::Entity entity = m_Registry.CreateEntity();
         VECTOR::TransformComponent t;
         t.position = position;
         t.scale = scale;
         m_Registry.AddComponent(entity, t);
 
-        auto mat = CreateColorMaterial(color);
-        // Make heavy targets shiny and brightly lit!
+        auto mat = VECTOR::ResourceManager::Get().LoadMaterial(materialPath, materialPath);
+        
+        // Add point lights for visual flair on targets
         if (mass == 100.0f) {
-            mat->albedoColor = glm::vec4(color * 2.0f, 1.0f);
-            mat->specularStrength = 1.0f;
-            mat->shininess = 64.0f;
-            m_Registry.AddComponent(entity, VECTOR::PointLightComponent(color, 2.0f, 15.0f));
+            m_Registry.AddComponent(entity, VECTOR::PointLightComponent(glm::vec3(1.0f, 0.0f, 0.0f), 2.0f, 15.0f));
         } else if (mass == 10.0f) {
-            m_Registry.AddComponent(entity, VECTOR::PointLightComponent(color, 1.0f, 10.0f));
+            m_Registry.AddComponent(entity, VECTOR::PointLightComponent(glm::vec3(0.0f, 0.0f, 1.0f), 1.0f, 10.0f));
         }
 
         m_Registry.AddComponent(entity, VECTOR::RenderComponent(mat));
@@ -215,7 +208,8 @@ namespace Game {
 
         // Submit Directional Light
         glm::vec3 sunDir = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.3f));
-        renderer->SetDirectionalLight(sunDir, glm::vec3(0.9f, 0.9f, 0.8f), 0.8f);
+        // Pass -sunDir because the shader expects the direction the light is travelling
+        renderer->SetDirectionalLight(-sunDir, glm::vec3(1.0f, 0.95f, 0.9f), 1.5f);
 
         // Submit Point Lights
         m_Registry.View<VECTOR::TransformComponent, VECTOR::PointLightComponent>([&](VECTOR::Entity entity) {
@@ -238,6 +232,18 @@ namespace Game {
             renderer->SubmitMesh(m.mesh.get(), r.material.get(), model);
         });
 
+        // Submit the sun (unlit)
+        glm::mat4 sunModel = glm::mat4(1.0f);
+        sunModel = glm::translate(sunModel, sunDir * 80.0f);
+        sunModel = glm::scale(sunModel, glm::vec3(10.0f, 10.0f, 10.0f));
+        
+        VECTOR::Material sunMat;
+        sunMat.isUnlit = true;
+        sunMat.albedoColor = glm::vec4(3.0f, 3.0f, 2.4f, 1.0f);
+        sunMat.shader = VECTOR::ResourceManager::Get().GetShader("Default3D");
+        // It will be drawn in the main pass
+        renderer->SubmitMesh(m_CubeMesh.get(), &sunMat, sunModel);
+
         // PASS 1: SHADOW MAP
         renderer->BeginShadowPass();
         renderer->FlushShadowPass();
@@ -253,14 +259,6 @@ namespace Game {
         }
 
         renderer->FlushMainPass();
-
-        // Draw the sun (unlit) directly via legacy path for simplicity
-        glm::mat4 sunModel = glm::mat4(1.0f);
-        sunModel = glm::translate(sunModel, sunDir * 80.0f);
-        sunModel = glm::scale(sunModel, glm::vec3(10.0f, 10.0f, 10.0f));
-        renderer->SetUnlitMode(true);
-        renderer->DrawMesh(m_CubeMesh.get(), nullptr, nullptr, sunModel, glm::vec4(1.0f, 1.0f, 0.8f, 1.0f));
-        renderer->SetUnlitMode(false);
 
         // PASS 3: POST PROCESS SCREEN QUAD
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);

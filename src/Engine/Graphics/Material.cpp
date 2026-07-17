@@ -1,6 +1,6 @@
-#include "Material.hpp"
-#include "Shader.hpp"
-#include "Texture2D.hpp"
+#include "Engine/Graphics/Material.hpp"
+#include "Engine/Graphics/Shader.hpp"
+#include "Engine/Graphics/Texture2D.hpp"
 
 namespace VECTOR {
 

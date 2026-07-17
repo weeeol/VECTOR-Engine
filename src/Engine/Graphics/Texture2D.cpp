@@ -1,6 +1,6 @@
-#include "Texture2D.hpp"
-#include "RendererAPI.hpp"
-#include "OpenGL/OpenGLTexture2D.hpp"
+#include "Engine/Graphics/Texture2D.hpp"
+#include "Engine/Graphics/RendererAPI.hpp"
+#include "Engine/Graphics/OpenGL/OpenGLTexture2D.hpp"
 #include "Engine/Core/Logger.hpp"
 
 namespace VECTOR {

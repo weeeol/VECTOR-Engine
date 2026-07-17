@@ -1,4 +1,4 @@
-#include "UniformBufferObject.hpp"
+#include "Engine/Graphics/UniformBufferObject.hpp"
 #include "Engine/Core/Logger.hpp"
 
 namespace VECTOR {

@@ -1,7 +1,7 @@
-#include "RenderQueue.hpp"
-#include "Material.hpp"
-#include "Mesh.hpp"
-#include "Shader.hpp"
+#include "Engine/Graphics/RenderQueue.hpp"
+#include "Engine/Graphics/Material.hpp"
+#include "Engine/Graphics/Mesh.hpp"
+#include "Engine/Graphics/Shader.hpp"
 
 namespace VECTOR {
 
@@ -18,22 +18,28 @@ namespace VECTOR {
         );
 
         m_LastDrawCallCount = 0;
-        uint64_t lastSortKey = UINT64_MAX; // Force first bind
+        const Material* lastMaterial = nullptr;
+        const Shader* currentShader = nullptr;
 
         for (const auto& cmd : m_Commands) {
             if (!cmd.mesh) continue;
 
-            // Only re-bind material when the sort key changes
-            if (cmd.sortKey != lastSortKey) {
-                if (cmd.material) {
-                    cmd.material->Bind();
+            // SortKey just groups them, but we still need to bind different materials!
+            if (cmd.material && cmd.material != lastMaterial) {
+                if (cmd.material->shader.get() != currentShader) {
+                    currentShader = cmd.material->shader.get();
+                    if (currentShader) {
+                        currentShader->Bind();
+                        currentShader->SetInt("shadowMap", 1);
+                    }
                 }
-                lastSortKey = cmd.sortKey;
+                cmd.material->Bind();
+                lastMaterial = cmd.material;
             }
 
             // Set per-object uniform (model matrix)
-            if (cmd.material && cmd.material->shader) {
-                cmd.material->shader->SetMat4("model", cmd.modelMatrix);
+            if (currentShader) {
+                currentShader->SetMat4("model", cmd.modelMatrix);
             }
 
             cmd.mesh->Draw();
