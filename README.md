@@ -1,6 +1,6 @@
 # VECTOR Engine and Pong
 
-**VECTOR** (Velocity Engine for C++ Texturing and Object Rendering) is a custom hardware-accelerated 2D C++ game engine built from scratch using SDL2. It is compiled as a standalone static library (`libVECTOR.a`) and includes a fully functional Pong game that demonstrates the engine's capabilities.
+**VECTOR** (Velocity Engine for C++ Texturing and Object Rendering) is a custom hardware-accelerated 2D C++ game engine built from scratch using SDL3. It is compiled as a standalone static library (`libVECTOR.a`) and includes a fully functional Pong game that demonstrates the engine's capabilities.
 
 ## Features
 - **Post-Processing & Juice**: Engine support for render targets enables dynamic CRT scanline overlays. Gameplay features impact screen shake, particle explosions, and velocity-based ball squish & stretch.
@@ -19,7 +19,7 @@
 
 * C++17 or C++20 compatible compiler
 * CMake 3.10+
-* SDL2, SDL2_ttf, SDL2_image, and SDL2_mixer development libraries
+* SDL3, SDL3_ttf, SDL3_image, and SDL3_mixer development libraries
 * Box2D (v3.0+)
 
 ## Controls
@@ -35,7 +35,7 @@ This engine uses a **universal CMake configuration**. It first attempts to find 
 ### Option 1: Vcpkg (Universal / MSVC / Cross-Platform)
 If you are using MSVC or a standard CMake environment, it is highly recommended to use [vcpkg](https://vcpkg.io/):
 ```bash
-vcpkg install sdl2 sdl2-ttf sdl2-image sdl2-mixer box2d
+vcpkg install sdl3 sdl3-ttf sdl3-image sdl3-mixer box2d
 mkdir build && cd build
 cmake -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake ..
 cmake --build .
@@ -44,7 +44,7 @@ cmake --build .
 ### Option 2: MSYS2 / MinGW (Windows)
 If using MSYS2 (UCRT64), install the dependencies:
 ```bash
-pacman -S mingw-w64-ucrt-x86_64-SDL2 mingw-w64-ucrt-x86_64-SDL2_ttf mingw-w64-ucrt-x86_64-SDL2_image mingw-w64-ucrt-x86_64-SDL2_mixer mingw-w64-ucrt-x86_64-box2d
+pacman -S mingw-w64-ucrt-x86_64-SDL3 mingw-w64-ucrt-x86_64-SDL3_ttf mingw-w64-ucrt-x86_64-SDL3_image mingw-w64-ucrt-x86_64-SDL3_mixer mingw-w64-ucrt-x86_64-box2d
 ```
 
 Then configure and build via CMake:
