@@ -69,7 +69,15 @@ namespace VECTOR {
 
         virtual uint32_t GetDrawCallCount() const override { return 0; }
 
+        struct RenderCommand {
+            const Mesh* mesh;
+            const Material* material;
+            glm::mat4 model;
+        };
+
     private:
+        std::vector<RenderCommand> m_RenderQueue;
+        
         SDL_Window* m_Window = nullptr;
         std::unique_ptr<VulkanContext> m_Context;
         std::unique_ptr<VulkanSwapchain> m_Swapchain;
@@ -98,6 +106,7 @@ namespace VECTOR {
         std::vector<VkDescriptorSet> m_GlobalDescriptorSets;
         std::vector<std::unique_ptr<UniformBuffer>> m_PerFrameUBOs;
         std::vector<std::unique_ptr<UniformBuffer>> m_LightUBOs;
+        LightUBOData m_LightData{};
         
         std::unique_ptr<VulkanPipeline> m_Pipeline;
         std::unique_ptr<VulkanTexture2D> m_DummyTexture;

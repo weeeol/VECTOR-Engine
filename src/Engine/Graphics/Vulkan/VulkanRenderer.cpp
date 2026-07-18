@@ -348,10 +348,18 @@ namespace VECTOR {
         perFrameBinding.descriptorCount = 1;
         perFrameBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
+        VkDescriptorSetLayoutBinding lightBinding{};
+        lightBinding.binding = 1;
+        lightBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        lightBinding.descriptorCount = 1;
+        lightBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        std::vector<VkDescriptorSetLayoutBinding> bindings = { perFrameBinding, lightBinding };
+
         VkDescriptorSetLayoutCreateInfo globalLayoutInfo{};
         globalLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        globalLayoutInfo.bindingCount = 1;
-        globalLayoutInfo.pBindings = &perFrameBinding;
+        globalLayoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        globalLayoutInfo.pBindings = bindings.data();
 
         if (vkCreateDescriptorSetLayout(device, &globalLayoutInfo, nullptr, &m_GlobalSetLayout) != VK_SUCCESS) {
             VECTOR_LOG_ERROR("Failed to create global descriptor set layout!");
@@ -453,7 +461,29 @@ namespace VECTOR {
             descriptorWrite.descriptorCount = 1;
             descriptorWrite.pBufferInfo = &bufferInfo;
 
-            vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+            VkDescriptorBufferInfo lightBufferInfo{};
+            auto lightVulkanUBO = dynamic_cast<VulkanUniformBuffer*>(m_LightUBOs[i].get());
+            if (lightVulkanUBO) {
+                lightBufferInfo.buffer = lightVulkanUBO->GetBuffer();
+                lightBufferInfo.offset = 0;
+                lightBufferInfo.range = sizeof(LightUBOData);
+            }
+
+            VkWriteDescriptorSet lightDescriptorWrite{};
+            lightDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            lightDescriptorWrite.dstSet = m_GlobalDescriptorSets[i];
+            lightDescriptorWrite.dstBinding = 1;
+            lightDescriptorWrite.dstArrayElement = 0;
+            lightDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            lightDescriptorWrite.descriptorCount = 1;
+            lightDescriptorWrite.pBufferInfo = &lightBufferInfo;
+
+            std::vector<VkWriteDescriptorSet> descriptorWrites = { descriptorWrite };
+            if (lightVulkanUBO) {
+                descriptorWrites.push_back(lightDescriptorWrite);
+            }
+
+            vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
         }
 
         // Create Dummy Texture for Set 1
@@ -510,52 +540,20 @@ namespace VECTOR {
 
     void VulkanRenderer::SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model) {
         if (!m_FrameStarted) return;
-        
-        VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
-        
-        // Bind Pipeline
-        m_Pipeline->Bind(commandBuffer);
-
-        // Bind Global Descriptor Set (Set 0) and Material Set (Set 1)
-        VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], m_DummyMaterialDescriptorSet };
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 2, sets, 0, nullptr);
-
-        // Material Push Constants
-        struct PushConstants {
-            glm::mat4 model;
-            glm::vec4 albedoColor;
-            uint32_t hasDiffuseMap;
-        } pc;
-
-        pc.model = model;
-        
-        if (material) {
-            pc.albedoColor = material->albedoColor;
-            pc.hasDiffuseMap = (material->albedoTexture != nullptr) ? 1 : 0;
-        } else {
-            pc.albedoColor = glm::vec4(1.0f);
-            pc.hasDiffuseMap = 0;
-        }
-
-        vkCmdPushConstants(commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &pc);
-
-        // Bind Mesh Buffers and Draw
-        auto vulkanMesh = dynamic_cast<const VulkanMesh*>(mesh);
-        if (vulkanMesh) {
-            VkBuffer vertexBuffers[] = { vulkanMesh->GetVertexBuffer()->GetBuffer() };
-            VkDeviceSize offsets[] = { 0 };
-            vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-            
-            vkCmdBindIndexBuffer(commandBuffer, vulkanMesh->GetIndexBuffer()->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
-            
-            vkCmdDrawIndexed(commandBuffer, vulkanMesh->GetIndexCount(), 1, 0, 0, 0);
-        }
+        m_RenderQueue.push_back({mesh, material, model});
     }
 
     void VulkanRenderer::SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) {
+        if (m_LightData.numPointLights < MAX_POINT_LIGHTS) {
+            int idx = m_LightData.numPointLights++;
+            m_LightData.pointLights[idx].positionAndRadius = glm::vec4(position, radius);
+            m_LightData.pointLights[idx].colorAndIntensity = glm::vec4(color, intensity);
+        }
     }
 
     void VulkanRenderer::SetDirectionalLight(const glm::vec3& direction, const glm::vec3& color, float intensity) {
+        m_LightData.dirLight.direction = glm::vec4(glm::normalize(direction), 0.0f);
+        m_LightData.dirLight.colorAndIntensity = glm::vec4(color, intensity);
     }
 
     void VulkanRenderer::BeginUI() {
@@ -604,6 +602,57 @@ namespace VECTOR {
     }
 
     void VulkanRenderer::FlushMainPass() {
+        if (!m_FrameStarted) return;
+        
+        // Update Light UBO before drawing
+        m_LightUBOs[m_CurrentFrame]->SetData(&m_LightData, sizeof(LightUBOData), 0);
+        m_LightData.numPointLights = 0;
+        
+        if (m_RenderQueue.empty()) return;
+
+        VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
+
+        // Bind Pipeline
+        m_Pipeline->Bind(commandBuffer);
+
+        // Bind Global Descriptor Set (Set 0) and Material Set (Set 1)
+        VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], m_DummyMaterialDescriptorSet };
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 2, sets, 0, nullptr);
+
+        for (const auto& cmd : m_RenderQueue) {
+            // Material Push Constants
+            struct PushConstants {
+                glm::mat4 model;
+                glm::vec4 albedoColor;
+                uint32_t hasDiffuseMap;
+            } pc;
+
+            pc.model = cmd.model;
+            
+            if (cmd.material) {
+                pc.albedoColor = cmd.material->albedoColor;
+                pc.hasDiffuseMap = (cmd.material->albedoTexture != nullptr) ? 1 : 0;
+            } else {
+                pc.albedoColor = glm::vec4(1.0f);
+                pc.hasDiffuseMap = 0;
+            }
+
+            vkCmdPushConstants(commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &pc);
+
+            // Bind Mesh Buffers and Draw
+            auto vulkanMesh = dynamic_cast<const VulkanMesh*>(cmd.mesh);
+            if (vulkanMesh) {
+                VkBuffer vertexBuffers[] = { vulkanMesh->GetVertexBuffer()->GetBuffer() };
+                VkDeviceSize offsets[] = { 0 };
+                vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+                
+                vkCmdBindIndexBuffer(commandBuffer, vulkanMesh->GetIndexBuffer()->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
+                
+                vkCmdDrawIndexed(commandBuffer, vulkanMesh->GetIndexCount(), 1, 0, 0, 0);
+            }
+        }
+
+        m_RenderQueue.clear();
     }
 
     void VulkanRenderer::EndPostProcessPass() {
