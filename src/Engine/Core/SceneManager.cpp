@@ -1,4 +1,5 @@
 #include "Engine/Core/SceneManager.hpp"
+#include "Engine/Core/Application.hpp"
 
 namespace VECTOR {
 
@@ -28,6 +29,7 @@ namespace VECTOR {
     void SceneManager::Update(float deltaTime) {
         if (m_NeedsPop) {
             if (!m_Scenes.empty()) {
+                Application::Get().GetRenderer()->WaitIdle();
                 m_Scenes.back()->OnExit();
                 m_Scenes.pop_back();
             }

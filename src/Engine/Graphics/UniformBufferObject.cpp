@@ -1,6 +1,7 @@
 #include "Engine/Graphics/UniformBufferObject.hpp"
 #include "Engine/Graphics/RendererAPI.hpp"
 #include "Engine/Graphics/OpenGL/OpenGLUniformBuffer.hpp"
+#include "Engine/Graphics/Vulkan/VulkanUniformBuffer.hpp"
 #include "Engine/Core/Logger.hpp"
 #include <GL/glew.h>
 
@@ -24,6 +25,8 @@ namespace VECTOR {
                 return nullptr;
             case RendererAPI::API::OpenGL:
                 return std::make_unique<OpenGLUniformBuffer>(size, bindingPoint);
+            case RendererAPI::API::Vulkan:
+                return std::make_unique<VulkanUniformBuffer>(size, bindingPoint);
         }
 
         VECTOR_LOG_ERROR("Unknown RendererAPI!");

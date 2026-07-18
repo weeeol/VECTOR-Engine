@@ -18,6 +18,8 @@ namespace VECTOR {
         }
         m_Fonts.clear();
         m_Shaders.clear();
+        m_Textures.clear();
+        m_Materials.clear();
     }
 
     TTF_Font* ResourceManager::GetFont(const std::string& fontPath, int fontSize) {

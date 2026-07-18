@@ -1,6 +1,7 @@
 #include "Engine/Graphics/Texture2D.hpp"
 #include "Engine/Graphics/RendererAPI.hpp"
 #include "Engine/Graphics/OpenGL/OpenGLTexture2D.hpp"
+#include "Engine/Graphics/Vulkan/VulkanTexture2D.hpp"
 #include "Engine/Core/Logger.hpp"
 
 namespace VECTOR {
@@ -12,6 +13,8 @@ namespace VECTOR {
                 return nullptr;
             case RendererAPI::API::OpenGL:
                 return std::make_shared<OpenGLTexture2D>(path);
+            case RendererAPI::API::Vulkan:
+                return std::make_shared<VulkanTexture2D>(path);
         }
 
         VECTOR_LOG_ERROR("Unknown RendererAPI!");

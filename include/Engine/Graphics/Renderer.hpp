@@ -19,6 +19,7 @@ namespace VECTOR {
 
         virtual bool Initialize(const std::string& title, int width, int height) = 0;
         virtual void Shutdown() = 0;
+        virtual void WaitIdle() {}
 
         virtual void Clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) = 0;
         virtual void Present() = 0;

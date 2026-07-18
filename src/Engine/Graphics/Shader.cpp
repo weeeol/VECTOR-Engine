@@ -1,6 +1,7 @@
 #include "Engine/Graphics/Shader.hpp"
 #include "Engine/Graphics/RendererAPI.hpp"
 #include "Engine/Graphics/OpenGL/OpenGLShader.hpp"
+#include "Engine/Graphics/Vulkan/VulkanShader.hpp"
 #include "Engine/Core/Logger.hpp"
 #include <fstream>
 #include <sstream>
@@ -8,6 +9,10 @@
 namespace VECTOR {
 
     std::shared_ptr<Shader> Shader::CreateFromFile(const std::string& vertexPath, const std::string& fragmentPath) {
+        if (RendererAPI::GetAPI() == RendererAPI::API::Vulkan) {
+            return std::make_shared<VulkanShader>(vertexPath, fragmentPath);
+        }
+
         std::string vertexCode;
         std::string fragmentCode;
         std::ifstream vShaderFile;
@@ -44,6 +49,9 @@ namespace VECTOR {
                 return nullptr;
             case RendererAPI::API::OpenGL:
                 return std::make_shared<OpenGLShader>(vertexSrc, fragmentSrc);
+            case RendererAPI::API::Vulkan:
+                VECTOR_LOG_ERROR("VulkanShader doesn't support CreateFromSource (requires SPIR-V file path)!");
+                return nullptr;
         }
 
         VECTOR_LOG_ERROR("Unknown RendererAPI!");

@@ -124,14 +124,18 @@ namespace VECTOR {
     }
 
     void Application::Shutdown() {
+        if (m_Renderer) {
+            m_Renderer->WaitIdle();
+        }
+
         SceneManager::Get().Clear();
         
+        ResourceManager::Get().Shutdown();
+        AudioManager::Get().Shutdown();
+
         if (m_Renderer) {
             m_Renderer->Shutdown();
         }
-        
-        AudioManager::Get().Shutdown();
-        ResourceManager::Get().Shutdown();
         
         SDL_Quit();
     }

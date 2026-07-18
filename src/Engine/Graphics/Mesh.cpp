@@ -1,6 +1,7 @@
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/RendererAPI.hpp"
 #include "Engine/Graphics/OpenGL/OpenGLMesh.hpp"
+#include "Engine/Graphics/Vulkan/VulkanMesh.hpp"
 #include "Engine/Core/Logger.hpp"
 
 namespace VECTOR {
@@ -12,6 +13,8 @@ namespace VECTOR {
                 return nullptr;
             case RendererAPI::API::OpenGL:
                 return std::make_shared<OpenGLMesh>(vertices, indices);
+            case RendererAPI::API::Vulkan:
+                return std::make_shared<VulkanMesh>(vertices, indices);
         }
 
         VECTOR_LOG_ERROR("Unknown RendererAPI!");

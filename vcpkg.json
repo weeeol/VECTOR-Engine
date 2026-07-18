@@ -2,7 +2,12 @@
   "name": "vector-engine",
   "version-string": "1.0.0",
   "dependencies": [
-    "sdl3",
+    {
+      "name": "sdl3",
+      "features": [
+        "vulkan"
+      ]
+    },
     "sdl3-image",
     "sdl3-ttf",
     "sdl3-mixer",
