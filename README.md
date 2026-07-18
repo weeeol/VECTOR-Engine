@@ -1,10 +1,10 @@
 # VECTOR Engine: 3D Physically Based Deferred FPS
 
-**VECTOR** (Velocity Engine for C++ Texturing and Object Rendering) is a custom hardware-accelerated 3D C++ game engine built from scratch. Originally a 2D Pong Engine, it has been completely pivoted into a **3D Physically Based Deferred First-Person Shooter (FPS)** prototype using OpenGL 3.3 Core, Bullet Physics, and SDL3!
+**VECTOR** (Velocity Engine for C++ Texturing and Object Rendering) is a custom hardware-accelerated 3D C++ game engine built from scratch. Originally a 2D Pong Engine, it has been completely pivoted into a **3D Physically Based Deferred First-Person Shooter (FPS)** prototype supporting both **OpenGL 3.3 Core** and **Vulkan**, using Bullet Physics and SDL3!
 
 ## Features
+- **Dual-Backend Hardware Rendering**: Supports both a modernized deferred OpenGL 3.3 pipeline (with G-Buffer and screen-space lighting) and a growing Vulkan backend.
 - **Dynamic Sparse Set ECS**: A highly optimized Entity-Component System core framework with dynamic page scaling and **Entity ID Recycling**, maximizing CPU cache locality and preventing index exhaustion.
-- **Modernized Deferred Rendering Pipeline**: Renders geometry attributes (position, normals, albedo, metallic-roughness-ao) into a dedicated **G-Buffer** followed by a screen-space lighting pass. Scales efficiently with a large number of dynamic point lights.
 - **Physically Based Rendering (PBR)**: Upgraded from Blinn-Phong to a metallic-roughness workflow utilizing the **Cook-Torrance BRDF** (GGX normal distribution, Fresnel-Schlick, and Smith geometry shadow mapping).
 - **Physical Volumetric Lighting**: Advanced fragment shaders that perform 3D Volumetric Raymarching directly against the shadow map to calculate real atmospheric scattering, rays, and fog.
 - **Shadow Mapping**: Multi-pass rendering pipeline with a dedicated depth pre-pass and PCF (Percentage-Closer Filtering) soft shadows.
@@ -12,14 +12,14 @@
 - **Asset Management & Shader Cache**: A centralized `ResourceManager` handling on-the-fly shader compilation, caching, and font loading. Core engine shaders are abstracted completely into the `assets/engine/shaders` library.
 - **Physics Simulation**: Integrated Bullet3 for 3D rigid body dynamics, gravity, and continuous collision detection. Includes physics-based projectile shooting.
 - **First-Person Camera**: Mouse-look and WASD movement systems that apply forces directly to the player's physical RigidBody.
-- **OpenGL 2D UI Overlay**: Custom orthographic rendering layer built on top of the 3D pipeline for menus, crosshairs, and text using `SDL3_ttf`.
+- **2D UI Overlay**: Custom orthographic rendering layer built on top of the 3D pipeline for menus, crosshairs, and text.
 - **Audio & BGM Support**: Robust audio manager supporting `SDL3_mixer` sound effects and background music with persistent volume configurations.
 
 ## Requirements
 
 * C++17 or C++20 compatible compiler
 * CMake 3.15+
-* OpenGL 3.3+ Compatible GPU
+* Vulkan SDK & OpenGL 3.3+ Compatible GPU
 * GLEW and GLM
 * SDL3, SDL3_ttf, SDL3_image, and SDL3_mixer development libraries
 * Bullet Physics (Bullet3)
