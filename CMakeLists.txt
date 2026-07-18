@@ -22,6 +22,8 @@ find_package(GLEW REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Bullet CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(Vulkan REQUIRED)
+find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 set(VECTOR_SOURCES
     src/Engine/Core/Application.cpp
     src/Engine/Core/Logger.cpp
@@ -41,6 +43,7 @@ set(VECTOR_SOURCES
     src/Engine/Graphics/OpenGL/OpenGLMesh.cpp
     src/Engine/Graphics/OpenGL/OpenGLUniformBuffer.cpp
     src/Engine/Graphics/OpenGL/OpenGLRenderer.cpp
+    src/Engine/Graphics/Vulkan/VulkanRenderer.cpp
     src/Engine/Input/InputManager.cpp
     src/Engine/Audio/AudioManager.cpp
     src/Engine/Events/EventBus.cpp
@@ -51,7 +54,7 @@ set(VECTOR_SOURCES
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
 target_include_directories(VECTOR PUBLIC include src ${VECTOR_SDL_INCLUDES} ${BULLET_ROOT_DIR}/${BULLET_INCLUDE_DIRS})
 target_link_directories(VECTOR PUBLIC ${BULLET_ROOT_DIR}/${BULLET_LIBRARY_DIRS})
-target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES} imgui::imgui)
+target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES} imgui::imgui Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator)
 
 # ==============================================================================
 # PONG GAME EXECUTABLE
