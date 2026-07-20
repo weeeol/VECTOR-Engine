@@ -166,6 +166,7 @@ namespace Game {
     }
 
     void MainMenuScene::Render(VECTOR::Renderer* renderer) {
+        renderer->Clear(0, 0, 0, 255);
         renderer->BeginUI();
         
         if (m_State == MainMenuState::Main) {

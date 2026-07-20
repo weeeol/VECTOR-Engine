@@ -1,10 +1,14 @@
 #include "Engine/Graphics/Vulkan/VulkanRenderer.hpp"
+#include "Engine/Graphics/Vulkan/VulkanBuffer.hpp"
+#include <SDL3/SDL_vulkan.h>
+#include <iostream>
+#include <glm/gtc/matrix_transform.hpp>
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Core/ResourceManager.hpp"
-#include <imgui.h>
-#include <imgui_impl_sdl3.h>
-#include <imgui_impl_vulkan.h>
 #include "Engine/Graphics/Vulkan/VulkanMesh.hpp"
+#include "imgui.h"
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_vulkan.h"
 #include "Engine/Graphics/Vulkan/VulkanUniformBuffer.hpp"
 
 namespace VECTOR {
@@ -37,19 +41,36 @@ namespace VECTOR {
         CreateCommandBuffers();
         CreateSyncObjects();
         
+        CreateShadowResources();
+        
         CreateDescriptorSetLayouts();
         CreateUniformBuffers();
         CreateDescriptorPoolAndSets();
+
+        m_PostProcessor = std::make_unique<VulkanPostProcessor>(width, height, m_Swapchain->GetRenderPass());
 
         VECTOR_LOG_INFO("Loading Shaders...");
         ResourceManager::Get().LoadShader("Default3D", "assets/engine/shaders/vulkan/main3D.vert.spv", "assets/engine/shaders/vulkan/main3D.frag.spv");
 
         PipelineConfigInfo pipelineConfig{};
         VulkanPipeline::DefaultPipelineConfigInfo(pipelineConfig);
-        pipelineConfig.renderPass = m_Swapchain->GetRenderPass();
+        pipelineConfig.renderPass = m_PostProcessor->GetOffscreenRenderPass();
         pipelineConfig.pipelineLayout = m_PipelineLayout;
         
         m_Pipeline = std::make_unique<VulkanPipeline>("assets/engine/shaders/vulkan/main3D.vert.spv", "assets/engine/shaders/vulkan/main3D.frag.spv", pipelineConfig);
+        
+        PipelineConfigInfo wireframeConfig = pipelineConfig;
+        wireframeConfig.rasterizationInfo.polygonMode = VK_POLYGON_MODE_LINE;
+        m_WireframePipeline = std::make_unique<VulkanPipeline>("assets/engine/shaders/vulkan/main3D.vert.spv", "assets/engine/shaders/vulkan/main3D.frag.spv", wireframeConfig);
+
+        PipelineConfigInfo depthConfig = pipelineConfig;
+        depthConfig.renderPass = m_ShadowRenderPass;
+        depthConfig.rasterizationInfo.cullMode = VK_CULL_MODE_NONE; // Match legacy OpenGL
+        // Depth bias can be enabled here if needed
+        depthConfig.rasterizationInfo.depthBiasEnable = VK_TRUE;
+        depthConfig.colorBlendInfo.attachmentCount = 0; // No color attachment
+        depthConfig.colorBlendInfo.pAttachments = nullptr;
+        m_DepthPipeline = std::make_unique<VulkanPipeline>("assets/engine/shaders/vulkan/depth.vert.spv", "assets/engine/shaders/vulkan/depth.frag.spv", depthConfig);
 
         // Create Descriptor Pool for ImGui
         VkDescriptorPoolSize pool_sizes[] =
@@ -101,6 +122,10 @@ namespace VECTOR {
         
         ImGui_ImplVulkan_Init(&init_info);
 
+        ImGuiIO& io = ImGui::GetIO();
+        io.Fonts->AddFontDefault();
+        m_GameFont = io.Fonts->AddFontFromFileTTF("assets/font.ttf", 48.0f);
+
         return true;
     }
 
@@ -119,11 +144,19 @@ namespace VECTOR {
                 vkDestroyFence(device, m_InFlightFences[i], nullptr);
             }
             
-            m_DummyTexture.reset();
+            if (m_PostProcessor) m_PostProcessor.reset();
             m_Pipeline.reset();
+            m_WireframePipeline.reset();
+            m_DepthPipeline.reset();
             
             m_PerFrameUBOs.clear();
             m_LightUBOs.clear();
+
+            vkDestroySampler(device, m_ShadowSampler, nullptr);
+            vkDestroyImageView(device, m_ShadowImageView, nullptr);
+            vmaDestroyImage(m_Context->GetAllocator(), m_ShadowImage, m_ShadowImageAllocation);
+            vkDestroyFramebuffer(device, m_ShadowFramebuffer, nullptr);
+            vkDestroyRenderPass(device, m_ShadowRenderPass, nullptr);
 
             if (m_MainDescriptorPool != VK_NULL_HANDLE) vkDestroyDescriptorPool(device, m_MainDescriptorPool, nullptr);
             if (m_PipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
@@ -137,6 +170,7 @@ namespace VECTOR {
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
 
+        m_DummyTexture.reset();
         m_Swapchain.reset();
         m_Context.reset(); // Shutdown happens in destructor
 
@@ -146,93 +180,108 @@ namespace VECTOR {
         }
     }
 
-    void VulkanRenderer::Clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+    void VulkanRenderer::BeginFrame() {
+        if (m_FrameStarted) return;
+        
+        m_DrawCallCount = 0;
+        
         VkDevice device = m_Context->GetDevice();
+        vkWaitForFences(device, 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
 
-        if (!m_FrameStarted) {
-            vkWaitForFences(device, 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
-
-            VkResult result = m_Swapchain->AcquireNextImage(m_ImageAvailableSemaphores[m_CurrentFrame], &m_ImageIndex);
-            if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-                RecreateSwapchain();
-                return;
-            } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-                VECTOR_LOG_ERROR("Failed to acquire swapchain image!");
-                return;
-            }
-
-            vkResetFences(device, 1, &m_InFlightFences[m_CurrentFrame]);
-
-            VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
-            vkResetCommandBuffer(commandBuffer, 0);
-
-            VkCommandBufferBeginInfo beginInfo{};
-            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-            if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-                VECTOR_LOG_ERROR("Failed to begin recording command buffer!");
-            }
-
-            VkRenderPassBeginInfo renderPassInfo{};
-            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            renderPassInfo.renderPass = m_Swapchain->GetRenderPass();
-            renderPassInfo.framebuffer = m_Swapchain->GetFramebuffer(m_ImageIndex);
-            renderPassInfo.renderArea.offset = {0, 0};
-            renderPassInfo.renderArea.extent = m_Swapchain->GetExtent();
-
-            std::vector<VkClearValue> clearValues(2);
-            clearValues[0].color = {{r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f}};
-            clearValues[1].depthStencil = {1.0f, 0};
-
-            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-            renderPassInfo.pClearValues = clearValues.data();
-
-            vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-            VkViewport viewport{};
-            viewport.x = 0.0f;
-            viewport.y = 0.0f;
-            viewport.width = static_cast<float>(m_Swapchain->GetExtent().width);
-            viewport.height = static_cast<float>(m_Swapchain->GetExtent().height);
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-            vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-            VkRect2D scissor{};
-            scissor.offset = {0, 0};
-            scissor.extent = m_Swapchain->GetExtent();
-            vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-            m_FrameStarted = true;
-        } else {
-            // Already started, just clear the attachments
-            VkClearAttachment clearColor{};
-            clearColor.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            clearColor.colorAttachment = 0;
-            clearColor.clearValue.color = {{r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f}};
-            
-            VkClearAttachment clearDepth{};
-            clearDepth.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-            clearDepth.clearValue.depthStencil = {1.0f, 0};
-
-            VkClearAttachment attachments[] = {clearColor, clearDepth};
-
-            VkClearRect clearRect{};
-            clearRect.rect.offset = {0, 0};
-            clearRect.rect.extent = m_Swapchain->GetExtent();
-            clearRect.baseArrayLayer = 0;
-            clearRect.layerCount = 1;
-
-            vkCmdClearAttachments(m_CommandBuffers[m_CurrentFrame], 2, attachments, 1, &clearRect);
+        VkResult result = m_Swapchain->AcquireNextImage(m_ImageAvailableSemaphores[m_CurrentFrame], &m_ImageIndex);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+            RecreateSwapchain();
+            return;
+        } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+            VECTOR_LOG_ERROR("Failed to acquire swapchain image!");
+            return;
         }
+
+        vkResetFences(device, 1, &m_InFlightFences[m_CurrentFrame]);
+
+        VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
+        vkResetCommandBuffer(commandBuffer, 0);
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+            VECTOR_LOG_ERROR("Failed to begin recording command buffer!");
+        }
+        
+        m_FrameStarted = true;
+    }
+
+    void VulkanRenderer::Clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+        // Convert from sRGB (0-255) to Linear space (0.0-1.0) because the post-processor will gamma correct it back.
+        float linR = std::pow(r / 255.0f, 2.2f);
+        float linG = std::pow(g / 255.0f, 2.2f);
+        float linB = std::pow(b / 255.0f, 2.2f);
+        float linA = a / 255.0f; // Alpha usually stays linear
+
+        if (!m_MainPassActive) {
+            m_ClearColor = glm::vec4(linR, linG, linB, linA);
+            return;
+        }
+
+        VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
+        VkClearAttachment clearColor{};
+        clearColor.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        clearColor.colorAttachment = 0;
+        clearColor.clearValue.color = {{linR, linG, linB, linA}};
+        
+        VkClearRect clearRect{};
+        clearRect.rect.offset = {0, 0};
+        clearRect.rect.extent = m_Swapchain->GetExtent();
+        clearRect.baseArrayLayer = 0;
+        clearRect.layerCount = 1;
+        
+        vkCmdClearAttachments(commandBuffer, 1, &clearColor, 1, &clearRect);
     }
 
     void VulkanRenderer::Present() {
+        if (!m_FrameStarted) {
+            BeginFrame();
+        }
+        if (!m_MainPassActive) {
+            BeginMainPass();
+        }
+        
         VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
         
+        // 1. End the offscreen main pass
+        vkCmdEndRenderPass(commandBuffer);
+        m_MainPassActive = false;
+
+        // 2. Render Bloom (does its own RenderPasses)
+        m_PostProcessor->RenderBloom(commandBuffer);
+
+        // 3. Begin Swapchain Render Pass for Post Processing & ImGui
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = m_Swapchain->GetRenderPass();
+        renderPassInfo.framebuffer = m_Swapchain->GetFramebuffer(m_ImageIndex);
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = m_Swapchain->GetExtent();
+        
+        std::vector<VkClearValue> clearValues(2);
+        clearValues[0].color = {{m_ClearColor.r, m_ClearColor.g, m_ClearColor.b, m_ClearColor.a}};
+        clearValues[1].depthStencil = {1.0f, 0};
+        
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+        
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        // 4. Render Post Processing Final Pass
+        m_PostProcessor->RenderFinal(commandBuffer, m_GlobalDescriptorSets[m_CurrentFrame], m_CurrentFrame);
+
+        // 5. Render ImGui
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 
+        // 5. End Swapchain Render Pass
         vkCmdEndRenderPass(commandBuffer);
+        m_MainPassActive = false;
         
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             VECTOR_LOG_ERROR("Failed to record command buffer!");
@@ -264,7 +313,7 @@ namespace VECTOR {
             m_FramebufferResized = false;
             RecreateSwapchain();
         } else if (result != VK_SUCCESS) {
-            VECTOR_LOG_ERROR("Failed to present swapchain image!");
+            VECTOR_LOG_ERROR("Failed to present swap chain image!");
         }
 
         m_CurrentFrame = (m_CurrentFrame + 1) % m_FramesInFlight;
@@ -289,6 +338,9 @@ namespace VECTOR {
         vkDeviceWaitIdle(m_Context->GetDevice());
 
         m_Swapchain->Recreate(width, height);
+        if (m_PostProcessor) {
+            m_PostProcessor->Recreate(width, height);
+        }
     }
 
     void VulkanRenderer::CreateCommandPool() {
@@ -354,7 +406,13 @@ namespace VECTOR {
         lightBinding.descriptorCount = 1;
         lightBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        std::vector<VkDescriptorSetLayoutBinding> bindings = { perFrameBinding, lightBinding };
+        VkDescriptorSetLayoutBinding shadowBinding{};
+        shadowBinding.binding = 2;
+        shadowBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        shadowBinding.descriptorCount = 1;
+        shadowBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        std::vector<VkDescriptorSetLayoutBinding> bindings = { perFrameBinding, lightBinding, shadowBinding };
 
         VkDescriptorSetLayoutCreateInfo globalLayoutInfo{};
         globalLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -385,7 +443,7 @@ namespace VECTOR {
         // 3. Pipeline Layout
         VkPushConstantRange pushConstant{};
         pushConstant.offset = 0;
-        pushConstant.size = sizeof(glm::mat4) + sizeof(glm::vec4) + sizeof(uint32_t); // model + color + bool
+        pushConstant.size = sizeof(glm::mat4) + sizeof(glm::vec4) + sizeof(uint32_t) * 2; // model + color + hasTexture + isUnlit
         pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayout setLayouts[] = { m_GlobalSetLayout, m_MaterialSetLayout };
@@ -418,7 +476,7 @@ namespace VECTOR {
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(m_FramesInFlight * 2); // 2 UBOs per frame
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[1].descriptorCount = static_cast<uint32_t>(1024); // max textures
+        poolSizes[1].descriptorCount = static_cast<uint32_t>(m_FramesInFlight + 1024); // max textures + shadow maps
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -447,19 +505,10 @@ namespace VECTOR {
             VkDescriptorBufferInfo bufferInfo{};
             auto vulkanUBO = dynamic_cast<VulkanUniformBuffer*>(m_PerFrameUBOs[i].get());
             if (!vulkanUBO) continue;
-
-            bufferInfo.buffer = vulkanUBO->GetBuffer();
-            bufferInfo.offset = 0;
-            bufferInfo.range = sizeof(PerFrameData);
-
-            VkWriteDescriptorSet descriptorWrite{};
-            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrite.dstSet = m_GlobalDescriptorSets[i];
-            descriptorWrite.dstBinding = 0;
-            descriptorWrite.dstArrayElement = 0;
-            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            descriptorWrite.descriptorCount = 1;
-            descriptorWrite.pBufferInfo = &bufferInfo;
+            VkDescriptorBufferInfo perFrameBufferInfo{};
+            perFrameBufferInfo.buffer = vulkanUBO->GetBuffer();
+            perFrameBufferInfo.offset = 0;
+            perFrameBufferInfo.range = sizeof(PerFrameData);
 
             VkDescriptorBufferInfo lightBufferInfo{};
             auto lightVulkanUBO = dynamic_cast<VulkanUniformBuffer*>(m_LightUBOs[i].get());
@@ -469,18 +518,45 @@ namespace VECTOR {
                 lightBufferInfo.range = sizeof(LightUBOData);
             }
 
-            VkWriteDescriptorSet lightDescriptorWrite{};
-            lightDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            lightDescriptorWrite.dstSet = m_GlobalDescriptorSets[i];
-            lightDescriptorWrite.dstBinding = 1;
-            lightDescriptorWrite.dstArrayElement = 0;
-            lightDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            lightDescriptorWrite.descriptorCount = 1;
-            lightDescriptorWrite.pBufferInfo = &lightBufferInfo;
+            VkDescriptorImageInfo shadowImageInfo{};
+            shadowImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            shadowImageInfo.imageView = m_ShadowImageView;
+            shadowImageInfo.sampler = m_ShadowSampler;
 
-            std::vector<VkWriteDescriptorSet> descriptorWrites = { descriptorWrite };
+            std::vector<VkWriteDescriptorSet> descriptorWrites;
+            
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = m_GlobalDescriptorSets[i];
+            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pBufferInfo = &perFrameBufferInfo;
+            descriptorWrites.push_back(descriptorWrite);
+
             if (lightVulkanUBO) {
+                VkWriteDescriptorSet lightDescriptorWrite{};
+                lightDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                lightDescriptorWrite.dstSet = m_GlobalDescriptorSets[i];
+                lightDescriptorWrite.dstBinding = 1;
+                lightDescriptorWrite.dstArrayElement = 0;
+                lightDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                lightDescriptorWrite.descriptorCount = 1;
+                lightDescriptorWrite.pBufferInfo = &lightBufferInfo;
                 descriptorWrites.push_back(lightDescriptorWrite);
+            }
+
+            if (m_ShadowImageView && m_ShadowSampler) {
+                VkWriteDescriptorSet shadowDescriptorWrite{};
+                shadowDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                shadowDescriptorWrite.dstSet = m_GlobalDescriptorSets[i];
+                shadowDescriptorWrite.dstBinding = 2;
+                shadowDescriptorWrite.dstArrayElement = 0;
+                shadowDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                shadowDescriptorWrite.descriptorCount = 1;
+                shadowDescriptorWrite.pImageInfo = &shadowImageInfo;
+                descriptorWrites.push_back(shadowDescriptorWrite);
             }
 
             vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
@@ -518,28 +594,34 @@ namespace VECTOR {
     }
 
     void VulkanRenderer::SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) {
-        if (!m_FrameStarted) return;
+        if (!m_FrameStarted) BeginFrame();
 
         PerFrameData data{};
         data.view = view;
         data.projection = projection;
         // The Y axis is flipped in Vulkan clip space compared to OpenGL
-        // glm handles this via GLM_FORCE_DEPTH_ZERO_TO_ONE in our CMakeLists, but we might also need to invert Y in projection.
-        // For now, we'll invert Y in projection matrix here to avoid upside down rendering.
         data.projection[1][1] *= -1.0f;
         
-        data.lightSpaceMatrix = glm::mat4(1.0f); // Default for now
+        glm::vec3 sunDir = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.3f));
+        glm::vec3 lightPos = sunDir * 80.0f;
+        glm::mat4 lightProjection = glm::ortho(-60.0f, 60.0f, -60.0f, 60.0f, 1.0f, 150.0f);
+        // Flip Y for Vulkan projection
+        lightProjection[1][1] *= -1.0f;
+        glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+        m_LightSpaceMatrix = lightProjection * lightView;
+        
+        data.lightSpaceMatrix = m_LightSpaceMatrix;
         data.viewPos = glm::vec4(viewPos, 1.0f);
         
         // Fill some default directional light data so scene isn't completely black
-        data.sunDir = glm::vec4(glm::normalize(glm::vec3(0.5f, 1.0f, 0.5f)), 0.0f);
+        data.sunDir = glm::vec4(sunDir, 0.0f);
         data.sunColor = glm::vec4(1.0f);
 
         m_PerFrameUBOs[m_CurrentFrame]->SetData(&data, sizeof(PerFrameData), 0);
     }
 
     void VulkanRenderer::SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model) {
-        if (!m_FrameStarted) return;
+        if (!m_FrameStarted) BeginFrame();
         m_RenderQueue.push_back({mesh, material, model});
     }
 
@@ -570,7 +652,7 @@ namespace VECTOR {
 
     void VulkanRenderer::DrawUIText(const std::string& text, int x, int y, const glm::vec4& color, int fontSize) {
         ImGui::GetBackgroundDrawList()->AddText(
-            ImGui::GetFont(),
+            m_GameFont ? m_GameFont : ImGui::GetFont(),
             (float)fontSize,
             ImVec2((float)x, (float)y),
             ImColor(color.r, color.g, color.b, color.a),
@@ -593,12 +675,111 @@ namespace VECTOR {
     }
 
     void VulkanRenderer::BeginShadowPass() {
+        BeginFrame();
+        if (!m_FrameStarted) return;
+        
+        VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
+        
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = m_ShadowRenderPass;
+        renderPassInfo.framebuffer = m_ShadowFramebuffer;
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = {SHADOW_MAP_SIZE, SHADOW_MAP_SIZE};
+        
+        VkClearValue clearDepth;
+        clearDepth.depthStencil = {1.0f, 0};
+        renderPassInfo.clearValueCount = 1;
+        renderPassInfo.pClearValues = &clearDepth;
+        
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(SHADOW_MAP_SIZE);
+        viewport.height = static_cast<float>(SHADOW_MAP_SIZE);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = {SHADOW_MAP_SIZE, SHADOW_MAP_SIZE};
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
     }
 
     void VulkanRenderer::FlushShadowPass() {
+        if (!m_FrameStarted) return;
+        VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
+        
+        m_DepthPipeline->Bind(commandBuffer);
+        
+        for (const auto& cmd : m_RenderQueue) {
+            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame] };
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 1, sets, 0, nullptr);
+            
+            struct PushConstants {
+                glm::mat4 model;
+            } pc;
+            pc.model = cmd.model;
+            
+            vkCmdPushConstants(commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(glm::mat4), &pc);
+            
+            if (cmd.mesh) {
+                auto vulkanMesh = dynamic_cast<const VulkanMesh*>(cmd.mesh);
+                if (vulkanMesh) {
+                    VkBuffer vertexBuffers[] = { vulkanMesh->GetVertexBuffer()->GetBuffer() };
+                    VkDeviceSize offsets[] = { 0 };
+                    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+                    vkCmdBindIndexBuffer(commandBuffer, vulkanMesh->GetIndexBuffer()->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
+                    vkCmdDrawIndexed(commandBuffer, vulkanMesh->GetIndexCount(), 1, 0, 0, 0);
+                    m_DrawCallCount++;
+                }
+            }
+        }
+        
+        vkCmdEndRenderPass(commandBuffer);
     }
 
     void VulkanRenderer::BeginMainPass() {
+        if (m_MainPassActive) return;
+        
+        BeginFrame();
+        if (!m_FrameStarted) return;
+        
+        VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
+        
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = m_PostProcessor->GetOffscreenRenderPass();
+        renderPassInfo.framebuffer = m_PostProcessor->GetOffscreenFramebuffer();
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = m_Swapchain->GetExtent();
+        
+        std::vector<VkClearValue> clearValues(2);
+        clearValues[0].color = {{m_ClearColor.r, m_ClearColor.g, m_ClearColor.b, m_ClearColor.a}};
+        clearValues[1].depthStencil = {1.0f, 0};
+        
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+        
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        m_MainPassActive = true;
+        
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(m_Swapchain->GetExtent().width);
+        viewport.height = static_cast<float>(m_Swapchain->GetExtent().height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = m_Swapchain->GetExtent();
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
     }
 
     void VulkanRenderer::FlushMainPass() {
@@ -613,28 +794,39 @@ namespace VECTOR {
         VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
 
         // Bind Pipeline
-        m_Pipeline->Bind(commandBuffer);
-
-        // Bind Global Descriptor Set (Set 0) and Material Set (Set 1)
-        VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], m_DummyMaterialDescriptorSet };
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 2, sets, 0, nullptr);
+        if (m_IsWireframe) {
+            m_WireframePipeline->Bind(commandBuffer);
+        } else {
+            m_Pipeline->Bind(commandBuffer);
+        }
 
         for (const auto& cmd : m_RenderQueue) {
+            // Bind Descriptor Sets
+            VkDescriptorSet materialSet = m_DummyMaterialDescriptorSet;
+            if (cmd.material && cmd.material->albedoTexture) {
+                materialSet = GetOrCreateTextureDescriptorSet(cmd.material->albedoTexture.get());
+            }
+            
+            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], materialSet };
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 2, sets, 0, nullptr);
             // Material Push Constants
             struct PushConstants {
                 glm::mat4 model;
-                glm::vec4 albedoColor;
-                uint32_t hasDiffuseMap;
+                glm::vec4 color;
+                uint32_t hasTexture;
+                uint32_t isUnlit;
             } pc;
 
             pc.model = cmd.model;
             
             if (cmd.material) {
-                pc.albedoColor = cmd.material->albedoColor;
-                pc.hasDiffuseMap = (cmd.material->albedoTexture != nullptr) ? 1 : 0;
+                pc.color = cmd.material->albedoColor;
+                pc.hasTexture = cmd.material->albedoTexture ? 1 : 0;
+                pc.isUnlit = cmd.material->isUnlit ? 1 : 0;
             } else {
-                pc.albedoColor = glm::vec4(1.0f);
-                pc.hasDiffuseMap = 0;
+                pc.color = glm::vec4(1.0f);
+                pc.hasTexture = 0;
+                pc.isUnlit = 0;
             }
 
             vkCmdPushConstants(commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &pc);
@@ -649,6 +841,7 @@ namespace VECTOR {
                 vkCmdBindIndexBuffer(commandBuffer, vulkanMesh->GetIndexBuffer()->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
                 
                 vkCmdDrawIndexed(commandBuffer, vulkanMesh->GetIndexCount(), 1, 0, 0, 0);
+                m_DrawCallCount++;
             }
         }
 
@@ -661,6 +854,177 @@ namespace VECTOR {
     void VulkanRenderer::SetFullscreen(bool fullscreen, bool borderless) {
         if (m_Window) {
             SDL_SetWindowFullscreen(m_Window, fullscreen);
+        }
+    }
+
+    VkDescriptorSet VulkanRenderer::GetOrCreateTextureDescriptorSet(const Texture2D* texture) {
+        if (!texture) return m_DummyMaterialDescriptorSet;
+
+        auto it = m_TextureDescriptorSets.find(texture);
+        if (it != m_TextureDescriptorSets.end()) {
+            return it->second;
+        }
+
+        auto vulkanTex = dynamic_cast<const VulkanTexture2D*>(texture);
+        if (!vulkanTex) return m_DummyMaterialDescriptorSet;
+
+        VkDevice device = m_Context->GetDevice();
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = m_MainDescriptorPool;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &m_MaterialSetLayout;
+
+        VkDescriptorSet newSet = VK_NULL_HANDLE;
+        if (vkAllocateDescriptorSets(device, &allocInfo, &newSet) == VK_SUCCESS) {
+            VkDescriptorImageInfo imageInfo{};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = vulkanTex->GetImageView();
+            imageInfo.sampler = vulkanTex->GetSampler();
+
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = newSet;
+            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pImageInfo = &imageInfo;
+
+            vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+            m_TextureDescriptorSets[texture] = newSet;
+            return newSet;
+        }
+
+        VECTOR_LOG_ERROR("Failed to allocate descriptor set for texture!");
+        return m_DummyMaterialDescriptorSet;
+    }
+
+    void VulkanRenderer::CreateShadowResources() {
+        VkDevice device = m_Context->GetDevice();
+        VmaAllocator allocator = m_Context->GetAllocator();
+
+        // 1. Create Render Pass
+        VkAttachmentDescription depthAttachment{};
+        depthAttachment.format = VK_FORMAT_D32_SFLOAT;
+        depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkAttachmentReference depthAttachmentRef{};
+        depthAttachmentRef.attachment = 0;
+        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpass{};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 0;
+        subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+        std::array<VkSubpassDependency, 2> dependencies;
+        dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependencies[0].dstSubpass = 0;
+        dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+        dependencies[1].srcSubpass = 0;
+        dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+        dependencies[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        dependencies[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+        VkRenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = 1;
+        renderPassInfo.pAttachments = &depthAttachment;
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpass;
+        renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+        renderPassInfo.pDependencies = dependencies.data();
+
+        if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &m_ShadowRenderPass) != VK_SUCCESS) {
+            VECTOR_LOG_ERROR("Failed to create shadow render pass!");
+        }
+
+        // 2. Create Image
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = SHADOW_MAP_SIZE;
+        imageInfo.extent.height = SHADOW_MAP_SIZE;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = VK_FORMAT_D32_SFLOAT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        allocInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+
+        if (vmaCreateImage(allocator, &imageInfo, &allocInfo, &m_ShadowImage, &m_ShadowImageAllocation, nullptr) != VK_SUCCESS) {
+            VECTOR_LOG_ERROR("Failed to create shadow image!");
+        }
+
+        // 3. Create ImageView
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = m_ShadowImage;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = VK_FORMAT_D32_SFLOAT;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        if (vkCreateImageView(device, &viewInfo, nullptr, &m_ShadowImageView) != VK_SUCCESS) {
+            VECTOR_LOG_ERROR("Failed to create shadow image view!");
+        }
+
+        // 4. Create Sampler
+        VkSamplerCreateInfo samplerInfo{};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.maxAnisotropy = 1.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 1.0f;
+        samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+
+        if (vkCreateSampler(device, &samplerInfo, nullptr, &m_ShadowSampler) != VK_SUCCESS) {
+            VECTOR_LOG_ERROR("Failed to create shadow sampler!");
+        }
+
+        // 5. Create Framebuffer
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = m_ShadowRenderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = &m_ShadowImageView;
+        framebufferInfo.width = SHADOW_MAP_SIZE;
+        framebufferInfo.height = SHADOW_MAP_SIZE;
+        framebufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &m_ShadowFramebuffer) != VK_SUCCESS) {
+            VECTOR_LOG_ERROR("Failed to create shadow framebuffer!");
         }
     }
 

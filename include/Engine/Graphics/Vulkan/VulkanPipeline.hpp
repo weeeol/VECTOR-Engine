@@ -19,6 +19,7 @@ namespace VECTOR {
         VkPipelineLayout pipelineLayout = nullptr;
         VkRenderPass renderPass = nullptr;
         uint32_t subpass = 0;
+        bool emptyVertexInput = false;
     };
 
     class VulkanPipeline {

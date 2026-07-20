@@ -48,6 +48,7 @@ set(VECTOR_SOURCES
     src/Engine/Graphics/Vulkan/VulkanSwapchain.cpp
     src/Engine/Graphics/Vulkan/VulkanShader.cpp
     src/Engine/Graphics/Vulkan/VulkanPipeline.cpp
+    src/Engine/Graphics/Vulkan/VulkanPostProcessor.cpp
     src/Engine/Graphics/Vulkan/VulkanBuffer.cpp
     src/Engine/Graphics/Vulkan/VulkanMesh.cpp
     src/Engine/Graphics/Vulkan/VulkanUniformBuffer.cpp

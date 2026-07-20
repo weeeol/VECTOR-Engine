@@ -6,9 +6,15 @@
 #include "Engine/Graphics/UniformBufferObject.hpp"
 #include "Engine/Graphics/Vulkan/VulkanPipeline.hpp"
 #include "Engine/Graphics/Vulkan/VulkanTexture2D.hpp"
+#include "Engine/Graphics/Vulkan/VulkanPostProcessor.hpp"
+#include <SDL3_ttf/SDL_ttf.h>
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <vector>
+#include <unordered_map>
+
+struct SDL_Window;
+struct ImFont;
 
 namespace VECTOR {
 
@@ -64,10 +70,10 @@ namespace VECTOR {
         virtual Material* GetDefaultMaterial() const override { return nullptr; }
         virtual void SetUnlitMode(bool unlit) override {}
         
-        virtual void SetWireframeMode(bool enabled) override {}
+        virtual void SetWireframeMode(bool enabled) override { m_IsWireframe = enabled; }
         virtual std::string GetRendererInfo() const override { return "Vulkan Renderer (Stub)"; }
 
-        virtual uint32_t GetDrawCallCount() const override { return 0; }
+        virtual uint32_t GetDrawCallCount() const override { return m_DrawCallCount; }
 
         struct RenderCommand {
             const Mesh* mesh;
@@ -97,6 +103,9 @@ namespace VECTOR {
         glm::mat4 m_DummyMatrix = glm::mat4(1.0f);
         bool m_FramebufferResized = false;
         bool m_FrameStarted = false;
+        bool m_MainPassActive = false;
+        glm::vec4 m_ClearColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        ImFont* m_GameFont = nullptr;
         
         VkDescriptorSetLayout m_GlobalSetLayout = VK_NULL_HANDLE;
         VkDescriptorSetLayout m_MaterialSetLayout = VK_NULL_HANDLE;
@@ -107,10 +116,27 @@ namespace VECTOR {
         std::vector<std::unique_ptr<UniformBuffer>> m_PerFrameUBOs;
         std::vector<std::unique_ptr<UniformBuffer>> m_LightUBOs;
         LightUBOData m_LightData{};
+        bool m_IsWireframe = false;
         
         std::unique_ptr<VulkanPipeline> m_Pipeline;
+        std::unique_ptr<VulkanPipeline> m_WireframePipeline;
+        
+        // Shadow Mapping
+        const uint32_t SHADOW_MAP_SIZE = 2048;
+        VkRenderPass m_ShadowRenderPass = VK_NULL_HANDLE;
+        VkImage m_ShadowImage = VK_NULL_HANDLE;
+        VmaAllocation m_ShadowImageAllocation = VK_NULL_HANDLE;
+        VkImageView m_ShadowImageView = VK_NULL_HANDLE;
+        VkSampler m_ShadowSampler = VK_NULL_HANDLE;
+        VkFramebuffer m_ShadowFramebuffer = VK_NULL_HANDLE;
+        std::unique_ptr<VulkanPipeline> m_DepthPipeline;
+        glm::mat4 m_LightSpaceMatrix = glm::mat4(1.0f);
+        
         std::unique_ptr<VulkanTexture2D> m_DummyTexture;
         VkDescriptorSet m_DummyMaterialDescriptorSet = VK_NULL_HANDLE;
+        
+        std::unordered_map<const Texture2D*, VkDescriptorSet> m_TextureDescriptorSets;
+        VkDescriptorSet GetOrCreateTextureDescriptorSet(const Texture2D* texture);
 
         void CreateCommandPool();
         void CreateCommandBuffers();
@@ -119,7 +145,15 @@ namespace VECTOR {
         void CreateUniformBuffers();
         void CreateDescriptorPoolAndSets();
         
+        void BeginFrame();
+
         void RecreateSwapchain();
+        void CreatePipelines();
+        
+        void CreateShadowResources();
+        
+        std::unique_ptr<VulkanPostProcessor> m_PostProcessor;
+        uint32_t m_DrawCallCount = 0;
     };
 
 } // namespace VECTOR
