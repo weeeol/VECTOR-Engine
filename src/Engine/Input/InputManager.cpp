@@ -45,16 +45,16 @@ namespace VECTOR {
     }
 
     bool InputManager::IsMouseButtonPressed(int button) const {
-        if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse) {
-            return false;
-        }
+        // if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse) {
+        //     return false;
+        // }
         return (m_MouseState & SDL_BUTTON_MASK(button)) != 0;
     }
     
     bool InputManager::IsMouseButtonJustPressed(int button) const {
-        if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse) {
-            return false;
-        }
+        // if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse) {
+        //     return false;
+        // }
         bool isPressedNow = (m_MouseState & SDL_BUTTON_MASK(button)) != 0;
         bool wasPressedBefore = (m_PrevMouseState & SDL_BUTTON_MASK(button)) != 0;
         return isPressedNow && !wasPressedBefore;

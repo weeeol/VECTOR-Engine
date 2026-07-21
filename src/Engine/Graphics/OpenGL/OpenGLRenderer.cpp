@@ -140,9 +140,14 @@ namespace VECTOR {
         ImGuiIO& io = ImGui::GetIO(); (void)io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
+        
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.WindowRounding = 0.0f;
+        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.105f, 0.11f, 1.0f);
 
         // Setup Platform/Renderer backends
         ImGui_ImplSDL3_InitForOpenGL(m_Window, m_GLContext);

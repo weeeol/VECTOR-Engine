@@ -17,18 +17,23 @@ namespace VECTOR {
         DestroyResources();
         
         VkDevice device = VulkanContext::Get()->GetDevice();
+        if (m_BloomRenderPass) {
+            vkDestroyRenderPass(device, m_BloomRenderPass, nullptr);
+        }
         vkDestroyRenderPass(device, m_OffscreenRenderPass, nullptr);
         
         // Destructors of VulkanPipeline handle pipeline destruction
     }
 
-    void VulkanPostProcessor::Recreate(uint32_t width, uint32_t height) {
+    void VulkanPostProcessor::Recreate(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass) {
         m_Width = width;
         m_Height = height;
+        m_SwapchainRenderPass = swapchainRenderPass;
         
         DestroyResources();
         CreateResources();
         CreateDescriptorSets();
+        CreatePipelines();
     }
     
     namespace {
@@ -156,10 +161,7 @@ namespace VECTOR {
         }
         m_BloomFramebuffers.clear();
 
-        if (m_BloomRenderPass) {
-            vkDestroyRenderPass(device, m_BloomRenderPass, nullptr);
-            m_BloomRenderPass = VK_NULL_HANDLE;
-        }
+
 
         if (m_BloomSetLayout) {
             vkDestroyDescriptorSetLayout(device, m_BloomSetLayout, nullptr);
@@ -299,12 +301,31 @@ namespace VECTOR {
         bloomSubpass.colorAttachmentCount = 1;
         bloomSubpass.pColorAttachments = &bloomAttachmentRef;
 
+        std::array<VkSubpassDependency, 2> bloomDependencies;
+        bloomDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        bloomDependencies[0].dstSubpass = 0;
+        bloomDependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        bloomDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        bloomDependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        bloomDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        bloomDependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+        bloomDependencies[1].srcSubpass = 0;
+        bloomDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+        bloomDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        bloomDependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        bloomDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        bloomDependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        bloomDependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
         VkRenderPassCreateInfo bloomRenderPassInfo{};
         bloomRenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         bloomRenderPassInfo.attachmentCount = 1;
         bloomRenderPassInfo.pAttachments = &bloomAttachment;
         bloomRenderPassInfo.subpassCount = 1;
         bloomRenderPassInfo.pSubpasses = &bloomSubpass;
+        bloomRenderPassInfo.dependencyCount = static_cast<uint32_t>(bloomDependencies.size());
+        bloomRenderPassInfo.pDependencies = bloomDependencies.data();
 
         if (vkCreateRenderPass(device, &bloomRenderPassInfo, nullptr, &m_BloomRenderPass) != VK_SUCCESS) {
             VECTOR_LOG_ERROR("Failed to create bloom render pass!");

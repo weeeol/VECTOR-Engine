@@ -146,6 +146,8 @@ namespace VECTOR {
             ImGui_ImplSDL3_ProcessEvent(&event);
             if (event.type == SDL_EVENT_QUIT) {
                 Quit();
+            } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+                SetResolution(event.window.data1, event.window.data2);
             }
         }
         

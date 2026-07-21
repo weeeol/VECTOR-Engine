@@ -16,6 +16,7 @@ namespace Game {
 
         float m_MouseSensitivity = 0.1f;
         float m_MovementSpeed = 10.0f;
+        bool m_RequireRightClick = false;
 
     private:
         VECTOR::InputManager* m_InputManager;

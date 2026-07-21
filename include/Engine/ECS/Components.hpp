@@ -3,12 +3,19 @@
 #include <glm/gtc/quaternion.hpp>
 #include <stdint.h>
 #include <memory>
+#include <string>
 
 class btRigidBody;
 
 namespace VECTOR {
 
     class Material;
+
+    struct TagComponent {
+        std::string tag;
+        TagComponent() = default;
+        TagComponent(const std::string& t) : tag(t) {}
+    };
 
     struct TransformComponent {
         glm::vec3 position;
@@ -44,8 +51,9 @@ namespace VECTOR {
         float yaw;
         float pitch;
         float fov;
+        bool isActive;
         
-        CameraComponent() : front(0,0,-1), up(0,1,0), right(1,0,0), yaw(-90.0f), pitch(0.0f), fov(45.0f) {}
+        CameraComponent() : front(0,0,-1), up(0,1,0), right(1,0,0), yaw(-90.0f), pitch(0.0f), fov(45.0f), isActive(true) {}
     };
 
     struct PointLightComponent {

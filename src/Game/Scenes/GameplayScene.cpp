@@ -33,6 +33,9 @@ namespace Game {
         m_Registry.RegisterComponent<VECTOR::PointLightComponent>();
         m_Registry.RegisterComponent<VECTOR::DirectionalLightComponent>();
         m_Registry.RegisterComponent<AIComponent>(); // Reusing AIComponent for enemies
+        m_Registry.RegisterComponent<VECTOR::TagComponent>();
+
+        m_EditorUI = std::make_unique<EditorUI>(m_Registry, VECTOR::Application::Get().GetRenderer());
 
         auto physSys = std::make_unique<VECTOR::BulletPhysicsSystem>();
         m_PhysicsSystem = physSys.get();
@@ -203,10 +206,22 @@ namespace Game {
     // CreateColorMaterial removed
 
     void GameplayScene::GenerateArena() {
+        // Editor Camera
+        m_EditorCamera = m_Registry.CreateEntity();
+        m_Registry.AddComponent(m_EditorCamera, VECTOR::TagComponent{"Editor Camera"});
+        m_Registry.AddComponent(m_EditorCamera, VECTOR::TransformComponent{glm::vec3(0.0f, 10.0f, 10.0f)});
+        auto eCam = VECTOR::CameraComponent{};
+        eCam.pitch = -45.0f;
+        eCam.isActive = true;
+        m_Registry.AddComponent(m_EditorCamera, eCam);
+
         // Player Camera
         m_Player = m_Registry.CreateEntity();
+        m_Registry.AddComponent(m_Player, VECTOR::TagComponent{"Player Camera"});
         m_Registry.AddComponent(m_Player, VECTOR::TransformComponent{glm::vec3(0.0f, 2.0f, 5.0f)});
-        m_Registry.AddComponent(m_Player, VECTOR::CameraComponent{});
+        auto pCam = VECTOR::CameraComponent{};
+        pCam.isActive = false;
+        m_Registry.AddComponent(m_Player, pCam);
 
         btCollisionShape* playerShape = new btCapsuleShape(0.5f, 1.0f);
         btTransform playerStartTransform;
@@ -248,6 +263,14 @@ namespace Game {
 
     void GameplayScene::CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy) {
         VECTOR::Entity entity = m_Registry.CreateEntity();
+        
+        std::string name = "Cube";
+        if (mass == 100.0f) name = "Heavy Target";
+        else if (mass == 10.0f) name = "Medium Target";
+        else if (mass == 1.0f) name = "Light Target";
+        else if (mass == 0.0f) name = "Floor";
+        m_Registry.AddComponent(entity, VECTOR::TagComponent{name});
+        
         VECTOR::TransformComponent t;
         t.position = position;
         t.scale = scale;
@@ -312,7 +335,8 @@ namespace Game {
         }
         m_WasF3Pressed = isF3Pressed;
 
-        bool targetRelative = !m_DebugMode && m_State == GameState::Playing;
+        bool isRightClickHeld = m_InputManager->IsMouseButtonPressed(SDL_BUTTON_RIGHT);
+        bool targetRelative = (m_State == GameState::Playing) || (m_State == GameState::Editor && isRightClickHeld);
         static bool lastRelative = true;
         if (targetRelative != lastRelative) {
             m_InputManager->SetRelativeMouseMode(targetRelative);
@@ -332,22 +356,31 @@ namespace Game {
         }
         m_WasEscapePressed = isEscapePressed;
 
-        if (m_State != GameState::Playing) {
+        if (m_State == GameState::Editor) {
+            m_CameraSystem->m_RequireRightClick = true;
+            m_CameraSystem->Update(m_Registry, deltaTime);
+        } else if (m_State == GameState::Playing) {
+            m_CameraSystem->m_RequireRightClick = false;
+            for (auto& system : m_Systems) {
+                system->Update(m_Registry, deltaTime);
+            }
+        } else {
             m_UISystem->Update(m_UIRegistry, deltaTime);
             if (m_NeedsUIRefresh) {
                 CreateUI();
                 m_NeedsUIRefresh = false;
             }
-        } else {
-            for (auto& system : m_Systems) {
-                system->Update(m_Registry, deltaTime);
-            }
         }
     }
 
     void GameplayScene::Render(VECTOR::Renderer* renderer) {
-        auto& camT = m_Registry.GetComponent<VECTOR::TransformComponent>(m_Player);
-        auto& camC = m_Registry.GetComponent<VECTOR::CameraComponent>(m_Player);
+        VECTOR::Entity activeCameraEntity = m_Player;
+        if (m_State == GameState::Editor) {
+            activeCameraEntity = m_EditorCamera;
+        }
+        
+        auto& camT = m_Registry.GetComponent<VECTOR::TransformComponent>(activeCameraEntity);
+        auto& camC = m_Registry.GetComponent<VECTOR::CameraComponent>(activeCameraEntity);
 
         glm::mat4 view = glm::lookAt(camT.position, camT.position + camC.front, camC.up);
         glm::mat4 projection = glm::perspective(glm::radians(camC.fov), (float)m_Width / (float)m_Height, 0.1f, 100.0f);
@@ -414,7 +447,7 @@ namespace Game {
 
         // Raw text debug info has been migrated to the Dear ImGui Debugger window.
 
-        if (m_State != GameState::Playing) {
+        if (m_State == GameState::Paused || m_State == GameState::Settings) {
             renderer->DrawUIRect(0, 0, m_Width, m_Height, glm::vec4(0.0f, 0.0f, 0.0f, 150/255.0f)); // Dark overlay
             if (m_State == GameState::Paused) {
                 renderer->DrawUIText("PAUSED", m_Width / 2 - 80, m_Height / 2 - 120, glm::vec4(1.0f), 48);
@@ -452,7 +485,60 @@ namespace Game {
         renderer->EndUI();
 
         // Render Dear ImGui Debug HUD
-        if (m_DebugMode) {
+        if (m_State == GameState::Editor || m_DebugMode) {
+            EditorAction action = m_EditorUI->Render(m_State == GameState::Playing);
+            
+            if (action == EditorAction::Play) {
+                m_State = GameState::Playing;
+                m_InitialTransforms.clear();
+                m_Registry.View<VECTOR::TransformComponent>([&](VECTOR::Entity entity) {
+                    m_InitialTransforms[entity] = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+                });
+                
+                if (m_Registry.HasComponent<VECTOR::CameraComponent>(m_EditorCamera)) {
+                    m_Registry.GetComponent<VECTOR::CameraComponent>(m_EditorCamera).isActive = false;
+                }
+                if (m_Registry.HasComponent<VECTOR::CameraComponent>(m_Player)) {
+                    m_Registry.GetComponent<VECTOR::CameraComponent>(m_Player).isActive = true;
+                }
+                VECTOR::AudioManager::Get().PlayMusic("assets/bgm.wav");
+            } else if (action == EditorAction::Stop) {
+                m_State = GameState::Editor;
+                for (auto& pair : m_InitialTransforms) {
+                    VECTOR::Entity entity = pair.first;
+                    auto& transform = pair.second;
+                    
+                    if (m_Registry.HasComponent<VECTOR::TransformComponent>(entity)) {
+                        m_Registry.GetComponent<VECTOR::TransformComponent>(entity) = transform;
+                    }
+                    if (m_Registry.HasComponent<VECTOR::RigidBodyComponent>(entity)) {
+                        auto& rb = m_Registry.GetComponent<VECTOR::RigidBodyComponent>(entity);
+                        if (rb.body) {
+                            btTransform startTransform;
+                            startTransform.setIdentity();
+                            startTransform.setOrigin(btVector3(transform.position.x, transform.position.y, transform.position.z));
+                            
+                            // glm::quat to btQuaternion
+                            btQuaternion btq(transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w);
+                            startTransform.setRotation(btq);
+                            
+                            rb.body->setWorldTransform(startTransform);
+                            rb.body->setLinearVelocity(btVector3(0,0,0));
+                            rb.body->setAngularVelocity(btVector3(0,0,0));
+                            rb.body->clearForces();
+                        }
+                    }
+                }
+                
+                if (m_Registry.HasComponent<VECTOR::CameraComponent>(m_EditorCamera)) {
+                    m_Registry.GetComponent<VECTOR::CameraComponent>(m_EditorCamera).isActive = true;
+                }
+                if (m_Registry.HasComponent<VECTOR::CameraComponent>(m_Player)) {
+                    m_Registry.GetComponent<VECTOR::CameraComponent>(m_Player).isActive = false;
+                }
+                VECTOR::AudioManager::Get().StopMusic();
+            }
+            
             ImGui::Begin("VECTOR Engine Debugger", &m_DebugMode);
             
             if (ImGui::CollapsingHeader("System Info", ImGuiTreeNodeFlags_DefaultOpen)) {

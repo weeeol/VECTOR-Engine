@@ -16,13 +16,17 @@ namespace Game {
         registry.View<VECTOR::TransformComponent, VECTOR::CameraComponent>([&](VECTOR::Entity entity) {
             auto& t = registry.GetComponent<VECTOR::TransformComponent>(entity);
             auto& cam = registry.GetComponent<VECTOR::CameraComponent>(entity);
+            
+            if (!cam.isActive) return;
 
             // Mouse Look
-            float xoffset = m_InputManager->GetMouseDeltaX() * m_MouseSensitivity;
-            float yoffset = -m_InputManager->GetMouseDeltaY() * m_MouseSensitivity; // reversed since y-coordinates go from bottom to top
+            if (!m_RequireRightClick || m_InputManager->IsMouseButtonPressed(SDL_BUTTON_RIGHT)) {
+                float xoffset = m_InputManager->GetMouseDeltaX() * m_MouseSensitivity;
+                float yoffset = -m_InputManager->GetMouseDeltaY() * m_MouseSensitivity; // reversed since y-coordinates go from bottom to top
 
-            cam.yaw += xoffset;
-            cam.pitch += yoffset;
+                cam.yaw += xoffset;
+                cam.pitch += yoffset;
+            }
 
             // Make sure that when pitch is out of bounds, screen doesn't get flipped
             if (cam.pitch > 89.0f) cam.pitch = 89.0f;

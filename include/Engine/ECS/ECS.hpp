@@ -94,6 +94,8 @@ namespace VECTOR {
     public:
         Registry() : m_NextEntity(0) {}
         
+        const std::vector<Entity>& GetActiveEntities() const { return m_ActiveEntities; }
+        
         Entity CreateEntity() {
             Entity id;
             if (!m_FreeEntities.empty()) {

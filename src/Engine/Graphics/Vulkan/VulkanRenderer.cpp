@@ -96,6 +96,11 @@ namespace VECTOR {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGui::StyleColorsDark();
+        
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.WindowRounding = 0.0f;
+        style.Colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.105f, 0.11f, 1.0f);
+        
         ImGui_ImplSDL3_InitForVulkan(m_Window);
 
         ImGui_ImplVulkan_InitInfo init_info = {};
@@ -119,6 +124,8 @@ namespace VECTOR {
         ImGui_ImplVulkan_Init(&init_info);
 
         ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         io.Fonts->AddFontDefault();
         m_GameFont = io.Fonts->AddFontFromFileTTF("assets/font.ttf", 48.0f);
 
@@ -326,7 +333,7 @@ namespace VECTOR {
 
         m_Swapchain->Recreate(width, height);
         if (m_PostProcessor) {
-            m_PostProcessor->Recreate(width, height);
+            m_PostProcessor->Recreate(width, height, m_Swapchain->GetRenderPass());
         }
     }
 

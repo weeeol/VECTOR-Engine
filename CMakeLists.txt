@@ -77,6 +77,7 @@ set(GAME_SOURCES
     src/Game/Systems/GameSystems.cpp
     src/Game/Systems/CameraSystem.cpp
     src/Game/Systems/ShootingSystem.cpp
+    src/Game/Editor/EditorUI.cpp
 )
 
 add_executable(Pong src/main.cpp ${GAME_SOURCES})

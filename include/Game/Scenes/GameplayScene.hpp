@@ -2,13 +2,16 @@
 
 #include "Engine/Core/Scene.hpp"
 #include "Engine/ECS/ECS.hpp"
+#include "Engine/ECS/Components.hpp"
 #include "Engine/Physics/BulletPhysicsSystem.hpp"
 #include "Engine/UI/UISystem.hpp"
 #include "Game/Systems/GameSystems.hpp"
 #include "Game/Systems/CameraSystem.hpp"
 #include "Game/Systems/ShootingSystem.hpp"
+#include "Game/Editor/EditorUI.hpp"
 #include <memory>
 #include <vector>
+#include <unordered_map>
 
 namespace VECTOR {
     class InputManager;
@@ -34,6 +37,7 @@ namespace Game {
         void ClearUI();
 
         enum class GameState {
+            Editor,
             Playing,
             Paused,
             Settings
@@ -45,6 +49,8 @@ namespace Game {
 
         VECTOR::Registry m_Registry;
         VECTOR::Entity m_Player;
+        VECTOR::Entity m_EditorCamera;
+        std::unordered_map<VECTOR::Entity, VECTOR::TransformComponent> m_InitialTransforms;
 
         std::vector<std::unique_ptr<VECTOR::System>> m_Systems;
         VECTOR::BulletPhysicsSystem* m_PhysicsSystem = nullptr;
@@ -53,12 +59,14 @@ namespace Game {
         VECTOR::Registry m_UIRegistry;
         std::unique_ptr<VECTOR::UISystem> m_UISystem;
 
-        GameState m_State = GameState::Playing;
+        GameState m_State = GameState::Editor;
         bool m_WasEscapePressed = false;
         bool m_NeedsUIRefresh = false;
         
         bool m_DebugMode = false;
         bool m_WasF3Pressed = false;
+        
+        std::unique_ptr<EditorUI> m_EditorUI;
         
         std::shared_ptr<VECTOR::Mesh> m_CubeMesh;
 
