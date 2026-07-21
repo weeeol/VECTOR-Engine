@@ -32,15 +32,19 @@ namespace VECTOR {
         
         // Check if mouse button was just pressed this frame
         bool IsMouseButtonJustPressed(int button) const;
+        
+        void SetIgnoreImGuiCapture(bool ignore) { m_IgnoreImGuiCapture = ignore; }
+        bool GetIgnoreImGuiCapture() const { return m_IgnoreImGuiCapture; }
 
     private:
         const bool* m_KeyboardState;
-        Uint32 m_MouseState;
-        Uint32 m_PrevMouseState;
-        float m_MouseX;
-        float m_MouseY;
-        float m_MouseDeltaX;
-        float m_MouseDeltaY;
+        uint32_t m_MouseState;
+        uint32_t m_PrevMouseState;
+        
+        float m_MouseX, m_MouseY;
+        float m_MouseDeltaX, m_MouseDeltaY;
+        
+        bool m_IgnoreImGuiCapture = false;
     };
 
 } // namespace VECTOR

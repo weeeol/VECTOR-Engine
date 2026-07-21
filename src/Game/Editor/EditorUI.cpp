@@ -37,6 +37,7 @@ namespace Game {
         DrawHierarchy();
         DrawInspector();
         DrawProject();
+        DrawScene();
         return action;
     }
 
@@ -105,6 +106,7 @@ namespace Game {
             ImGui::DockBuilderDockWindow("Inspector", dock_id_right);
             ImGui::DockBuilderDockWindow("Project", dock_id_bottom);
             ImGui::DockBuilderDockWindow("##Toolbar", dock_id_top);
+            ImGui::DockBuilderDockWindow("Scene", dock_main_id);
             
             ImGui::DockBuilderFinish(dockspace_id);
         }
@@ -217,10 +219,35 @@ namespace Game {
         ImGui::Separator();
         ImGui::TextDisabled("Right click to create new assets...");
         
-        // Dummy assets
         ImGui::Selectable("  Scenes", false);
         ImGui::Selectable("  Models", false);
         ImGui::Selectable("  Scripts", false);
         ImGui::End();
     }
+
+    void EditorUI::DrawScene()
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
+        ImGui::Begin("Scene");
+        
+        ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
+        
+        if (viewportPanelSize.x > 0.0f && viewportPanelSize.y > 0.0f)
+        {
+            m_Renderer->SetSceneResolution((int)viewportPanelSize.x, (int)viewportPanelSize.y);
+            
+            void* textureID = m_Renderer->GetSceneTextureID();
+            if (textureID)
+            {
+                ImGui::Image(textureID, ImVec2{ viewportPanelSize.x, viewportPanelSize.y });
+            }
+        }
+        
+        m_SceneHovered = ImGui::IsWindowHovered();
+        m_SceneFocused = ImGui::IsWindowFocused();
+        
+        ImGui::End();
+        ImGui::PopStyleVar();
+    }
+
 }

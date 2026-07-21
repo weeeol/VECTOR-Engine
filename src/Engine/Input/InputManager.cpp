@@ -18,7 +18,7 @@ namespace VECTOR {
         m_MouseState = SDL_GetMouseState(&m_MouseX, &m_MouseY);
         SDL_GetRelativeMouseState(&m_MouseDeltaX, &m_MouseDeltaY);
 
-        if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse) {
+        if (!m_IgnoreImGuiCapture && ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse) {
             m_MouseDeltaX = 0.0f;
             m_MouseDeltaY = 0.0f;
         }
@@ -35,7 +35,7 @@ namespace VECTOR {
     }
 
     bool InputManager::IsKeyPressed(SDL_Scancode key) const {
-        if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureKeyboard) {
+        if (!m_IgnoreImGuiCapture && ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureKeyboard) {
             return false;
         }
         if (m_KeyboardState) {

@@ -4,8 +4,8 @@
 
 namespace VECTOR {
 
-    VulkanPostProcessor::VulkanPostProcessor(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass)
-        : m_Width(width), m_Height(height), m_SwapchainRenderPass(swapchainRenderPass) {
+    VulkanPostProcessor::VulkanPostProcessor(uint32_t width, uint32_t height)
+        : m_Width(width), m_Height(height) {
         
         CreateOffscreenRenderPass();
         CreateResources();
@@ -20,15 +20,17 @@ namespace VECTOR {
         if (m_BloomRenderPass) {
             vkDestroyRenderPass(device, m_BloomRenderPass, nullptr);
         }
+        if (m_FinalRenderPass) {
+            vkDestroyRenderPass(device, m_FinalRenderPass, nullptr);
+        }
         vkDestroyRenderPass(device, m_OffscreenRenderPass, nullptr);
         
         // Destructors of VulkanPipeline handle pipeline destruction
     }
 
-    void VulkanPostProcessor::Recreate(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass) {
+    void VulkanPostProcessor::Recreate(uint32_t width, uint32_t height) {
         m_Width = width;
         m_Height = height;
-        m_SwapchainRenderPass = swapchainRenderPass;
         
         DestroyResources();
         CreateResources();
@@ -211,6 +213,18 @@ namespace VECTOR {
             vmaDestroyImage(allocator, m_OffscreenDepthImage, m_OffscreenDepthAlloc);
             m_OffscreenDepthImage = VK_NULL_HANDLE;
         }
+        if (m_FinalFramebuffer) {
+            vkDestroyFramebuffer(device, m_FinalFramebuffer, nullptr);
+            m_FinalFramebuffer = VK_NULL_HANDLE;
+        }
+        if (m_FinalColorView) {
+            vkDestroyImageView(device, m_FinalColorView, nullptr);
+            m_FinalColorView = VK_NULL_HANDLE;
+        }
+        if (m_FinalColorImage) {
+            vmaDestroyImage(allocator, m_FinalColorImage, m_FinalColorAlloc);
+            m_FinalColorImage = VK_NULL_HANDLE;
+        }
     }
     
     void VulkanPostProcessor::CreateOffscreenRenderPass() {
@@ -330,6 +344,56 @@ namespace VECTOR {
         if (vkCreateRenderPass(device, &bloomRenderPassInfo, nullptr, &m_BloomRenderPass) != VK_SUCCESS) {
             VECTOR_LOG_ERROR("Failed to create bloom render pass!");
         }
+
+        // Final Render Pass
+        VkAttachmentDescription finalAttachment{};
+        finalAttachment.format = VK_FORMAT_B8G8R8A8_UNORM; // Same as swapchain format normally
+        finalAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        finalAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        finalAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        finalAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        finalAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        finalAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        finalAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkAttachmentReference finalAttachmentRef{};
+        finalAttachmentRef.attachment = 0;
+        finalAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription finalSubpass{};
+        finalSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        finalSubpass.colorAttachmentCount = 1;
+        finalSubpass.pColorAttachments = &finalAttachmentRef;
+
+        std::array<VkSubpassDependency, 2> finalDependencies;
+        finalDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        finalDependencies[0].dstSubpass = 0;
+        finalDependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        finalDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        finalDependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        finalDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        finalDependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+        finalDependencies[1].srcSubpass = 0;
+        finalDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+        finalDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        finalDependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        finalDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        finalDependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        finalDependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+        VkRenderPassCreateInfo finalRenderPassInfo{};
+        finalRenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        finalRenderPassInfo.attachmentCount = 1;
+        finalRenderPassInfo.pAttachments = &finalAttachment;
+        finalRenderPassInfo.subpassCount = 1;
+        finalRenderPassInfo.pSubpasses = &finalSubpass;
+        finalRenderPassInfo.dependencyCount = static_cast<uint32_t>(finalDependencies.size());
+        finalRenderPassInfo.pDependencies = finalDependencies.data();
+
+        if (vkCreateRenderPass(device, &finalRenderPassInfo, nullptr, &m_FinalRenderPass) != VK_SUCCESS) {
+            VECTOR_LOG_ERROR("Failed to create final render pass!");
+        }
     }
     
     void VulkanPostProcessor::CreateResources() {
@@ -383,6 +447,25 @@ namespace VECTOR {
 
         if (vkCreateSampler(device, &samplerInfo, nullptr, &m_ColorSampler) != VK_SUCCESS) {
             VECTOR_LOG_ERROR("Failed to create color sampler!");
+        }
+
+        // 4.5 Create Final Offscreen Image and Framebuffer
+        CreateImage(m_Width, m_Height, VK_FORMAT_B8G8R8A8_UNORM,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    m_FinalColorImage, m_FinalColorAlloc);
+        m_FinalColorView = CreateImageView(m_FinalColorImage, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+        
+        VkFramebufferCreateInfo finalFbInfo{};
+        finalFbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        finalFbInfo.renderPass = m_FinalRenderPass;
+        finalFbInfo.attachmentCount = 1;
+        finalFbInfo.pAttachments = &m_FinalColorView;
+        finalFbInfo.width = m_Width;
+        finalFbInfo.height = m_Height;
+        finalFbInfo.layers = 1;
+
+        if (vkCreateFramebuffer(device, &finalFbInfo, nullptr, &m_FinalFramebuffer) != VK_SUCCESS) {
+            VECTOR_LOG_ERROR("Failed to create final framebuffer!");
         }
 
         // 5. Create Bloom Mips and Framebuffers
@@ -500,8 +583,8 @@ namespace VECTOR {
             configInfo
         );
 
-        // Final Post Process pipeline overwrites Swapchain (no blending needed)
-        configInfo.renderPass = m_SwapchainRenderPass;
+        // Final Post Process pipeline overwrites the Final Framebuffer
+        configInfo.renderPass = m_FinalRenderPass;
         configInfo.colorBlendAttachment.blendEnable = VK_FALSE;
         
         VkPipelineLayoutCreateInfo postLayoutInfo{};
@@ -771,7 +854,21 @@ namespace VECTOR {
 
     void VulkanPostProcessor::RenderFinal(VkCommandBuffer commandBuffer, VkDescriptorSet globalSet, uint32_t currentFrame) {
         // --- 3. Final Post Process Pass ---
-        // Assume Swapchain RenderPass has ALREADY begun in VulkanRenderer!
+        // Render into m_FinalFramebuffer instead of Swapchain!
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = m_FinalRenderPass;
+        renderPassInfo.framebuffer = m_FinalFramebuffer;
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = {m_Width, m_Height};
+        
+        std::array<VkClearValue, 1> clearValues{};
+        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+        
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         
         m_PostProcessPipeline->Bind(commandBuffer);
 
@@ -801,6 +898,8 @@ namespace VECTOR {
         vkCmdPushConstants(commandBuffer, m_PostProcessPipeline->GetLayout(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PostPush), &postPush);
 
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+        vkCmdEndRenderPass(commandBuffer);
     }
     
 } // namespace VECTOR

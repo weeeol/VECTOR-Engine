@@ -52,7 +52,7 @@ namespace VECTOR {
         CreateUniformBuffers();
         CreateDescriptorSets();
 
-        m_PostProcessor = std::make_unique<VulkanPostProcessor>(width, height, m_Swapchain->GetRenderPass());
+        m_PostProcessor = std::make_unique<VulkanPostProcessor>(width, height);
 
         VECTOR_LOG_INFO("Loading Shaders...");
         ResourceManager::Get().LoadShader("Default3D", "assets/engine/shaders/vulkan/main3D.vert.spv", "assets/engine/shaders/vulkan/main3D.frag.spv");
@@ -122,6 +122,8 @@ namespace VECTOR {
         init_info.UseDynamicRendering = false;
         
         ImGui_ImplVulkan_Init(&init_info);
+        
+        m_SceneTextureID = ImGui_ImplVulkan_AddTexture(m_PostProcessor->GetColorSampler(), m_PostProcessor->GetFinalColorView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         ImGuiIO& io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -161,7 +163,13 @@ namespace VECTOR {
             vkDestroyCommandPool(device, m_CommandPool, nullptr);
         }
 
+        if (m_SceneTextureID) {
+            ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)m_SceneTextureID);
+            m_SceneTextureID = nullptr;
+        }
+
         ImGui_ImplSDL3_Shutdown();
+        ImGui_ImplVulkan_Shutdown();
         ImGui::DestroyContext();
 
         m_DummyTexture.reset();
@@ -175,6 +183,21 @@ namespace VECTOR {
     }
 
     void VulkanRenderer::BeginFrame() {
+        if (m_PendingSceneWidth > 0 && m_PendingSceneHeight > 0) {
+            if (m_PostProcessor && (m_PostProcessor->GetWidth() != m_PendingSceneWidth || m_PostProcessor->GetHeight() != m_PendingSceneHeight)) {
+                vkDeviceWaitIdle(m_Context->GetDevice());
+                if (m_SceneTextureID) {
+                    ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)m_SceneTextureID);
+                    m_SceneTextureID = nullptr;
+                }
+                
+                m_PostProcessor->Recreate(m_PendingSceneWidth, m_PendingSceneHeight);
+                m_SceneTextureID = ImGui_ImplVulkan_AddTexture(m_PostProcessor->GetColorSampler(), m_PostProcessor->GetFinalColorView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+            m_PendingSceneWidth = -1;
+            m_PendingSceneHeight = -1;
+        }
+
         if (m_FrameStarted) return;
         
         m_DrawCallCount = 0;
@@ -250,7 +273,10 @@ namespace VECTOR {
         // 2. Render Bloom (does its own RenderPasses)
         m_PostProcessor->RenderBloom(commandBuffer);
 
-        // 3. Begin Swapchain Render Pass for Post Processing & ImGui
+        // 3. Render Final composite into its own offscreen texture
+        m_PostProcessor->RenderFinal(commandBuffer, m_GlobalDescriptorSets[m_CurrentFrame], m_CurrentFrame);
+
+        // 4. Begin Swapchain Render Pass for Post Processing & ImGui
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = m_Swapchain->GetRenderPass();
@@ -266,9 +292,6 @@ namespace VECTOR {
         renderPassInfo.pClearValues = clearValues.data();
         
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        // 4. Render Post Processing Final Pass
-        m_PostProcessor->RenderFinal(commandBuffer, m_GlobalDescriptorSets[m_CurrentFrame], m_CurrentFrame);
 
         // 5. Render ImGui
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
@@ -297,8 +320,9 @@ namespace VECTOR {
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
-        if (vkQueueSubmit(m_Context->GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[m_CurrentFrame]) != VK_SUCCESS) {
-            VECTOR_LOG_ERROR("Failed to submit draw command buffer!");
+        VkResult submitResult = vkQueueSubmit(m_Context->GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[m_CurrentFrame]);
+        if (submitResult != VK_SUCCESS) {
+            VECTOR_LOG_ERROR("Failed to submit draw command buffer! Error: " + std::to_string((int)submitResult));
         }
 
         VkResult result = m_Swapchain->Present(m_Context->GetGraphicsQueue(), m_ImageIndex, m_RenderFinishedSemaphores[m_CurrentFrame]);
@@ -321,6 +345,12 @@ namespace VECTOR {
         m_FramebufferResized = true;
     }
 
+    void VulkanRenderer::SetSceneResolution(int width, int height) {
+        if (width <= 0 || height <= 0) return;
+        m_PendingSceneWidth = width;
+        m_PendingSceneHeight = height;
+    }
+
     void VulkanRenderer::RecreateSwapchain() {
         int width = 0, height = 0;
         SDL_GetWindowSizeInPixels(m_Window, &width, &height);
@@ -333,7 +363,11 @@ namespace VECTOR {
 
         m_Swapchain->Recreate(width, height);
         if (m_PostProcessor) {
-            m_PostProcessor->Recreate(width, height, m_Swapchain->GetRenderPass());
+            if (m_SceneTextureID) {
+                ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)m_SceneTextureID);
+            }
+            m_PostProcessor->Recreate(width, height);
+            m_SceneTextureID = ImGui_ImplVulkan_AddTexture(m_PostProcessor->GetColorSampler(), m_PostProcessor->GetFinalColorView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
     }
 
@@ -619,7 +653,7 @@ namespace VECTOR {
         renderPassInfo.renderPass = m_PostProcessor->GetOffscreenRenderPass();
         renderPassInfo.framebuffer = m_PostProcessor->GetOffscreenFramebuffer();
         renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = m_Swapchain->GetExtent();
+        renderPassInfo.renderArea.extent = { m_PostProcessor->GetWidth(), m_PostProcessor->GetHeight() };
         
         std::vector<VkClearValue> clearValues(2);
         clearValues[0].color = {{m_ClearColor.r, m_ClearColor.g, m_ClearColor.b, m_ClearColor.a}};

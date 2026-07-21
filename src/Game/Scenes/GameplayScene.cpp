@@ -357,14 +357,17 @@ namespace Game {
         m_WasEscapePressed = isEscapePressed;
 
         if (m_State == GameState::Editor) {
+            m_InputManager->SetIgnoreImGuiCapture(m_EditorUI->IsSceneHovered() || m_EditorUI->IsSceneFocused());
             m_CameraSystem->m_RequireRightClick = true;
             m_CameraSystem->Update(m_Registry, deltaTime);
         } else if (m_State == GameState::Playing) {
+            m_InputManager->SetIgnoreImGuiCapture(m_EditorUI->IsSceneHovered() || m_EditorUI->IsSceneFocused());
             m_CameraSystem->m_RequireRightClick = false;
             for (auto& system : m_Systems) {
                 system->Update(m_Registry, deltaTime);
             }
         } else {
+            m_InputManager->SetIgnoreImGuiCapture(false);
             m_UISystem->Update(m_UIRegistry, deltaTime);
             if (m_NeedsUIRefresh) {
                 CreateUI();
@@ -484,8 +487,8 @@ namespace Game {
         }
         renderer->EndUI();
 
-        // Render Dear ImGui Debug HUD
-        if (m_State == GameState::Editor || m_DebugMode) {
+        // Render Dear ImGui Editor (ALWAYS render the editor if we are in Editor OR Playing)
+        if (m_State == GameState::Editor || m_State == GameState::Playing || m_DebugMode) {
             EditorAction action = m_EditorUI->Render(m_State == GameState::Playing);
             
             if (action == EditorAction::Play) {
@@ -501,6 +504,7 @@ namespace Game {
                 if (m_Registry.HasComponent<VECTOR::CameraComponent>(m_Player)) {
                     m_Registry.GetComponent<VECTOR::CameraComponent>(m_Player).isActive = true;
                 }
+                m_InputManager->SetRelativeMouseMode(true);
                 VECTOR::AudioManager::Get().PlayMusic("assets/bgm.wav");
             } else if (action == EditorAction::Stop) {
                 m_State = GameState::Editor;
@@ -536,6 +540,7 @@ namespace Game {
                 if (m_Registry.HasComponent<VECTOR::CameraComponent>(m_Player)) {
                     m_Registry.GetComponent<VECTOR::CameraComponent>(m_Player).isActive = false;
                 }
+                m_InputManager->SetRelativeMouseMode(false);
                 VECTOR::AudioManager::Get().StopMusic();
             }
             

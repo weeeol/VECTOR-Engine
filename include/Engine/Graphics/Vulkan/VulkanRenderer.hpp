@@ -44,6 +44,9 @@ namespace VECTOR {
 
         virtual void SetResolution(int width, int height) override;
         virtual void SetFullscreen(bool fullscreen, bool borderless) override;
+        
+        virtual void* GetSceneTextureID() override { return m_SceneTextureID; }
+        virtual void SetSceneResolution(int width, int height) override;
 
         virtual void SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) override;
 
@@ -110,6 +113,11 @@ namespace VECTOR {
         bool m_FramebufferResized = false;
         bool m_FrameStarted = false;
         bool m_MainPassActive = false;
+        
+        void* m_SceneTextureID = nullptr;
+        
+        int m_PendingSceneWidth = -1;
+        int m_PendingSceneHeight = -1;
         glm::vec4 m_ClearColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
         ImFont* m_GameFont = nullptr;
         

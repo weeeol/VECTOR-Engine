@@ -42,6 +42,10 @@ namespace VECTOR {
         virtual void BeginImGuiFrame() = 0;
         virtual void EndImGuiFrame() = 0;
 
+        // Editor Integration
+        virtual void* GetSceneTextureID() { return nullptr; }
+        virtual void SetSceneResolution(int width, int height) {}
+
         virtual SDL_Window* GetWindow() const = 0;
 
         // Multi-Pass Rendering Methods

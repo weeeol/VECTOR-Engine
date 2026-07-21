@@ -19,10 +19,10 @@ namespace VECTOR {
 
     class VulkanPostProcessor {
     public:
-        VulkanPostProcessor(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass);
+        VulkanPostProcessor(uint32_t width, uint32_t height);
         ~VulkanPostProcessor();
 
-        void Recreate(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass);
+        void Recreate(uint32_t width, uint32_t height);
         
         // Call this during rendering
         void RenderBloom(VkCommandBuffer commandBuffer);
@@ -31,6 +31,12 @@ namespace VECTOR {
         VkRenderPass GetOffscreenRenderPass() const { return m_OffscreenRenderPass; }
         VkFramebuffer GetOffscreenFramebuffer() const { return m_OffscreenFramebuffer; }
         VkImageView GetOffscreenColorView() const { return m_OffscreenColorView; }
+        
+        VkImageView GetFinalColorView() const { return m_FinalColorView; }
+        VkSampler GetColorSampler() const { return m_ColorSampler; }
+        
+        uint32_t GetWidth() const { return m_Width; }
+        uint32_t GetHeight() const { return m_Height; }
         
         float exposure = 1.0f;
         float bloomStrength = 0.04f;
@@ -48,8 +54,6 @@ namespace VECTOR {
         uint32_t m_Width;
         uint32_t m_Height;
         
-        VkRenderPass m_SwapchainRenderPass = VK_NULL_HANDLE;
-        
         // Offscreen G-Buffer
         VkRenderPass m_OffscreenRenderPass = VK_NULL_HANDLE;
         VkFramebuffer m_OffscreenFramebuffer = VK_NULL_HANDLE;
@@ -61,6 +65,13 @@ namespace VECTOR {
         VkImage m_OffscreenDepthImage = VK_NULL_HANDLE;
         VmaAllocation m_OffscreenDepthAlloc = VK_NULL_HANDLE;
         VkImageView m_OffscreenDepthView = VK_NULL_HANDLE;
+        
+        // Final Output (Post Processed)
+        VkRenderPass m_FinalRenderPass = VK_NULL_HANDLE;
+        VkFramebuffer m_FinalFramebuffer = VK_NULL_HANDLE;
+        VkImage m_FinalColorImage = VK_NULL_HANDLE;
+        VmaAllocation m_FinalColorAlloc = VK_NULL_HANDLE;
+        VkImageView m_FinalColorView = VK_NULL_HANDLE;
         
         // Bloom
         std::vector<BloomMip> m_BloomMips;
