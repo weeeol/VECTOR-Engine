@@ -44,6 +44,8 @@ set(VECTOR_SOURCES
     src/Engine/Graphics/OpenGL/OpenGLUniformBuffer.cpp
     src/Engine/Graphics/OpenGL/OpenGLRenderer.cpp
     src/Engine/Graphics/Vulkan/VulkanRenderer.cpp
+    src/Engine/Graphics/Vulkan/VulkanDescriptorManager.cpp
+    src/Engine/Graphics/Vulkan/VulkanShadowPass.cpp
     src/Engine/Graphics/Vulkan/VulkanContext.cpp
     src/Engine/Graphics/Vulkan/VulkanSwapchain.cpp
     src/Engine/Graphics/Vulkan/VulkanShader.cpp

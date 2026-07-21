@@ -35,126 +35,104 @@ namespace Game {
 
     void MainMenuScene::CreateUI() {
         ClearUI();
+        if (m_State == MainMenuState::Main) {
+            CreateMainMenuUI();
+        } else if (m_State == MainMenuState::Settings) {
+            CreateSettingsMenuUI();
+        }
+    }
+
+    VECTOR::Entity MainMenuScene::CreateButtonEntity(int x, int y, int width, int height, const std::string& text, 
+                                      const glm::vec4& normalColor, const glm::vec4& hoverColor, 
+                                      std::function<void()> onClick) {
+        VECTOR::Entity btn = m_Registry.CreateEntity();
+        m_Registry.AddComponent(btn, VECTOR::UIRectComponent(x, y, width, height, normalColor));
+        m_Registry.AddComponent(btn, VECTOR::UITextComponent(text, 24, glm::vec4(1.0f)));
+        auto& textC = m_Registry.GetComponent<VECTOR::UITextComponent>(btn);
+        textC.offsetX = (width / 2) - (text.length() * 6);
+        textC.offsetY = (height / 2) - 12;
+        m_Registry.AddComponent(btn, VECTOR::UIButtonComponent(normalColor, hoverColor, onClick));
+        return btn;
+    }
+
+    VECTOR::Entity MainMenuScene::CreateSliderEntity(int x, int y, int width, int height, float initialValue, std::function<void(float)> onChange) {
+        VECTOR::Entity slider = m_Registry.CreateEntity();
+        m_Registry.AddComponent(slider, VECTOR::UIRectComponent(x, y, width, height, glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f)));
+        m_Registry.AddComponent(slider, VECTOR::UISliderComponent(initialValue, onChange));
+        return slider;
+    }
+
+    void MainMenuScene::CreateMainMenuUI() {
         int btnWidth = 200;
         int btnHeight = 40;
         int startX = m_Width / 2 - btnWidth / 2;
         int startY = m_Height / 2 - 20;
 
-        if (m_State == MainMenuState::Main) {
-            VECTOR::Entity playBtn = m_Registry.CreateEntity();
-            m_Registry.AddComponent(playBtn, VECTOR::UIRectComponent(startX, startY, btnWidth, btnHeight, glm::vec4(50/255.0f, 100/255.0f, 50/255.0f, 1.0f)));
-            m_Registry.AddComponent(playBtn, VECTOR::UITextComponent("Play", 24, glm::vec4(1.0f)));
-            
-            auto& textC = m_Registry.GetComponent<VECTOR::UITextComponent>(playBtn);
-            textC.offsetX = (btnWidth / 2) - (std::string("Play").length() * 6);
-            textC.offsetY = (btnHeight / 2) - 12;
+        CreateButtonEntity(startX, startY, btnWidth, btnHeight, "Play", 
+            glm::vec4(50/255.0f, 100/255.0f, 50/255.0f, 1.0f), 
+            glm::vec4(100/255.0f, 200/255.0f, 100/255.0f, 1.0f),
+            [this]() {
+                m_SelectedDifficulty = AIDifficulty::Medium;
+                auto gameplayScene = std::make_unique<GameplayScene>(m_Width, m_Height, m_InputManager, m_SelectedDifficulty);
+                VECTOR::SceneManager::Get().ChangeScene(std::move(gameplayScene));
+            }
+        );
 
-            m_Registry.AddComponent(playBtn, VECTOR::UIButtonComponent(
-                glm::vec4(50/255.0f, 100/255.0f, 50/255.0f, 1.0f),
-                glm::vec4(100/255.0f, 200/255.0f, 100/255.0f, 1.0f),
-                [this]() {
-                    m_SelectedDifficulty = AIDifficulty::Medium;
-                    auto gameplayScene = std::make_unique<GameplayScene>(m_Width, m_Height, m_InputManager, m_SelectedDifficulty);
-                    VECTOR::SceneManager::Get().ChangeScene(std::move(gameplayScene));
-                }
-            ));
+        CreateButtonEntity(startX, startY + 60, btnWidth, btnHeight, "Settings", 
+            glm::vec4(50/255.0f, 50/255.0f, 100/255.0f, 1.0f), 
+            glm::vec4(100/255.0f, 100/255.0f, 200/255.0f, 1.0f),
+            [this]() {
+                m_State = MainMenuState::Settings;
+                m_NeedsUIRefresh = true;
+            }
+        );
 
-            VECTOR::Entity settingsBtn = m_Registry.CreateEntity();
-            m_Registry.AddComponent(settingsBtn, VECTOR::UIRectComponent(startX, startY + 60, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 100/255.0f, 1.0f)));
-            m_Registry.AddComponent(settingsBtn, VECTOR::UITextComponent("Settings", 24, glm::vec4(1.0f)));
-            auto& sText = m_Registry.GetComponent<VECTOR::UITextComponent>(settingsBtn);
-            sText.offsetX = (btnWidth / 2) - (std::string("Settings").length() * 6);
-            sText.offsetY = (btnHeight / 2) - 12;
+        CreateButtonEntity(startX, startY + 120, btnWidth, btnHeight, "Exit", 
+            glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f), 
+            glm::vec4(200/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+            []() {
+                VECTOR::Application::Get().Quit();
+            }
+        );
 
-            m_Registry.AddComponent(settingsBtn, VECTOR::UIButtonComponent(
-                glm::vec4(50/255.0f, 50/255.0f, 100/255.0f, 1.0f),
-                glm::vec4(100/255.0f, 100/255.0f, 200/255.0f, 1.0f),
-                [this]() {
-                    m_State = MainMenuState::Settings;
-                    m_NeedsUIRefresh = true;
-                }
-            ));
+        CreateSliderEntity(startX, startY + 200, btnWidth, 20, VECTOR::AudioManager::Get().GetMusicVolume(), [](float val) {
+            VECTOR::AudioManager::Get().SetMusicVolume(val);
+        });
+    }
 
-            VECTOR::Entity exitBtn = m_Registry.CreateEntity();
-            m_Registry.AddComponent(exitBtn, VECTOR::UIRectComponent(startX, startY + 120, btnWidth, btnHeight, glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
-            m_Registry.AddComponent(exitBtn, VECTOR::UITextComponent("Exit", 24, glm::vec4(1.0f)));
-            auto& eText = m_Registry.GetComponent<VECTOR::UITextComponent>(exitBtn);
-            eText.offsetX = (btnWidth / 2) - (std::string("Exit").length() * 6);
-            eText.offsetY = (btnHeight / 2) - 12;
+    void MainMenuScene::CreateSettingsMenuUI() {
+        int btnWidth = 200;
+        int btnHeight = 40;
+        int startX = m_Width / 2 - btnWidth / 2;
+        int startY = m_Height / 2 - 20;
 
-            m_Registry.AddComponent(exitBtn, VECTOR::UIButtonComponent(
-                glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f),
-                glm::vec4(200/255.0f, 100/255.0f, 100/255.0f, 1.0f),
-                []() {
-                    VECTOR::Application::Get().Quit();
-                }
-            ));
+        CreateButtonEntity(startX, startY, btnWidth, btnHeight, "1280x720", 
+            glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+            []() { VECTOR::Application::Get().SetResolution(1280, 720); }
+        );
 
-            VECTOR::Entity volSlider = m_Registry.CreateEntity();
-            m_Registry.AddComponent(volSlider, VECTOR::UIRectComponent(startX, startY + 200, btnWidth, 20, glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f)));
-            m_Registry.AddComponent(volSlider, VECTOR::UISliderComponent(VECTOR::AudioManager::Get().GetMusicVolume(), [](float val) {
-                VECTOR::AudioManager::Get().SetMusicVolume(val);
-            }));
-        } else if (m_State == MainMenuState::Settings) {
-            // Settings UI
-            VECTOR::Entity res1 = m_Registry.CreateEntity();
-            m_Registry.AddComponent(res1, VECTOR::UIRectComponent(startX, startY, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
-            m_Registry.AddComponent(res1, VECTOR::UITextComponent("1280x720", 24, glm::vec4(1.0f)));
-            auto& r1Text = m_Registry.GetComponent<VECTOR::UITextComponent>(res1);
-            r1Text.offsetX = (btnWidth / 2) - (std::string("1280x720").length() * 6);
-            r1Text.offsetY = (btnHeight / 2) - 12;
-            m_Registry.AddComponent(res1, VECTOR::UIButtonComponent(
-                glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
-                []() { VECTOR::Application::Get().SetResolution(1280, 720); }
-            ));
+        CreateButtonEntity(startX, startY + 60, btnWidth, btnHeight, "1920x1080", 
+            glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+            []() { VECTOR::Application::Get().SetResolution(1920, 1080); }
+        );
 
-            VECTOR::Entity res2 = m_Registry.CreateEntity();
-            m_Registry.AddComponent(res2, VECTOR::UIRectComponent(startX, startY + 60, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
-            m_Registry.AddComponent(res2, VECTOR::UITextComponent("1920x1080", 24, glm::vec4(1.0f)));
-            auto& r2Text = m_Registry.GetComponent<VECTOR::UITextComponent>(res2);
-            r2Text.offsetX = (btnWidth / 2) - (std::string("1920x1080").length() * 6);
-            r2Text.offsetY = (btnHeight / 2) - 12;
-            m_Registry.AddComponent(res2, VECTOR::UIButtonComponent(
-                glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
-                []() { VECTOR::Application::Get().SetResolution(1920, 1080); }
-            ));
+        CreateButtonEntity(startX - 110, startY + 120, btnWidth, btnHeight, "Windowed", 
+            glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+            []() { VECTOR::Application::Get().SetFullscreen(false, false); }
+        );
 
-            VECTOR::Entity fsWin = m_Registry.CreateEntity();
-            m_Registry.AddComponent(fsWin, VECTOR::UIRectComponent(startX - 110, startY + 120, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
-            m_Registry.AddComponent(fsWin, VECTOR::UITextComponent("Windowed", 24, glm::vec4(1.0f)));
-            auto& fswText = m_Registry.GetComponent<VECTOR::UITextComponent>(fsWin);
-            fswText.offsetX = (btnWidth / 2) - (std::string("Windowed").length() * 6);
-            fswText.offsetY = (btnHeight / 2) - 12;
-            m_Registry.AddComponent(fsWin, VECTOR::UIButtonComponent(
-                glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
-                []() { VECTOR::Application::Get().SetFullscreen(false, false); }
-            ));
+        CreateButtonEntity(startX + 110, startY + 120, btnWidth, btnHeight, "Borderless", 
+            glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+            []() { VECTOR::Application::Get().SetFullscreen(true, true); }
+        );
 
-            VECTOR::Entity fsB = m_Registry.CreateEntity();
-            m_Registry.AddComponent(fsB, VECTOR::UIRectComponent(startX + 110, startY + 120, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
-            m_Registry.AddComponent(fsB, VECTOR::UITextComponent("Borderless", 24, glm::vec4(1.0f)));
-            auto& fsbText = m_Registry.GetComponent<VECTOR::UITextComponent>(fsB);
-            fsbText.offsetX = (btnWidth / 2) - (std::string("Borderless").length() * 6);
-            fsbText.offsetY = (btnHeight / 2) - 12;
-            m_Registry.AddComponent(fsB, VECTOR::UIButtonComponent(
-                glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
-                []() { VECTOR::Application::Get().SetFullscreen(true, true); }
-            ));
-
-            VECTOR::Entity backBtn = m_Registry.CreateEntity();
-            m_Registry.AddComponent(backBtn, VECTOR::UIRectComponent(startX, startY + 180, btnWidth, btnHeight, glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
-            m_Registry.AddComponent(backBtn, VECTOR::UITextComponent("Back", 24, glm::vec4(1.0f)));
-            auto& bText = m_Registry.GetComponent<VECTOR::UITextComponent>(backBtn);
-            bText.offsetX = (btnWidth / 2) - (std::string("Back").length() * 6);
-            bText.offsetY = (btnHeight / 2) - 12;
-            m_Registry.AddComponent(backBtn, VECTOR::UIButtonComponent(
-                glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(200/255.0f, 100/255.0f, 100/255.0f, 1.0f),
-                [this]() {
-                    m_State = MainMenuState::Main;
-                    m_NeedsUIRefresh = true;
-                }
-            ));
-        }
+        CreateButtonEntity(startX, startY + 180, btnWidth, btnHeight, "Back", 
+            glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(200/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+            [this]() {
+                m_State = MainMenuState::Main;
+                m_NeedsUIRefresh = true;
+            }
+        );
     }
 
     void MainMenuScene::Update(float deltaTime) {

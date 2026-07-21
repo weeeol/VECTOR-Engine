@@ -12,11 +12,14 @@
 #include <vk_mem_alloc.h>
 #include <vector>
 #include <unordered_map>
+#include <memory>
 
 struct SDL_Window;
 struct ImFont;
 
 namespace VECTOR {
+    class VulkanDescriptorManager;
+    class VulkanShadowPass;
 
     class VulkanRenderer : public Renderer {
     public:
@@ -87,6 +90,9 @@ namespace VECTOR {
         SDL_Window* m_Window = nullptr;
         std::unique_ptr<VulkanContext> m_Context;
         std::unique_ptr<VulkanSwapchain> m_Swapchain;
+        
+        std::unique_ptr<VulkanDescriptorManager> m_DescriptorManager;
+        std::unique_ptr<VulkanShadowPass> m_ShadowPass;
 
         VkCommandPool m_CommandPool = VK_NULL_HANDLE;
         VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
@@ -107,11 +113,6 @@ namespace VECTOR {
         glm::vec4 m_ClearColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
         ImFont* m_GameFont = nullptr;
         
-        VkDescriptorSetLayout m_GlobalSetLayout = VK_NULL_HANDLE;
-        VkDescriptorSetLayout m_MaterialSetLayout = VK_NULL_HANDLE;
-        VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
-        VkDescriptorPool m_MainDescriptorPool = VK_NULL_HANDLE;
-        
         std::vector<VkDescriptorSet> m_GlobalDescriptorSets;
         std::vector<std::unique_ptr<UniformBuffer>> m_PerFrameUBOs;
         std::vector<std::unique_ptr<UniformBuffer>> m_LightUBOs;
@@ -122,14 +123,6 @@ namespace VECTOR {
         std::unique_ptr<VulkanPipeline> m_WireframePipeline;
         
         // Shadow Mapping
-        const uint32_t SHADOW_MAP_SIZE = 2048;
-        VkRenderPass m_ShadowRenderPass = VK_NULL_HANDLE;
-        VkImage m_ShadowImage = VK_NULL_HANDLE;
-        VmaAllocation m_ShadowImageAllocation = VK_NULL_HANDLE;
-        VkImageView m_ShadowImageView = VK_NULL_HANDLE;
-        VkSampler m_ShadowSampler = VK_NULL_HANDLE;
-        VkFramebuffer m_ShadowFramebuffer = VK_NULL_HANDLE;
-        std::unique_ptr<VulkanPipeline> m_DepthPipeline;
         glm::mat4 m_LightSpaceMatrix = glm::mat4(1.0f);
         
         std::unique_ptr<VulkanTexture2D> m_DummyTexture;
@@ -141,16 +134,13 @@ namespace VECTOR {
         void CreateCommandPool();
         void CreateCommandBuffers();
         void CreateSyncObjects();
-        void CreateDescriptorSetLayouts();
         void CreateUniformBuffers();
-        void CreateDescriptorPoolAndSets();
+        void CreateDescriptorSets();
         
         void BeginFrame();
 
         void RecreateSwapchain();
         void CreatePipelines();
-        
-        void CreateShadowResources();
         
         std::unique_ptr<VulkanPostProcessor> m_PostProcessor;
         uint32_t m_DrawCallCount = 0;
