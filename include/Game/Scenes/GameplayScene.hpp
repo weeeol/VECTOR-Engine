@@ -31,7 +31,7 @@ namespace Game {
 
     private:
         void ResetGame();
-        b2BodyId CreateBox(float x, float y, float width, float height, b2BodyType type, float density, float friction, float restitution, bool isSensor, void* userData);
+        void SetupUI();
 
         int m_Width;
         int m_Height;

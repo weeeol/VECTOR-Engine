@@ -12,6 +12,7 @@
 #include "Engine/UI/UISlider.hpp"
 #include "Engine/UI/UIButton.hpp"
 #include "Game/Core/SaveManager.hpp"
+#include "Game/Core/EntityFactory.hpp"
 #include <cmath>
 #include <algorithm>
 #include <iostream>
@@ -46,36 +47,19 @@ namespace Game {
         m_Systems.push_back(std::make_unique<PlayerInputSystem>(m_InputManager, m_Height));
 
         // Create Walls
-        CreateBox(width/2.0f, -10.0f, width, 20.0f, b2_staticBody, 0.0f, 0.0f, 1.0f, false, (void*)0); // Top
-        CreateBox(width/2.0f, height + 10.0f, width, 20.0f, b2_staticBody, 0.0f, 0.0f, 1.0f, false, (void*)0); // Bottom
+        EntityFactory::CreateWalls(m_PhysicsSystem, width, height);
 
         // Create Goals
-        CreateBox(-10.0f, height/2.0f, 20.0f, height, b2_staticBody, 0.0f, 0.0f, 0.0f, true, (void*)2); // Left Goal
-        CreateBox(width + 10.0f, height/2.0f, 20.0f, height, b2_staticBody, 0.0f, 0.0f, 0.0f, true, (void*)3); // Right Goal
+        EntityFactory::CreateGoals(m_PhysicsSystem, width, height);
 
         // Player 1
-        m_Player1 = m_Registry.CreateEntity();
-        m_Registry.AddComponent(m_Player1, VECTOR::TransformComponent{{30.0f, height / 2.0f - 50.0f}});
-        m_Registry.AddComponent(m_Player1, VECTOR::RenderComponent{20.0f, 100.0f, 60, 200, 255, 255});
-        m_Registry.AddComponent(m_Player1, PlayerInputComponent{SDL_SCANCODE_W, SDL_SCANCODE_S});
-        b2BodyId p1Body = CreateBox(30.0f + 10.0f, height / 2.0f, 20.0f, 100.0f, b2_kinematicBody, 1.0f, 0.0f, 1.0f, false, (void*)4);
-        m_Registry.AddComponent(m_Player1, VECTOR::RigidBodyComponent{p1Body});
+        m_Player1 = EntityFactory::CreatePlayer1(m_Registry, m_PhysicsSystem, width, height);
 
         // Player 2
-        m_Player2 = m_Registry.CreateEntity();
-        m_Registry.AddComponent(m_Player2, VECTOR::TransformComponent{{width - 50.0f, height / 2.0f - 50.0f}});
-        m_Registry.AddComponent(m_Player2, VECTOR::RenderComponent{20.0f, 100.0f, 255, 140, 50, 255});
-        m_Registry.AddComponent(m_Player2, AIComponent{aiDifficulty, AIState::Idle, 0.0f, 0.2f, height / 2.0f});
-        b2BodyId p2Body = CreateBox(width - 50.0f + 10.0f, height / 2.0f, 20.0f, 100.0f, b2_kinematicBody, 1.0f, 0.0f, 1.0f, false, (void*)4);
-        m_Registry.AddComponent(m_Player2, VECTOR::RigidBodyComponent{p2Body});
+        m_Player2 = EntityFactory::CreatePlayer2(m_Registry, m_PhysicsSystem, width, height, aiDifficulty);
         
         // Ball
-        m_Ball = m_Registry.CreateEntity();
-        m_Registry.AddComponent(m_Ball, VECTOR::TransformComponent{{width / 2.0f, height / 2.0f}});
-        m_Registry.AddComponent(m_Ball, VECTOR::RenderComponent{15.0f, 15.0f, 255, 255, 255, 255});
-        m_Registry.AddComponent(m_Ball, BallComponent{true});
-        b2BodyId ballBody = CreateBox(width / 2.0f + 7.5f, height / 2.0f + 7.5f, 15.0f, 15.0f, b2_dynamicBody, 1.0f, 0.0f, 1.05f, false, (void*)1);
-        m_Registry.AddComponent(m_Ball, VECTOR::RigidBodyComponent{ballBody});
+        m_Ball = EntityFactory::CreateBall(m_Registry, m_PhysicsSystem, width, height);
 
         m_BallTexture = std::make_shared<VECTOR::Texture>(VECTOR::Application::Get().GetRenderer(), "s:/Projects/VECTOR-Engine/assets/ball_spritesheet.bmp");
         m_BallAnimator = std::make_shared<VECTOR::Animator>(m_BallTexture.get(), 32, 32, 4, 0.4f); // Slower animation
@@ -84,45 +68,27 @@ namespace Game {
 
         m_Systems.push_back(std::make_unique<AISystem>(m_Ball, m_Height));
 
-        auto volumeSlider = std::make_shared<VECTOR::UISlider>(width / 2 - 100, height / 2 + 20, 200, 20, volume, [](float val) {
-            VECTOR::AudioManager::Get().SetMusicVolume(val);
-            // Save on change is tricky here, but we can do it on exit
-        });
-        m_PauseMenuUI.AddElement(volumeSlider);
-        
-        auto mainMenuButton = std::make_shared<VECTOR::UIButton>(width / 2 - 100, height / 2 + 60, 200, 40, "Main Menu", [this, volumeSlider]() {
-            SaveManager::SaveData(m_HighScorePlayer, m_HighScoreAI, volumeSlider->GetValue());
-            auto menuScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager);
-            VECTOR::SceneManager::Get().ChangeScene(std::move(menuScene));
-        });
-        m_PauseMenuUI.AddElement(mainMenuButton);
+        SetupUI();
 
         VECTOR::AudioManager::Get().SetMusicVolume(volume);
     }
 
     GameplayScene::~GameplayScene() {}
 
-    b2BodyId GameplayScene::CreateBox(float x, float y, float width, float height, b2BodyType type, float density, float friction, float restitution, bool isSensor, void* userData) {
-        b2BodyDef bodyDef = b2DefaultBodyDef();
-        bodyDef.type = type;
-        bodyDef.position = b2Vec2{x / VECTOR::PIXELS_PER_METER, y / VECTOR::PIXELS_PER_METER};
-        bodyDef.userData = userData;
-        bodyDef.fixedRotation = true;
-        bodyDef.isBullet = (type == b2_dynamicBody);
-        b2BodyId bodyId = b2CreateBody(m_PhysicsSystem->GetWorld(), &bodyDef);
-
-        b2Polygon box = b2MakeBox((width / 2.0f) / VECTOR::PIXELS_PER_METER, (height / 2.0f) / VECTOR::PIXELS_PER_METER);
-
-        b2ShapeDef shapeDef = b2DefaultShapeDef();
-        shapeDef.density = density;
-        shapeDef.material.friction = friction;
-        shapeDef.material.restitution = restitution;
-        shapeDef.isSensor = isSensor;
-        shapeDef.enableContactEvents = true; // Enables events when it touches other bodies
-        shapeDef.enableSensorEvents = true;
-
-        b2CreatePolygonShape(bodyId, &shapeDef, &box);
-        return bodyId;
+    void GameplayScene::SetupUI() {
+        float volume = VECTOR::AudioManager::Get().GetMusicVolume();
+        auto volumeSlider = std::make_shared<VECTOR::UISlider>(m_Width / 2 - 100, m_Height / 2 + 20, 200, 20, volume, [](float val) {
+            VECTOR::AudioManager::Get().SetMusicVolume(val);
+            // Save on change is tricky here, but we can do it on exit
+        });
+        m_PauseMenuUI.AddElement(volumeSlider);
+        
+        auto mainMenuButton = std::make_shared<VECTOR::UIButton>(m_Width / 2 - 100, m_Height / 2 + 60, 200, 40, "Main Menu", [this, volumeSlider]() {
+            SaveManager::SaveData(m_HighScorePlayer, m_HighScoreAI, volumeSlider->GetValue());
+            auto menuScene = std::make_unique<MainMenuScene>(m_Width, m_Height, m_InputManager);
+            VECTOR::SceneManager::Get().ChangeScene(std::move(menuScene));
+        });
+        m_PauseMenuUI.AddElement(mainMenuButton);
     }
 
     void GameplayScene::OnEnter() {
