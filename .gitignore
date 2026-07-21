@@ -29,3 +29,8 @@ compile_commands.json
 *.dll
 *.so
 *.dylib
+
+# Game Save Data
+*.dat
+save.dat
+settings.dat
