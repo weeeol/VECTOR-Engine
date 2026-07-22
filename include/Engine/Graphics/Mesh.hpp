@@ -7,10 +7,14 @@
 
 namespace VECTOR {
 
+#define MAX_BONE_INFLUENCE 4
+
     struct Vertex {
         glm::vec3 Position;
         glm::vec3 Normal;
         glm::vec2 TexCoords;
+        glm::ivec4 BoneIDs = glm::ivec4(-1);
+        glm::vec4 Weights = glm::vec4(0.0f);
     };
 
     class Mesh {
