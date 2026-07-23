@@ -25,6 +25,7 @@
         "vulkan-binding"
       ]
     },
-    "assimp"
+    "assimp",
+    "nlohmann-json"
   ]
 }

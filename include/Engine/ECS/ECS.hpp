@@ -127,6 +127,10 @@ namespace VECTOR {
             m_NextEntity = 0;
         }
 
+        const std::vector<Entity>& GetActiveEntities() const {
+            return m_ActiveEntities;
+        }
+
         template<typename T>
         void RegisterComponent() {
             std::type_index typeName = std::type_index(typeid(T));

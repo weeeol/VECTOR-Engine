@@ -23,6 +23,8 @@
 #include "Engine/Audio/AudioManager.hpp"
 #include "Game/Systems/ShootingSystem.hpp"
 #include "Engine/Graphics/Frustum.hpp"
+#include "Engine/Graphics/Mesh.hpp"
+#include "Engine/Scene/SceneSerializer.hpp"
 #include <imgui.h>
 #include <SDL3/SDL.h>
 
@@ -31,6 +33,7 @@ namespace Game {
     GameplayScene::GameplayScene(int width, int height, VECTOR::InputManager* inputManager, AIDifficulty aiDifficulty)
         : m_Width(width), m_Height(height), m_InputManager(inputManager)
     {
+        m_Registry.RegisterComponent<VECTOR::TagComponent>();
         m_Registry.RegisterComponent<VECTOR::TransformComponent>();
         m_Registry.RegisterComponent<VECTOR::RigidBodyComponent>();
         m_Registry.RegisterComponent<VECTOR::RenderComponent>();
@@ -368,6 +371,26 @@ namespace Game {
             }
         }
         m_WasEscapePressed = isEscapePressed;
+
+        bool isCtrlPressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_LCTRL) || m_InputManager->IsKeyPressed(SDL_SCANCODE_RCTRL);
+        bool isSPressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_S);
+        bool isOPressed = m_InputManager->IsKeyPressed(SDL_SCANCODE_O);
+
+        if (isCtrlPressed) {
+            if (isSPressed && !m_WasSPressed) {
+                VECTOR::SceneSerializer serializer(&m_Registry);
+                serializer.Serialize("assets/scenes/level1.json");
+            }
+            if (isOPressed && !m_WasOPressed) {
+                m_Registry.Clear(); // Clear the entire registry!
+                VECTOR::SceneSerializer serializer(&m_Registry);
+                serializer.Deserialize("assets/scenes/level1.json");
+                // The physics world also needs to be repopulated, but for this milestone we just test ECS.
+            }
+        }
+        
+        m_WasSPressed = isSPressed;
+        m_WasOPressed = isOPressed;
 
         if (m_State != GameState::Playing) {
             m_UISystem->Update(m_UIRegistry, deltaTime);

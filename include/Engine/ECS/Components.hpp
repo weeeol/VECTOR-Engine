@@ -3,12 +3,17 @@
 #include <glm/gtc/quaternion.hpp>
 #include <stdint.h>
 #include <memory>
+#include <string>
 
 class btRigidBody;
 
 namespace VECTOR {
 
     class Material;
+
+    struct TagComponent {
+        std::string tag;
+    };
 
     struct TransformComponent {
         glm::vec3 position;

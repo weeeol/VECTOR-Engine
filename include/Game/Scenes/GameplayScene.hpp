@@ -56,6 +56,8 @@ namespace Game {
 
         GameState m_State = GameState::Playing;
         bool m_WasEscapePressed = false;
+        bool m_WasSPressed = false;
+        bool m_WasOPressed = false;
         bool m_NeedsUIRefresh = false;
         
         std::shared_ptr<VECTOR::VulkanCubemap> m_Skybox;

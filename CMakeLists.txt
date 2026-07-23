@@ -25,6 +25,7 @@ find_package(imgui CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 set(VECTOR_SOURCES
     src/Engine/Core/Application.cpp
     src/Engine/Core/Logger.cpp
@@ -66,12 +67,13 @@ set(VECTOR_SOURCES
     src/Engine/Events/EventBus.cpp
     src/Engine/Physics/BulletPhysicsSystem.cpp
     src/Engine/UI/UISystem.cpp
+    src/Engine/Scene/SceneSerializer.cpp
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
 target_include_directories(VECTOR PUBLIC include src ${VECTOR_SDL_INCLUDES} ${BULLET_ROOT_DIR}/${BULLET_INCLUDE_DIRS})
 target_link_directories(VECTOR PUBLIC ${BULLET_ROOT_DIR}/${BULLET_LIBRARY_DIRS})
-target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES} imgui::imgui Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator assimp::assimp)
+target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES} imgui::imgui Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator assimp::assimp nlohmann_json::nlohmann_json)
 
 # ==============================================================================
 # PONG GAME EXECUTABLE
