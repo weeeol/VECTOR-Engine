@@ -78,18 +78,41 @@ namespace VECTOR {
             VECTOR_LOG_ERROR("Failed to create global descriptor set layout!");
         }
 
-        // 2. Material Set Layout (Set 1: Diffuse Map)
-        VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-        samplerLayoutBinding.binding = 0;
-        samplerLayoutBinding.descriptorCount = 1;
-        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        samplerLayoutBinding.pImmutableSamplers = nullptr;
-        samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        // 2. Material Set Layout (Set 1: Diffuse, Normal, MetallicRoughness, AO)
+        std::vector<VkDescriptorSetLayoutBinding> materialBindings(4);
+        
+        // Albedo map
+        materialBindings[0].binding = 0;
+        materialBindings[0].descriptorCount = 1;
+        materialBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        materialBindings[0].pImmutableSamplers = nullptr;
+        materialBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // Normal map
+        materialBindings[1].binding = 1;
+        materialBindings[1].descriptorCount = 1;
+        materialBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        materialBindings[1].pImmutableSamplers = nullptr;
+        materialBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // Metallic/Roughness map
+        materialBindings[2].binding = 2;
+        materialBindings[2].descriptorCount = 1;
+        materialBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        materialBindings[2].pImmutableSamplers = nullptr;
+        materialBindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // AO map
+        materialBindings[3].binding = 3;
+        materialBindings[3].descriptorCount = 1;
+        materialBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        materialBindings[3].pImmutableSamplers = nullptr;
+        materialBindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo materialLayoutInfo{};
         materialLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        materialLayoutInfo.bindingCount = 1;
-        materialLayoutInfo.pBindings = &samplerLayoutBinding;
+        materialLayoutInfo.bindingCount = static_cast<uint32_t>(materialBindings.size());
+        materialLayoutInfo.pBindings = materialBindings.data();
 
         if (vkCreateDescriptorSetLayout(device, &materialLayoutInfo, nullptr, &m_MaterialSetLayout) != VK_SUCCESS) {
             VECTOR_LOG_ERROR("Failed to create material descriptor set layout!");
@@ -115,7 +138,7 @@ namespace VECTOR {
         // 4. Pipeline Layout
         VkPushConstantRange pushConstant{};
         pushConstant.offset = 0;
-        pushConstant.size = sizeof(glm::mat4) + sizeof(glm::vec4) + sizeof(uint32_t) * 2; // model + color + hasTexture + isUnlit
+        pushConstant.size = 128; // model + color + hasTexture + isUnlit + PBR params
         pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayout setLayouts[] = { m_GlobalSetLayout, m_MaterialSetLayout, m_ObjectSetLayout };

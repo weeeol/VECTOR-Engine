@@ -19,6 +19,7 @@
 #include "Engine/Graphics/SkeletalAnimator.hpp"
 #include "Engine/Graphics/Shader.hpp"
 #include "Engine/Graphics/Texture2D.hpp"
+#include "Engine/Graphics/Vulkan/VulkanCubemap.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include <SDL3/SDL.h>
 #include <imgui.h>
@@ -250,6 +251,15 @@ namespace Game {
         CreateCube(glm::vec3(5, 1, -10), glm::vec3(1, 1, 1), 1.0f, "assets/materials/light_target.vmat");  // Light
         CreateCube(glm::vec3(-5, 1, -10), glm::vec3(3, 3, 3), 100.0f, "assets/materials/heavy_target.vmat"); // Heavy
 
+        // Load Skybox
+        std::vector<std::string> skyboxFaces = {
+            "assets/sky_right.hdr", "assets/sky_left.hdr",
+            "assets/sky_top.hdr", "assets/sky_bottom.hdr",
+            "assets/sky_front.hdr", "assets/sky_back.hdr"
+        };
+        auto skybox = std::make_shared<VECTOR::VulkanCubemap>(skyboxFaces);
+        VECTOR::Application::Get().GetRenderer()->SubmitSkybox(skybox.get());
+        
         // Load dae model
         VECTOR::Entity animatedEntity = m_Registry.CreateEntity();
         m_Registry.AddComponent(animatedEntity, VECTOR::TransformComponent{glm::vec3(0.0f, 0.0f, -5.0f), glm::quat(glm::vec3(0, 0, 0)), glm::vec3(1.0f)});
@@ -257,13 +267,18 @@ namespace Game {
         auto daeModel = std::make_shared<VECTOR::Model>("assets/models/Walking.dae");
         auto daeMaterial = std::make_shared<VECTOR::Material>();
         daeMaterial->shader = VECTOR::ResourceManager::Get().GetShader("Main3D");
-        daeMaterial->albedoColor = glm::vec4(0.8f, 0.2f, 0.2f, 1.0f);
+        daeMaterial->albedoColor = glm::vec4(1.0f, 0.8f, 0.2f, 1.0f); // Gold color
+        daeMaterial->metallic = 1.0f;  // Fully metallic
+        daeMaterial->roughness = 0.2f; // Smooth
         m_Registry.AddComponent(animatedEntity, VECTOR::RenderComponent{daeMaterial});
         m_Registry.AddComponent(animatedEntity, VECTOR::ModelComponent{daeModel});
         
         auto daeAnim = std::make_shared<VECTOR::Animation>("assets/models/Walking.dae", daeModel.get());
         auto daeAnimator = std::make_shared<VECTOR::SkeletalAnimator>(daeAnim.get());
         m_Registry.AddComponent(animatedEntity, VECTOR::SkeletalAnimationComponent{daeAnimator, daeAnim});
+        
+        // Store skybox to keep it alive
+        m_Skybox = skybox;
     }
 
     void GameplayScene::CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy) {
@@ -381,6 +396,10 @@ namespace Game {
         glm::mat4 projection = glm::perspective(glm::radians(camC.fov), (float)m_Width / (float)m_Height, 0.1f, 100.0f);
         
         renderer->SetViewProjection(camT.position, view, projection);
+        
+        if (m_Skybox) {
+            renderer->SubmitSkybox(m_Skybox.get());
+        }
 
         // Submit Directional Light
         glm::vec3 sunDir = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.3f));

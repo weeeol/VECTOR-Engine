@@ -39,14 +39,23 @@ layout(set = 0, binding = 1) uniform LightDataBlock {
 // Set 0, binding 2: Shadow map sampler
 layout(set = 0, binding = 2) uniform sampler2D shadowMap;
 
-// Set 1: Material Texture
-layout(set = 1, binding = 0) uniform sampler2D diffuseMap;
+// Set 1: Material Textures
+layout(set = 1, binding = 0) uniform sampler2D albedoMap;
+layout(set = 1, binding = 1) uniform sampler2D normalMap;
+layout(set = 1, binding = 2) uniform sampler2D metallicRoughnessMap;
+layout(set = 1, binding = 3) uniform sampler2D aoMap;
 
 // Push Constants
 layout(push_constant) uniform MaterialData {
     layout(offset = 64) vec4 albedoColor;
-    uint hasDiffuseMap;
+    uint hasAlbedoMap;
+    uint hasNormalMap;
+    uint hasMetallicRoughnessMap;
+    uint hasAOMap;
+    float metallicFactor;
+    float roughnessFactor;
     uint isUnlit;
+    uint _padding;
 } mat;
 
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
@@ -77,47 +86,143 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
     return shadow;
 }
 
-vec3 CalcDirectionalLight(DirectionalLightData light, vec3 normal, vec3 viewDir, float matSpecStr, float matShininess) {
-    vec3 lightDir = normalize(-light.direction.xyz);
-    vec3 lightColor = light.colorAndIntensity.xyz * light.colorAndIntensity.w;
-    
-    // Diffuse
-    float diff = max(dot(normal, lightDir), 0.0);
-    
-    // Specular
-    vec3 halfwayDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(normal, halfwayDir), 0.0), matShininess);
-    
-    vec3 diffuse = diff * lightColor;
-    vec3 specular = matSpecStr * spec * lightColor;
-    
-    float shadow = ShadowCalculation(FragPosLightSpace, normal, lightDir);
-    return (1.0 - shadow) * (diffuse + specular);
+const float PI = 3.14159265359;
+
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a = roughness*roughness;
+    float a2 = a*a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH*NdotH;
+
+    float num = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return num / denom;
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float num = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return num / denom;
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+vec3 getNormalFromMap() {
+    vec3 tangentNormal = texture(normalMap, TexCoords).xyz * 2.0 - 1.0;
+
+    vec3 Q1  = dFdx(FragPos);
+    vec3 Q2  = dFdy(FragPos);
+    vec2 st1 = dFdx(TexCoords);
+    vec2 st2 = dFdy(TexCoords);
+
+    vec3 N   = normalize(Normal);
+    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
+    vec3 B  = -normalize(cross(N, T));
+    mat3 TBN = mat3(T, B, N);
+
+    return normalize(TBN * tangentNormal);
 }
 
 void main() {
-    vec4 color = mat.albedoColor;
-    if (mat.hasDiffuseMap != 0) {
-        color *= texture(diffuseMap, TexCoords);
-    }
+    vec4 albedoTex = mat.hasAlbedoMap != 0 ? texture(albedoMap, TexCoords) : vec4(1.0);
+    vec3 albedo = pow(albedoTex.rgb * mat.albedoColor.rgb, vec3(2.2));
+    float alpha = albedoTex.a * mat.albedoColor.a;
     
     if (mat.isUnlit != 0) {
-        FragColor = color;
+        FragColor = vec4(albedo, alpha);
         return;
     }
+
+    float metallic = mat.metallicFactor;
+    float roughness = mat.roughnessFactor;
+    if (mat.hasMetallicRoughnessMap != 0) {
+        vec4 mr = texture(metallicRoughnessMap, TexCoords);
+        metallic *= mr.b;
+        roughness *= mr.g;
+    }
+
+    float ao = mat.hasAOMap != 0 ? texture(aoMap, TexCoords).r : 1.0;
+
+    vec3 N = (mat.hasNormalMap != 0) ? getNormalFromMap() : normalize(Normal);
+    vec3 V = normalize(pfd.viewPos.xyz - FragPos);
+
+    vec3 F0 = vec3(0.04); 
+    F0 = mix(F0, albedo, metallic);
+
+    vec3 Lo = vec3(0.0);
+
+    // Directional light
+    {
+        vec3 L = normalize(-lightData.dirLight.direction.xyz);
+        vec3 H = normalize(V + L);
+        vec3 radiance = lightData.dirLight.colorAndIntensity.xyz * lightData.dirLight.colorAndIntensity.w;
+
+        float NDF = DistributionGGX(N, H, roughness);       
+        float G   = GeometrySmith(N, V, L, roughness);      
+        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);       
+
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - metallic;	  
+
+        vec3 numerator    = NDF * G * F;
+        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+        vec3 specular     = numerator / denominator;  
+
+        float NdotL = max(dot(N, L), 0.0);        
+        
+        float shadow = ShadowCalculation(FragPosLightSpace, N, L);
+        Lo += (1.0 - shadow) * (kD * albedo / PI + specular) * radiance * NdotL;
+    }
+
+    // Point lights (if any)
+    for(int i = 0; i < lightData.numPointLights; ++i) 
+    {
+        vec3 lightPos = lightData.pointLights[i].positionAndRadius.xyz;
+        vec3 L = normalize(lightPos - FragPos);
+        vec3 H = normalize(V + L);
+        
+        float distance = length(lightPos - FragPos);
+        float attenuation = 1.0 / (distance * distance);
+        vec3 radiance = lightData.pointLights[i].colorAndIntensity.xyz * lightData.pointLights[i].colorAndIntensity.w * attenuation;
+        
+        float NDF = DistributionGGX(N, H, roughness);       
+        float G   = GeometrySmith(N, V, L, roughness);      
+        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);       
+
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - metallic;	  
+
+        vec3 numerator    = NDF * G * F;
+        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+        vec3 specular     = numerator / denominator;  
+
+        float NdotL = max(dot(N, L), 0.0);                
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+    }
+
+    // Ambient lighting (we'll replace this with IBL later)
+    vec3 ambient = vec3(0.03) * albedo * ao;
     
-    vec3 norm = normalize(Normal);
-    vec3 viewDir = normalize(pfd.viewPos.xyz - FragPos);
-    
-    float matSpecStr = 0.5;
-    float matShininess = 32.0;
+    vec3 color = ambient + Lo;
 
-    // Ambient
-    vec3 totalLighting = 0.3 * lightData.dirLight.colorAndIntensity.xyz;
-
-    // Directional Light
-    totalLighting += CalcDirectionalLight(lightData.dirLight, norm, viewDir, matSpecStr, matShininess);
-
-    vec3 result = totalLighting * color.rgb;
-    FragColor = vec4(result, color.a);
+    FragColor = vec4(color, alpha);
 }

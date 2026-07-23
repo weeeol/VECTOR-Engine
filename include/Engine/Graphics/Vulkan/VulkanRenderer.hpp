@@ -53,6 +53,8 @@ namespace VECTOR {
         virtual void SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) override;
         virtual void SetDirectionalLight(const glm::vec3& direction, const glm::vec3& color, float intensity) override;
 
+        virtual void SubmitSkybox(class VulkanCubemap* cubemap) override;
+
         virtual void BeginUI() override;
         virtual void DrawUIRect(int x, int y, int w, int h, const glm::vec4& color) override;
         virtual void DrawUIText(const std::string& text, int x, int y, const glm::vec4& color, int fontSize = 24) override;
@@ -128,11 +130,31 @@ namespace VECTOR {
         // Shadow Mapping
         glm::mat4 m_LightSpaceMatrix = glm::mat4(1.0f);
         
+        std::unique_ptr<VulkanPipeline> m_SkyboxPipeline;
+        class VulkanCubemap* m_CurrentSkybox = nullptr;
+        VkDescriptorSet m_SkyboxDescriptorSet = VK_NULL_HANDLE;
+        
         std::unique_ptr<VulkanTexture2D> m_DummyTexture;
         VkDescriptorSet m_DummyMaterialDescriptorSet = VK_NULL_HANDLE;
         
-        std::unordered_map<const Texture2D*, VkDescriptorSet> m_TextureDescriptorSets;
-        VkDescriptorSet GetOrCreateTextureDescriptorSet(const Texture2D* texture);
+        struct MaterialTextures {
+            const Texture2D* albedo;
+            const Texture2D* normal;
+            const Texture2D* mr;
+            const Texture2D* ao;
+            bool operator==(const MaterialTextures& o) const {
+                return albedo == o.albedo && normal == o.normal && mr == o.mr && ao == o.ao;
+            }
+        };
+        struct MaterialTexturesHash {
+            std::size_t operator()(const MaterialTextures& t) const {
+                return std::hash<const void*>()(t.albedo) ^ (std::hash<const void*>()(t.normal) << 1) ^
+                       (std::hash<const void*>()(t.mr) << 2) ^ (std::hash<const void*>()(t.ao) << 3);
+            }
+        };
+
+        std::unordered_map<MaterialTextures, VkDescriptorSet, MaterialTexturesHash> m_MaterialDescriptorSets;
+        VkDescriptorSet GetOrCreateMaterialDescriptorSet(const Material* material);
 
         void CreateCommandPool();
         void CreateCommandBuffers();

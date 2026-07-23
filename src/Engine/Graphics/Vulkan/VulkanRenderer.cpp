@@ -12,6 +12,7 @@
 #include "Engine/Graphics/Vulkan/VulkanUniformBuffer.hpp"
 #include "Engine/Graphics/Vulkan/VulkanDescriptorManager.hpp"
 #include "Engine/Graphics/Vulkan/VulkanShadowPass.hpp"
+#include "Engine/Graphics/Vulkan/VulkanCubemap.hpp"
 
 namespace VECTOR {
 
@@ -67,6 +68,12 @@ namespace VECTOR {
         PipelineConfigInfo wireframeConfig = pipelineConfig;
         wireframeConfig.rasterizationInfo.polygonMode = VK_POLYGON_MODE_LINE;
         m_WireframePipeline = std::make_unique<VulkanPipeline>("assets/engine/shaders/vulkan/main3D.vert.spv", "assets/engine/shaders/vulkan/main3D.frag.spv", wireframeConfig);
+
+        PipelineConfigInfo skyboxConfig = pipelineConfig;
+        skyboxConfig.depthStencilInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        skyboxConfig.depthStencilInfo.depthWriteEnable = VK_FALSE;
+        skyboxConfig.rasterizationInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
+        m_SkyboxPipeline = std::make_unique<VulkanPipeline>("assets/engine/shaders/vulkan/skybox.vert.spv", "assets/engine/shaders/vulkan/skybox.frag.spv", skyboxConfig);
 
         // Create Descriptor Pool for ImGui
         VkDescriptorPoolSize pool_sizes[] =
@@ -143,6 +150,7 @@ namespace VECTOR {
             if (m_PostProcessor) m_PostProcessor.reset();
             m_Pipeline.reset();
             m_WireframePipeline.reset();
+            m_SkyboxPipeline.reset();
             
             m_PerFrameUBOs.clear();
             m_LightUBOs.clear();
@@ -616,6 +624,10 @@ namespace VECTOR {
         // UI rendering handled by ImGui
     }
 
+    void VulkanRenderer::SubmitSkybox(VulkanCubemap* cubemap) {
+        m_CurrentSkybox = cubemap;
+    }
+
     void VulkanRenderer::BeginImGuiFrame() {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplSDL3_NewFrame();
@@ -727,8 +739,8 @@ namespace VECTOR {
 
         for (const auto& cmd : m_RenderQueue) {
             VkDescriptorSet materialSet = m_DummyMaterialDescriptorSet;
-            if (cmd.material && cmd.material->albedoTexture) {
-                materialSet = GetOrCreateTextureDescriptorSet(cmd.material->albedoTexture.get());
+            if (cmd.material) {
+                materialSet = GetOrCreateMaterialDescriptorSet(cmd.material);
             }
 
             VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], materialSet, cmd.objectDescriptorSet };
@@ -737,19 +749,35 @@ namespace VECTOR {
             struct PushConstants {
                 glm::mat4 model;
                 glm::vec4 color;
-                uint32_t hasTexture;
+                uint32_t hasAlbedoMap;
+                uint32_t hasNormalMap;
+                uint32_t hasMetallicRoughnessMap;
+                uint32_t hasAOMap;
+                float metallicFactor;
+                float roughnessFactor;
                 uint32_t isUnlit;
+                uint32_t _padding;
             } pc;
 
             pc.model = cmd.model;
             
             if (cmd.material) {
                 pc.color = cmd.material->albedoColor;
-                pc.hasTexture = cmd.material->albedoTexture ? 1 : 0;
+                pc.hasAlbedoMap = cmd.material->albedoTexture ? 1 : 0;
+                pc.hasNormalMap = cmd.material->normalTexture ? 1 : 0;
+                pc.hasMetallicRoughnessMap = cmd.material->metallicRoughnessTexture ? 1 : 0;
+                pc.hasAOMap = cmd.material->aoTexture ? 1 : 0;
+                pc.metallicFactor = cmd.material->metallic;
+                pc.roughnessFactor = cmd.material->roughness;
                 pc.isUnlit = cmd.material->isUnlit ? 1 : 0;
             } else {
                 pc.color = glm::vec4(1.0f);
-                pc.hasTexture = 0;
+                pc.hasAlbedoMap = 0;
+                pc.hasNormalMap = 0;
+                pc.hasMetallicRoughnessMap = 0;
+                pc.hasAOMap = 0;
+                pc.metallicFactor = 0.0f;
+                pc.roughnessFactor = 0.5f;
                 pc.isUnlit = 0;
             }
 
@@ -769,7 +797,44 @@ namespace VECTOR {
             }
         }
 
+        if (m_CurrentSkybox && m_SkyboxPipeline) {
+            m_SkyboxPipeline->Bind(commandBuffer);
+            
+            // Allocate a descriptor set for the skybox if not done or use a cached one.
+            // For simplicity, we can reuse the dummy material set and update it or allocate a new one.
+            // But allocating every frame isn't great. Let's just create a new one every frame for now, or use m_SkyboxDescriptorSet.
+            if (m_SkyboxDescriptorSet == VK_NULL_HANDLE) {
+                m_SkyboxDescriptorSet = m_DescriptorManager->AllocateMaterialSet();
+                if (m_SkyboxDescriptorSet != VK_NULL_HANDLE) {
+                    VkDescriptorImageInfo imageInfo{};
+                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    imageInfo.imageView = m_CurrentSkybox->GetImageView();
+                    imageInfo.sampler = m_CurrentSkybox->GetSampler();
+
+                    VkWriteDescriptorSet descriptorWrite{};
+                    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                    descriptorWrite.dstSet = m_SkyboxDescriptorSet;
+                    descriptorWrite.dstBinding = 0;
+                    descriptorWrite.dstArrayElement = 0;
+                    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                    descriptorWrite.descriptorCount = 1;
+                    descriptorWrite.pImageInfo = &imageInfo;
+
+                    vkUpdateDescriptorSets(m_Context->GetDevice(), 1, &descriptorWrite, 0, nullptr);
+                }
+            }
+            
+            if (m_SkyboxDescriptorSet != VK_NULL_HANDLE) {
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DescriptorManager->GetPipelineLayout(), 1, 1, &m_SkyboxDescriptorSet, 0, nullptr);
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DescriptorManager->GetPipelineLayout(), 0, 1, &m_GlobalDescriptorSets[m_CurrentFrame], 0, nullptr);
+                
+                // Draw 36 vertices without vertex buffer
+                vkCmdDraw(commandBuffer, 36, 1, 0, 0);
+            }
+        }
+
         m_RenderQueue.clear();
+        m_CurrentSkybox = nullptr;
     }
 
     void VulkanRenderer::EndPostProcessPass() {
@@ -781,41 +846,55 @@ namespace VECTOR {
         }
     }
 
-    VkDescriptorSet VulkanRenderer::GetOrCreateTextureDescriptorSet(const Texture2D* texture) {
-        if (!texture) return m_DummyMaterialDescriptorSet;
+    VkDescriptorSet VulkanRenderer::GetOrCreateMaterialDescriptorSet(const Material* material) {
+        if (!material) return m_DummyMaterialDescriptorSet;
 
-        auto it = m_TextureDescriptorSets.find(texture);
-        if (it != m_TextureDescriptorSets.end()) {
+        MaterialTextures matTex = {
+            material->albedoTexture.get(),
+            material->normalTexture.get(),
+            material->metallicRoughnessTexture.get(),
+            material->aoTexture.get()
+        };
+
+        auto it = m_MaterialDescriptorSets.find(matTex);
+        if (it != m_MaterialDescriptorSets.end()) {
             return it->second;
         }
-
-        auto vulkanTex = dynamic_cast<const VulkanTexture2D*>(texture);
-        if (!vulkanTex) return m_DummyMaterialDescriptorSet;
 
         VkDevice device = m_Context->GetDevice();
         VkDescriptorSet newSet = m_DescriptorManager->AllocateMaterialSet();
         
         if (newSet != VK_NULL_HANDLE) {
-            VkDescriptorImageInfo imageInfo{};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = vulkanTex->GetImageView();
-            imageInfo.sampler = vulkanTex->GetSampler();
+            std::vector<VkWriteDescriptorSet> writes;
+            std::vector<VkDescriptorImageInfo> imageInfos(4);
 
-            VkWriteDescriptorSet descriptorWrite{};
-            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrite.dstSet = newSet;
-            descriptorWrite.dstBinding = 0;
-            descriptorWrite.dstArrayElement = 0;
-            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            descriptorWrite.descriptorCount = 1;
-            descriptorWrite.pImageInfo = &imageInfo;
+            const Texture2D* texArray[4] = { matTex.albedo, matTex.normal, matTex.mr, matTex.ao };
 
-            vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
-            m_TextureDescriptorSets[texture] = newSet;
+            for (uint32_t i = 0; i < 4; ++i) {
+                auto vulkanTex = dynamic_cast<const VulkanTexture2D*>(texArray[i]);
+                if (!vulkanTex) vulkanTex = m_DummyTexture.get();
+
+                imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfos[i].imageView = vulkanTex->GetImageView();
+                imageInfos[i].sampler = vulkanTex->GetSampler();
+
+                VkWriteDescriptorSet descriptorWrite{};
+                descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                descriptorWrite.dstSet = newSet;
+                descriptorWrite.dstBinding = i;
+                descriptorWrite.dstArrayElement = 0;
+                descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                descriptorWrite.descriptorCount = 1;
+                descriptorWrite.pImageInfo = &imageInfos[i];
+                writes.push_back(descriptorWrite);
+            }
+
+            vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+            m_MaterialDescriptorSets[matTex] = newSet;
             return newSet;
         }
 
-        VECTOR_LOG_ERROR("Failed to allocate descriptor set for texture!");
+        VECTOR_LOG_ERROR("Failed to allocate descriptor set for material!");
         return m_DummyMaterialDescriptorSet;
     }
 

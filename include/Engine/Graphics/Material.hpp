@@ -26,6 +26,11 @@ namespace VECTOR {
 
         // Optional albedo (diffuse) texture
         std::shared_ptr<Texture2D> albedoTexture;
+        
+        // PBR textures
+        std::shared_ptr<Texture2D> normalTexture;
+        std::shared_ptr<Texture2D> metallicRoughnessTexture;
+        std::shared_ptr<Texture2D> aoTexture;
 
         // Base color (multiplied with texture if present)
         glm::vec4 albedoColor = glm::vec4(1.0f);

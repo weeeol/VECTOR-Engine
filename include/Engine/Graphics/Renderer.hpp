@@ -34,6 +34,8 @@ namespace VECTOR {
         virtual void SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) = 0;
         virtual void SetDirectionalLight(const glm::vec3& direction, const glm::vec3& color, float intensity) = 0;
 
+        virtual void SubmitSkybox(class VulkanCubemap* cubemap) {}
+
         virtual void BeginUI() = 0;
         virtual void DrawUIRect(int x, int y, int w, int h, const glm::vec4& color) = 0;
         virtual void DrawUIText(const std::string& text, int x, int y, const glm::vec4& color, int fontSize = 24) = 0;

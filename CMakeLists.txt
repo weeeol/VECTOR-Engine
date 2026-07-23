@@ -60,6 +60,7 @@ set(VECTOR_SOURCES
     src/Engine/Graphics/Vulkan/VulkanMesh.cpp
     src/Engine/Graphics/Vulkan/VulkanUniformBuffer.cpp
     src/Engine/Graphics/Vulkan/VulkanTexture2D.cpp
+    src/Engine/Graphics/Vulkan/VulkanCubemap.cpp
     src/Engine/Input/InputManager.cpp
     src/Engine/Audio/AudioManager.cpp
     src/Engine/Events/EventBus.cpp

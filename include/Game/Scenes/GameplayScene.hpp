@@ -13,6 +13,7 @@
 namespace VECTOR {
     class InputManager;
     class Material;
+    class VulkanCubemap;
 }
 
 namespace Game {
@@ -56,6 +57,8 @@ namespace Game {
         GameState m_State = GameState::Playing;
         bool m_WasEscapePressed = false;
         bool m_NeedsUIRefresh = false;
+        
+        std::shared_ptr<VECTOR::VulkanCubemap> m_Skybox;
         
         bool m_DebugMode = false;
         bool m_WasF3Pressed = false;
