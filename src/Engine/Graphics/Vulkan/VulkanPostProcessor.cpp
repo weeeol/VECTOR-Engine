@@ -139,8 +139,11 @@ namespace VECTOR {
             submitInfo.pCommandBuffers = &cmd;
 
             VkQueue graphicsQueue = VulkanContext::Get()->GetGraphicsQueue();
-            vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-            vkQueueWaitIdle(graphicsQueue);
+            {
+                std::lock_guard<std::mutex> lock(VulkanContext::Get()->GetGraphicsQueueMutex());
+                vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+                vkQueueWaitIdle(graphicsQueue);
+            }
 
             vkFreeCommandBuffers(device, tempPool, 1, &cmd);
             vkDestroyCommandPool(device, tempPool, nullptr);
@@ -435,7 +438,7 @@ namespace VECTOR {
         
         // Setup additive blending for upsampling
         // Downsample pipeline DOES NOT need blending (it overwrites)
-        configInfo.colorBlendAttachment.blendEnable = VK_FALSE;
+        configInfo.colorBlendAttachments[0].blendEnable = VK_FALSE;
 
         // Downsample Pipeline
         configInfo.renderPass = m_BloomRenderPass;
@@ -468,13 +471,13 @@ namespace VECTOR {
         );
 
         // Upsample pipeline NEEDS additive blending
-        configInfo.colorBlendAttachment.blendEnable = VK_TRUE;
-        configInfo.colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-        configInfo.colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-        configInfo.colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-        configInfo.colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-        configInfo.colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-        configInfo.colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+        configInfo.colorBlendAttachments[0].blendEnable = VK_TRUE;
+        configInfo.colorBlendAttachments[0].srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        configInfo.colorBlendAttachments[0].dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        configInfo.colorBlendAttachments[0].colorBlendOp = VK_BLEND_OP_ADD;
+        configInfo.colorBlendAttachments[0].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        configInfo.colorBlendAttachments[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        configInfo.colorBlendAttachments[0].alphaBlendOp = VK_BLEND_OP_ADD;
 
         // Upsample Pipeline (using same additive blending config)
         VkPipelineLayoutCreateInfo upLayoutInfo{};
@@ -503,7 +506,7 @@ namespace VECTOR {
 
         // Final Post Process pipeline overwrites Swapchain (no blending needed)
         configInfo.renderPass = m_SwapchainRenderPass;
-        configInfo.colorBlendAttachment.blendEnable = VK_FALSE;
+        configInfo.colorBlendAttachments[0].blendEnable = VK_FALSE;
         
         VkPipelineLayoutCreateInfo postLayoutInfo{};
         postLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;

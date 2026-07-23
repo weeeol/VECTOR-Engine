@@ -128,7 +128,17 @@ namespace Game {
             []() { VECTOR::Application::Get().SetFullscreen(true, true); }
         );
 
-        CreateButtonEntity(startX, startY + 180, btnWidth, btnHeight, "Back", 
+        bool ssaoOn = VECTOR::Application::Get().GetRenderer()->IsSSAOEnabled();
+        std::string ssaoTextStr = ssaoOn ? "SSAO: ON" : "SSAO: OFF";
+        CreateButtonEntity(startX, startY + 180, btnWidth, btnHeight, ssaoTextStr, 
+            glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+            [this, ssaoOn]() { 
+                VECTOR::Application::Get().GetRenderer()->SetSSAOEnabled(!ssaoOn); 
+                m_NeedsUIRefresh = true;
+            }
+        );
+
+        CreateButtonEntity(startX, startY + 240, btnWidth, btnHeight, "Back", 
             glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(200/255.0f, 100/255.0f, 100/255.0f, 1.0f),
             [this]() {
                 m_State = MainMenuState::Main;

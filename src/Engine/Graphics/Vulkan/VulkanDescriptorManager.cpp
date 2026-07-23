@@ -67,7 +67,13 @@ namespace VECTOR {
         shadowBinding.descriptorCount = 1;
         shadowBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        std::vector<VkDescriptorSetLayoutBinding> bindings = { perFrameBinding, lightBinding, shadowBinding };
+        VkDescriptorSetLayoutBinding ssaoBinding{};
+        ssaoBinding.binding = 3;
+        ssaoBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        ssaoBinding.descriptorCount = 1;
+        ssaoBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        std::vector<VkDescriptorSetLayoutBinding> bindings = { perFrameBinding, lightBinding, shadowBinding, ssaoBinding };
 
         VkDescriptorSetLayoutCreateInfo globalLayoutInfo{};
         globalLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;

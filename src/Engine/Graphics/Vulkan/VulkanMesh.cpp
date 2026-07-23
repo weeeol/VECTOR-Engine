@@ -50,10 +50,13 @@ namespace VECTOR {
         submitInfo.pCommandBuffers = &cmd;
 
         VkQueue graphicsQueue = VulkanContext::Get()->GetGraphicsQueue();
-        vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-        
-        VECTOR_LOG_INFO("UploadBufferData: Waiting for queue idle...");
-        vkQueueWaitIdle(graphicsQueue); // Wait for transfer to complete
+        {
+            std::lock_guard<std::mutex> lock(VulkanContext::Get()->GetGraphicsQueueMutex());
+            vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+            
+            VECTOR_LOG_INFO("UploadBufferData: Waiting for queue idle...");
+            vkQueueWaitIdle(graphicsQueue); // Wait for transfer to complete
+        }
 
         VECTOR_LOG_INFO("UploadBufferData: Freeing resources...");
         vkFreeCommandBuffers(device, tempPool, 1, &cmd);

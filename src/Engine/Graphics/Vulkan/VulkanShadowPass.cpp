@@ -196,8 +196,11 @@ namespace VECTOR {
             submitInfo.pCommandBuffers = &cmd;
 
             VkQueue graphicsQueue = m_Context->GetGraphicsQueue();
-            vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-            vkQueueWaitIdle(graphicsQueue);
+            {
+                std::lock_guard<std::mutex> lock(m_Context->GetGraphicsQueueMutex());
+                vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+                vkQueueWaitIdle(graphicsQueue);
+            }
 
             vkFreeCommandBuffers(device, tempPool, 1, &cmd);
             vkDestroyCommandPool(device, tempPool, nullptr);

@@ -20,6 +20,8 @@ struct ImFont;
 namespace VECTOR {
     class VulkanDescriptorManager;
     class VulkanShadowPass;
+    class VulkanPrepass;
+    class VulkanSSAO;
     class VulkanUniformBuffer;
 
     class VulkanRenderer : public Renderer {
@@ -67,6 +69,10 @@ namespace VECTOR {
 
         virtual void BeginShadowPass() override;
         virtual void FlushShadowPass() override;
+        
+        virtual void BeginPrepass();
+        virtual void FlushPrepass();
+        
         virtual void BeginMainPass() override;
         virtual void FlushMainPass() override;
         virtual void EndPostProcessPass() override;
@@ -80,6 +86,9 @@ namespace VECTOR {
         virtual std::string GetRendererInfo() const override { return "Vulkan Renderer (Stub)"; }
 
         virtual uint32_t GetDrawCallCount() const override { return m_DrawCallCount; }
+        
+        virtual void SetSSAOEnabled(bool enabled) override { m_SSAOEnabled = enabled; }
+        virtual bool IsSSAOEnabled() const override { return m_SSAOEnabled; }
 
         struct RenderCommand {
             const Mesh* mesh;
@@ -98,6 +107,9 @@ namespace VECTOR {
         
         std::unique_ptr<VulkanDescriptorManager> m_DescriptorManager;
         std::unique_ptr<VulkanShadowPass> m_ShadowPass;
+        std::unique_ptr<VulkanPrepass> m_Prepass;
+        std::unique_ptr<VulkanSSAO> m_SSAO;
+        bool m_SSAOEnabled = true;
 
         VkCommandPool m_CommandPool = VK_NULL_HANDLE;
         VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
@@ -161,9 +173,11 @@ namespace VECTOR {
         void CreateSyncObjects();
         void CreateUniformBuffers();
         void CreateDescriptorSets();
+
+        glm::mat4 m_CachedView;
+        glm::mat4 m_CachedProjection;
         
         void BeginFrame();
-
         void RecreateSwapchain();
         void CreatePipelines();
         

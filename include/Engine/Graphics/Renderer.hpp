@@ -49,6 +49,9 @@ namespace VECTOR {
         // Multi-Pass Rendering Methods
         virtual void BeginShadowPass() = 0;
         virtual void FlushShadowPass() = 0;
+        
+        virtual void BeginPrepass() {}
+        virtual void FlushPrepass() {}
         virtual void BeginMainPass() = 0;
         virtual void FlushMainPass() = 0;
         virtual void EndPostProcessPass() = 0;
@@ -62,6 +65,9 @@ namespace VECTOR {
         virtual std::string GetRendererInfo() const = 0;
 
         virtual uint32_t GetDrawCallCount() const = 0;
+
+        virtual void SetSSAOEnabled(bool enabled) {}
+        virtual bool IsSSAOEnabled() const { return false; }
 
         static std::unique_ptr<Renderer> Create();
     };

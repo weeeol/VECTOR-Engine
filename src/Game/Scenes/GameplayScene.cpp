@@ -195,8 +195,24 @@ namespace Game {
                 []() { VECTOR::Application::Get().SetFullscreen(true, true); }
             ));
 
+            VECTOR::Entity ssaoBtn = m_UIRegistry.CreateEntity();
+            m_UIRegistry.AddComponent(ssaoBtn, VECTOR::UIRectComponent(startX, startY + 180, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
+            bool ssaoOn = VECTOR::Application::Get().GetRenderer()->IsSSAOEnabled();
+            std::string ssaoTextStr = ssaoOn ? "SSAO: ON" : "SSAO: OFF";
+            m_UIRegistry.AddComponent(ssaoBtn, VECTOR::UITextComponent(ssaoTextStr, 24, glm::vec4(1.0f)));
+            auto& ssaoText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(ssaoBtn);
+            ssaoText.offsetX = (btnWidth / 2) - (ssaoTextStr.length() * 6);
+            ssaoText.offsetY = (btnHeight / 2) - 12;
+            m_UIRegistry.AddComponent(ssaoBtn, VECTOR::UIButtonComponent(
+                glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+                [this, ssaoOn]() {
+                    VECTOR::Application::Get().GetRenderer()->SetSSAOEnabled(!ssaoOn);
+                    m_NeedsUIRefresh = true;
+                }
+            ));
+
             VECTOR::Entity backBtn = m_UIRegistry.CreateEntity();
-            m_UIRegistry.AddComponent(backBtn, VECTOR::UIRectComponent(startX, startY + 180, btnWidth, btnHeight, glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
+            m_UIRegistry.AddComponent(backBtn, VECTOR::UIRectComponent(startX, startY + 240, btnWidth, btnHeight, glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
             m_UIRegistry.AddComponent(backBtn, VECTOR::UITextComponent("Back", 24, glm::vec4(1.0f)));
             auto& bText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(backBtn);
             bText.offsetX = (btnWidth / 2) - (std::string("Back").length() * 6);
@@ -530,6 +546,10 @@ namespace Game {
         // PASS 1: SHADOW MAP
         renderer->BeginShadowPass();
         renderer->FlushShadowPass();
+
+        // PASS 1.5: Z-PREPASS (Normal/Depth for SSAO)
+        renderer->BeginPrepass();
+        renderer->FlushPrepass();
 
         // PASS 2: MAIN POST-PROCESS FBO
         renderer->BeginMainPass();

@@ -79,8 +79,11 @@ namespace VECTOR {
         submitInfo.pCommandBuffers = &cmd;
 
         VkQueue graphicsQueue = VulkanContext::Get()->GetGraphicsQueue();
-        vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-        vkQueueWaitIdle(graphicsQueue);
+        {
+            std::lock_guard<std::mutex> lock(VulkanContext::Get()->GetGraphicsQueueMutex());
+            vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+            vkQueueWaitIdle(graphicsQueue);
+        }
 
         vkFreeCommandBuffers(device, tempPool, 1, &cmd);
         vkDestroyCommandPool(device, tempPool, nullptr);
@@ -131,8 +134,11 @@ namespace VECTOR {
         submitInfo.pCommandBuffers = &cmd;
 
         VkQueue graphicsQueue = VulkanContext::Get()->GetGraphicsQueue();
-        vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-        vkQueueWaitIdle(graphicsQueue);
+        {
+            std::lock_guard<std::mutex> lock(VulkanContext::Get()->GetGraphicsQueueMutex());
+            vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+            vkQueueWaitIdle(graphicsQueue);
+        }
 
         vkFreeCommandBuffers(device, tempPool, 1, &cmd);
         vkDestroyCommandPool(device, tempPool, nullptr);

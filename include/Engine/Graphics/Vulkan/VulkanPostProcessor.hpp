@@ -22,6 +22,8 @@ namespace VECTOR {
         VulkanPostProcessor(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass);
         ~VulkanPostProcessor();
 
+        void Process(VkCommandBuffer commandBuffer);
+        void ProcessSSAO(VkCommandBuffer commandBuffer, VkImageView normalView, VkImageView depthView, const glm::mat4& projection, const glm::mat4& view);
         void Recreate(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass);
         
         // Call this during rendering

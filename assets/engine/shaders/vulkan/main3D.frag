@@ -16,6 +16,7 @@ layout(set = 0, binding = 0) uniform PerFrameData {
     vec4 sunColor;
     vec4 lightPos;
     vec4 lightColor;
+    int ssaoEnabled;
 } pfd;
 
 #define MAX_POINT_LIGHTS 64
@@ -38,6 +39,9 @@ layout(set = 0, binding = 1) uniform LightDataBlock {
 
 // Set 0, binding 2: Shadow map sampler
 layout(set = 0, binding = 2) uniform sampler2D shadowMap;
+
+// Set 0, binding 3: SSAO map sampler
+layout(set = 0, binding = 3) uniform sampler2D ssaoMap;
 
 // Set 1: Material Textures
 layout(set = 1, binding = 0) uniform sampler2D albedoMap;
@@ -219,8 +223,12 @@ void main() {
         Lo += (kD * albedo / PI + specular) * radiance * NdotL;
     }
 
+    // Screen coordinates for sampling screen-space textures (like SSAO)
+    vec2 screenCoords = gl_FragCoord.xy / vec2(textureSize(ssaoMap, 0));
+    float ssao = pfd.ssaoEnabled == 1 ? texture(ssaoMap, screenCoords).r : 1.0;
+
     // Ambient lighting (we'll replace this with IBL later)
-    vec3 ambient = vec3(0.03) * albedo * ao;
+    vec3 ambient = vec3(0.03) * albedo * ao * ssao;
     
     vec3 color = ambient + Lo;
 

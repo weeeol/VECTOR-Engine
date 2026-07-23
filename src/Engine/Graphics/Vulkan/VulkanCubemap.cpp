@@ -70,8 +70,11 @@ namespace VECTOR {
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &cmd;
 
-        vkQueueSubmit(VulkanContext::Get()->GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-        vkQueueWaitIdle(VulkanContext::Get()->GetGraphicsQueue());
+        {
+            std::lock_guard<std::mutex> lock(VulkanContext::Get()->GetGraphicsQueueMutex());
+            vkQueueSubmit(VulkanContext::Get()->GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+            vkQueueWaitIdle(VulkanContext::Get()->GetGraphicsQueue());
+        }
 
         vkFreeCommandBuffers(device, tempPool, 1, &cmd);
         vkDestroyCommandPool(device, tempPool, nullptr);
@@ -213,8 +216,11 @@ namespace VECTOR {
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &cmd;
-        vkQueueSubmit(VulkanContext::Get()->GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-        vkQueueWaitIdle(VulkanContext::Get()->GetGraphicsQueue());
+        {
+            std::lock_guard<std::mutex> lock(VulkanContext::Get()->GetGraphicsQueueMutex());
+            vkQueueSubmit(VulkanContext::Get()->GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+            vkQueueWaitIdle(VulkanContext::Get()->GetGraphicsQueue());
+        }
 
         vkFreeCommandBuffers(device, tempPool, 1, &cmd);
         vkDestroyCommandPool(device, tempPool, nullptr);

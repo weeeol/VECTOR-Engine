@@ -43,13 +43,22 @@ namespace VECTOR {
         configInfo.multisampleInfo.sampleShadingEnable = VK_FALSE;
         configInfo.multisampleInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-        configInfo.colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        configInfo.colorBlendAttachment.blendEnable = VK_FALSE;
+        VkPipelineColorBlendAttachmentState defaultAttachment{};
+        defaultAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        defaultAttachment.blendEnable = VK_FALSE;
+        defaultAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        defaultAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+        defaultAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+        defaultAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        defaultAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        defaultAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+        
+        configInfo.colorBlendAttachments = { defaultAttachment };
 
         configInfo.colorBlendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
         configInfo.colorBlendInfo.logicOpEnable = VK_FALSE;
-        configInfo.colorBlendInfo.attachmentCount = 1;
-        configInfo.colorBlendInfo.pAttachments = &configInfo.colorBlendAttachment;
+        // Don't set attachmentCount or pAttachments here because the vector might resize or be modified later.
+        // We will set it in CreateGraphicsPipeline.
 
         configInfo.depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
         configInfo.depthStencilInfo.depthTestEnable = VK_TRUE;
@@ -130,22 +139,27 @@ namespace VECTOR {
             vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
         }
 
+        // Copy configInfo so we can modify it
+        PipelineConfigInfo localConfig = configInfo;
+        localConfig.colorBlendInfo.attachmentCount = static_cast<uint32_t>(localConfig.colorBlendAttachments.size());
+        localConfig.colorBlendInfo.pAttachments = localConfig.colorBlendAttachments.data();
+
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         pipelineInfo.stageCount = 2;
         pipelineInfo.pStages = shaderStages;
         pipelineInfo.pVertexInputState = &vertexInputInfo;
-        pipelineInfo.pInputAssemblyState = &configInfo.inputAssemblyInfo;
-        pipelineInfo.pViewportState = &configInfo.viewportInfo;
-        pipelineInfo.pRasterizationState = &configInfo.rasterizationInfo;
-        pipelineInfo.pMultisampleState = &configInfo.multisampleInfo;
-        pipelineInfo.pColorBlendState = &configInfo.colorBlendInfo;
-        pipelineInfo.pDepthStencilState = &configInfo.depthStencilInfo;
-        pipelineInfo.pDynamicState = &configInfo.dynamicStateInfo;
+        pipelineInfo.pInputAssemblyState = &localConfig.inputAssemblyInfo;
+        pipelineInfo.pViewportState = &localConfig.viewportInfo;
+        pipelineInfo.pRasterizationState = &localConfig.rasterizationInfo;
+        pipelineInfo.pMultisampleState = &localConfig.multisampleInfo;
+        pipelineInfo.pColorBlendState = &localConfig.colorBlendInfo;
+        pipelineInfo.pDepthStencilState = &localConfig.depthStencilInfo;
+        pipelineInfo.pDynamicState = &localConfig.dynamicStateInfo;
 
-        pipelineInfo.layout = configInfo.pipelineLayout;
-        pipelineInfo.renderPass = configInfo.renderPass;
-        pipelineInfo.subpass = configInfo.subpass;
+        pipelineInfo.layout = localConfig.pipelineLayout;
+        pipelineInfo.renderPass = localConfig.renderPass;
+        pipelineInfo.subpass = localConfig.subpass;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
         m_PipelineLayout = configInfo.pipelineLayout;

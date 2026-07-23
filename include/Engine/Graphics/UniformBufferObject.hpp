@@ -22,6 +22,8 @@ namespace VECTOR {
         glm::vec4 sunColor;          // offset 224, size 16  (vec3 + padding)
         glm::vec4 lightPos;          // offset 240, size 16  (vec3 + padding)
         glm::vec4 lightColor;        // offset 256, size 16  (vec3 + padding)
+        int ssaoEnabled;             // offset 272, size 4
+        int padding[3];              // padding to 16 bytes for std140
     };
     // Total: 272 bytes
 

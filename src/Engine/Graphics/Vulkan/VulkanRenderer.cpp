@@ -12,6 +12,8 @@
 #include "Engine/Graphics/Vulkan/VulkanUniformBuffer.hpp"
 #include "Engine/Graphics/Vulkan/VulkanDescriptorManager.hpp"
 #include "Engine/Graphics/Vulkan/VulkanShadowPass.hpp"
+#include "Engine/Graphics/Vulkan/VulkanPrepass.hpp"
+#include "Engine/Graphics/Vulkan/VulkanSSAO.hpp"
 #include "Engine/Graphics/Vulkan/VulkanCubemap.hpp"
 
 namespace VECTOR {
@@ -48,6 +50,13 @@ namespace VECTOR {
 
         m_ShadowPass = std::make_unique<VulkanShadowPass>(m_Context.get());
         m_ShadowPass->Initialize(m_DescriptorManager->GetPipelineLayout());
+        
+        m_Prepass = std::make_unique<VulkanPrepass>(m_Context.get(), pixelWidth, pixelHeight);
+        m_Prepass->Initialize(m_DescriptorManager->GetPipelineLayout());
+
+        m_SSAO = std::make_unique<VulkanSSAO>(m_Context.get(), pixelWidth, pixelHeight);
+        m_SSAO->Initialize();
+        m_SSAO->UpdateDescriptorSets(m_Prepass->GetNormalImageView(), m_Prepass->GetDepthImageView());
 
         CreateCommandPool();
         CreateCommandBuffers();
@@ -160,6 +169,8 @@ namespace VECTOR {
             m_ObjectDataPool.clear();
             m_DummyObjectUBO.reset();
 
+            if (m_SSAO) m_SSAO.reset();
+            if (m_Prepass) m_Prepass.reset();
             if (m_ShadowPass) m_ShadowPass.reset();
             if (m_DescriptorManager) m_DescriptorManager.reset();
 
@@ -304,11 +315,14 @@ namespace VECTOR {
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
-        if (vkQueueSubmit(m_Context->GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[m_CurrentFrame]) != VK_SUCCESS) {
-            VECTOR_LOG_ERROR("Failed to submit draw command buffer!");
+        VkResult result = VK_SUCCESS;
+        {
+            std::lock_guard<std::mutex> lock(m_Context->GetGraphicsQueueMutex());
+            if (vkQueueSubmit(m_Context->GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[m_CurrentFrame]) != VK_SUCCESS) {
+                VECTOR_LOG_ERROR("Failed to submit draw command buffer!");
+            }
+            result = m_Swapchain->Present(m_Context->GetGraphicsQueue(), m_ImageIndex, m_RenderFinishedSemaphores[m_CurrentFrame]);
         }
-
-        VkResult result = m_Swapchain->Present(m_Context->GetGraphicsQueue(), m_ImageIndex, m_RenderFinishedSemaphores[m_CurrentFrame]);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_FramebufferResized) {
             m_FramebufferResized = false;
@@ -336,11 +350,19 @@ namespace VECTOR {
             SDL_WaitEvent(nullptr);
         }
 
-        vkDeviceWaitIdle(m_Context->GetDevice());
+        {
+            std::lock_guard<std::mutex> lock(m_Context->GetGraphicsQueueMutex());
+            vkDeviceWaitIdle(m_Context->GetDevice());
+        }
 
         m_Swapchain->Recreate(width, height);
         if (m_PostProcessor) {
             m_PostProcessor->Recreate(width, height, m_Swapchain->GetRenderPass());
+        }
+        if (m_Prepass) m_Prepass->Resize(width, height);
+        if (m_SSAO) {
+            m_SSAO->Resize(width, height);
+            m_SSAO->UpdateDescriptorSets(m_Prepass->GetNormalImageView(), m_Prepass->GetDepthImageView());
         }
     }
 
@@ -462,6 +484,23 @@ namespace VECTOR {
                 descriptorWrites.push_back(shadowDescriptorWrite);
             }
 
+            VkDescriptorImageInfo ssaoImageInfo{};
+            if (m_SSAO && m_SSAO->GetSSAOImageView()) {
+                ssaoImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                ssaoImageInfo.imageView = m_SSAO->GetSSAOImageView();
+                ssaoImageInfo.sampler = m_SSAO->GetSampler();
+                
+                VkWriteDescriptorSet ssaoDescriptorWrite{};
+                ssaoDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                ssaoDescriptorWrite.dstSet = m_GlobalDescriptorSets[i];
+                ssaoDescriptorWrite.dstBinding = 3;
+                ssaoDescriptorWrite.dstArrayElement = 0;
+                ssaoDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                ssaoDescriptorWrite.descriptorCount = 1;
+                ssaoDescriptorWrite.pImageInfo = &ssaoImageInfo;
+                descriptorWrites.push_back(ssaoDescriptorWrite);
+            }
+
             vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
         }
 
@@ -520,6 +559,9 @@ namespace VECTOR {
     void VulkanRenderer::SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) {
         if (!m_FrameStarted) BeginFrame();
 
+        m_CachedView = view;
+        m_CachedProjection = projection;
+
         PerFrameData data{};
         data.view = view;
         data.projection = projection;
@@ -540,6 +582,7 @@ namespace VECTOR {
         // Fill some default directional light data so scene isn't completely black
         data.sunDir = glm::vec4(sunDir, 0.0f);
         data.sunColor = glm::vec4(1.0f);
+        data.ssaoEnabled = m_SSAOEnabled ? 1 : 0;
 
         m_PerFrameUBOs[m_CurrentFrame]->SetData(&data, sizeof(PerFrameData), 0);
     }
@@ -680,6 +723,58 @@ namespace VECTOR {
         }
         
         m_ShadowPass->EndPass(commandBuffer);
+    }
+
+    void VulkanRenderer::BeginPrepass() {
+        BeginFrame();
+        if (!m_FrameStarted) return;
+        
+        VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
+        m_Prepass->BeginPass(commandBuffer);
+    }
+
+    void VulkanRenderer::FlushPrepass() {
+        if (!m_FrameStarted) return;
+        VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
+        
+        m_Prepass->GetPipeline()->Bind(commandBuffer);
+        
+        for (const auto& cmd : m_RenderQueue) {
+            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], m_DummyMaterialDescriptorSet, cmd.objectDescriptorSet };
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DescriptorManager->GetPipelineLayout(), 0, 3, sets, 0, nullptr);
+            
+            struct PushConstants {
+                glm::mat4 model;
+            } pc;
+            pc.model = cmd.model;
+            
+            vkCmdPushConstants(commandBuffer, m_DescriptorManager->GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(glm::mat4), &pc);
+            
+            if (cmd.mesh) {
+                auto vulkanMesh = dynamic_cast<const VulkanMesh*>(cmd.mesh);
+                if (vulkanMesh) {
+                    VkBuffer vertexBuffers[] = { vulkanMesh->GetVertexBuffer()->GetBuffer() };
+                    VkDeviceSize offsets[] = { 0 };
+                    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+                    vkCmdBindIndexBuffer(commandBuffer, vulkanMesh->GetIndexBuffer()->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
+                    vkCmdDrawIndexed(commandBuffer, vulkanMesh->GetIndexCount(), 1, 0, 0, 0);
+                    // Don't increment draw call count here to avoid double counting
+                }
+            }
+        }
+        
+        m_Prepass->EndPass(commandBuffer);
+
+        // Generate SSAO using the prepass results
+        if (m_SSAOEnabled) {
+            m_SSAO->Generate(
+                commandBuffer, 
+                m_Prepass->GetNormalImageView(), 
+                m_Prepass->GetDepthImageView(), 
+                m_CachedProjection, 
+                m_CachedView
+            );
+        }
     }
 
     void VulkanRenderer::BeginMainPass() {

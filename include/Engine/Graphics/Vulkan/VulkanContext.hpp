@@ -5,6 +5,7 @@
 #include <SDL3/SDL.h>
 #include <vector>
 #include <optional>
+#include <mutex>
 
 namespace VECTOR {
 
@@ -35,6 +36,7 @@ namespace VECTOR {
         VkQueue GetPresentQueue() const { return m_PresentQueue; }
         uint32_t GetGraphicsQueueFamilyIndex() const { return m_GraphicsFamilyIndex; }
         VmaAllocator GetAllocator() const { return m_Allocator; }
+        std::mutex& GetGraphicsQueueMutex() { return m_GraphicsQueueMutex; }
 
     private:
         bool CreateInstance(SDL_Window* window);
@@ -64,6 +66,7 @@ namespace VECTOR {
         VkDevice m_Device = VK_NULL_HANDLE;
         VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
         VkQueue m_GraphicsQueue = VK_NULL_HANDLE;
+        std::mutex m_GraphicsQueueMutex;
         VkQueue m_PresentQueue = VK_NULL_HANDLE;
         uint32_t m_GraphicsFamilyIndex = 0;
         VmaAllocator m_Allocator = VK_NULL_HANDLE;
