@@ -20,3 +20,6 @@ These rules dictate how AI agents should interact with and write code for the VE
 
 ## 5. Token Efficiency
 - When writing code or refactoring, prioritize changes that isolate dependencies. The goal is to allow future agents to understand a component by reading only its header and immediate implementation, without needing engine-wide context.
+
+## 6. Graphics API Priority
+- **Vulkan is the Primary Focus**: Going forward, Vulkan development is the primary focus and OpenGL is considered deprecated. When building new rendering features, prioritize the Vulkan backend and do not spend effort maintaining OpenGL unless explicitly requested.
