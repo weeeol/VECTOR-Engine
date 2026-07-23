@@ -29,7 +29,7 @@ namespace VECTOR {
 
         virtual void SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) = 0;
 
-        virtual void SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model) = 0;
+        virtual void SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model, const std::vector<glm::mat4>* boneTransforms = nullptr) = 0;
 
         virtual void SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) = 0;
         virtual void SetDirectionalLight(const glm::vec3& direction, const glm::vec3& color, float intensity) = 0;

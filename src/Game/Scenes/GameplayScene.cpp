@@ -14,6 +14,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 // #include <GL/glew.h> Removed
 #include "Engine/Graphics/Mesh.hpp"
+#include "Engine/Graphics/Model.hpp"
+#include "Engine/Graphics/Animation.hpp"
+#include "Engine/Graphics/SkeletalAnimator.hpp"
 #include "Engine/Graphics/Shader.hpp"
 #include "Engine/Graphics/Texture2D.hpp"
 #include "Engine/Audio/AudioManager.hpp"
@@ -29,6 +32,8 @@ namespace Game {
         m_Registry.RegisterComponent<VECTOR::RigidBodyComponent>();
         m_Registry.RegisterComponent<VECTOR::RenderComponent>();
         m_Registry.RegisterComponent<VECTOR::MeshComponent>();
+        m_Registry.RegisterComponent<VECTOR::ModelComponent>();
+        m_Registry.RegisterComponent<VECTOR::SkeletalAnimationComponent>();
         m_Registry.RegisterComponent<VECTOR::CameraComponent>();
         m_Registry.RegisterComponent<VECTOR::PointLightComponent>();
         m_Registry.RegisterComponent<VECTOR::DirectionalLightComponent>();
@@ -244,6 +249,21 @@ namespace Game {
         CreateCube(glm::vec3(0, 1, -10), glm::vec3(2, 2, 2), 10.0f, "assets/materials/medium_target.vmat"); // Medium
         CreateCube(glm::vec3(5, 1, -10), glm::vec3(1, 1, 1), 1.0f, "assets/materials/light_target.vmat");  // Light
         CreateCube(glm::vec3(-5, 1, -10), glm::vec3(3, 3, 3), 100.0f, "assets/materials/heavy_target.vmat"); // Heavy
+
+        // Load dae model
+        VECTOR::Entity animatedEntity = m_Registry.CreateEntity();
+        m_Registry.AddComponent(animatedEntity, VECTOR::TransformComponent{glm::vec3(0.0f, 0.0f, -5.0f), glm::quat(glm::vec3(0, 0, 0)), glm::vec3(1.0f)});
+        
+        auto daeModel = std::make_shared<VECTOR::Model>("assets/models/Walking.dae");
+        auto daeMaterial = std::make_shared<VECTOR::Material>();
+        daeMaterial->shader = VECTOR::ResourceManager::Get().GetShader("Main3D");
+        daeMaterial->albedoColor = glm::vec4(0.8f, 0.2f, 0.2f, 1.0f);
+        m_Registry.AddComponent(animatedEntity, VECTOR::RenderComponent{daeMaterial});
+        m_Registry.AddComponent(animatedEntity, VECTOR::ModelComponent{daeModel});
+        
+        auto daeAnim = std::make_shared<VECTOR::Animation>("assets/models/Walking.dae", daeModel.get());
+        auto daeAnimator = std::make_shared<VECTOR::SkeletalAnimator>(daeAnim.get());
+        m_Registry.AddComponent(animatedEntity, VECTOR::SkeletalAnimationComponent{daeAnimator, daeAnim});
     }
 
     void GameplayScene::CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy) {
@@ -342,6 +362,14 @@ namespace Game {
             for (auto& system : m_Systems) {
                 system->Update(m_Registry, deltaTime);
             }
+
+            // Update skeletal animations
+            m_Registry.View<VECTOR::SkeletalAnimationComponent>([&](VECTOR::Entity entity) {
+                auto& animComp = m_Registry.GetComponent<VECTOR::SkeletalAnimationComponent>(entity);
+                if (animComp.animator) {
+                    animComp.animator->UpdateAnimation(deltaTime);
+                }
+            });
         }
     }
 
@@ -366,7 +394,7 @@ namespace Game {
             renderer->SubmitPointLight(t.position, l.radius, l.color, l.intensity);
         });
 
-        // Submit all renderable entities to the render queue
+        // Submit all renderable mesh entities
         m_Registry.View<VECTOR::TransformComponent, VECTOR::MeshComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
             auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
             auto& m = m_Registry.GetComponent<VECTOR::MeshComponent>(entity);
@@ -378,6 +406,30 @@ namespace Game {
             model = glm::scale(model, t.scale);
 
             renderer->SubmitMesh(m.mesh.get(), r.material.get(), model);
+        });
+
+        // Submit all renderable model entities
+        m_Registry.View<VECTOR::TransformComponent, VECTOR::ModelComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
+            auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
+            auto& m = m_Registry.GetComponent<VECTOR::ModelComponent>(entity);
+            auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
+
+            glm::mat4 modelMatrix = glm::mat4(1.0f);
+            modelMatrix = glm::translate(modelMatrix, t.position);
+            modelMatrix = modelMatrix * glm::mat4_cast(t.rotation);
+            modelMatrix = glm::scale(modelMatrix, t.scale);
+
+            const std::vector<glm::mat4>* boneTransforms = nullptr;
+            if (m_Registry.HasComponent<VECTOR::SkeletalAnimationComponent>(entity)) {
+                auto& animComp = m_Registry.GetComponent<VECTOR::SkeletalAnimationComponent>(entity);
+                if (animComp.animator) {
+                    boneTransforms = &animComp.animator->GetFinalBoneMatrices();
+                }
+            }
+
+            for (const auto& mesh : m.model->GetMeshes()) {
+                renderer->SubmitMesh(mesh.get(), r.material.get(), modelMatrix, boneTransforms);
+            }
         });
 
         // Submit the sun (unlit)

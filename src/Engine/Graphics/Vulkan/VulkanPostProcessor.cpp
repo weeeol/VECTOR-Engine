@@ -292,12 +292,29 @@ namespace VECTOR {
 
         VkAttachmentReference bloomAttachmentRef{};
         bloomAttachmentRef.attachment = 0;
-        bloomAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        bloomAttachmentRef.layout = VK_IMAGE_LAYOUT_GENERAL;
 
         VkSubpassDescription bloomSubpass{};
         bloomSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         bloomSubpass.colorAttachmentCount = 1;
         bloomSubpass.pColorAttachments = &bloomAttachmentRef;
+
+        std::array<VkSubpassDependency, 2> bloomDependencies;
+        bloomDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        bloomDependencies[0].dstSubpass = 0;
+        bloomDependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        bloomDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        bloomDependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        bloomDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+        bloomDependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+        bloomDependencies[1].srcSubpass = 0;
+        bloomDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+        bloomDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        bloomDependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        bloomDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+        bloomDependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        bloomDependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
         VkRenderPassCreateInfo bloomRenderPassInfo{};
         bloomRenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -305,6 +322,8 @@ namespace VECTOR {
         bloomRenderPassInfo.pAttachments = &bloomAttachment;
         bloomRenderPassInfo.subpassCount = 1;
         bloomRenderPassInfo.pSubpasses = &bloomSubpass;
+        bloomRenderPassInfo.dependencyCount = static_cast<uint32_t>(bloomDependencies.size());
+        bloomRenderPassInfo.pDependencies = bloomDependencies.data();
 
         if (vkCreateRenderPass(device, &bloomRenderPassInfo, nullptr, &m_BloomRenderPass) != VK_SUCCESS) {
             VECTOR_LOG_ERROR("Failed to create bloom render pass!");

@@ -20,6 +20,7 @@ struct ImFont;
 namespace VECTOR {
     class VulkanDescriptorManager;
     class VulkanShadowPass;
+    class VulkanUniformBuffer;
 
     class VulkanRenderer : public Renderer {
     public:
@@ -47,7 +48,7 @@ namespace VECTOR {
 
         virtual void SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) override;
 
-        virtual void SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model) override;
+        virtual void SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model, const std::vector<glm::mat4>* boneTransforms = nullptr) override;
 
         virtual void SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) override;
         virtual void SetDirectionalLight(const glm::vec3& direction, const glm::vec3& color, float intensity) override;
@@ -82,6 +83,8 @@ namespace VECTOR {
             const Mesh* mesh;
             const Material* material;
             glm::mat4 model;
+            const std::vector<glm::mat4>* boneTransforms = nullptr;
+            VkDescriptorSet objectDescriptorSet = VK_NULL_HANDLE;
         };
 
     private:
@@ -144,6 +147,16 @@ namespace VECTOR {
         
         std::unique_ptr<VulkanPostProcessor> m_PostProcessor;
         uint32_t m_DrawCallCount = 0;
+
+        struct ObjectData {
+            std::unique_ptr<VulkanUniformBuffer> ubo;
+            VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+        };
+        std::vector<ObjectData> m_ObjectDataPool;
+        uint32_t m_ObjectDataIndex = 0;
+        
+        std::unique_ptr<VulkanUniformBuffer> m_DummyObjectUBO;
+        VkDescriptorSet m_DummyObjectSet = VK_NULL_HANDLE;
     };
 
 } // namespace VECTOR

@@ -23,6 +23,8 @@ namespace VECTOR {
         auto& GetBoneInfoMap() { return m_BoneInfoMap; }
         int& GetBoneCount() { return m_BoneCount; }
 
+        const std::vector<std::shared_ptr<Mesh>>& GetMeshes() const { return m_Meshes; }
+
     private:
         void LoadModel(const std::string& path);
         void ProcessNode(aiNode* node, const aiScene* scene);

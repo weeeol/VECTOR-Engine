@@ -146,6 +146,8 @@ namespace VECTOR {
             
             m_PerFrameUBOs.clear();
             m_LightUBOs.clear();
+            m_ObjectDataPool.clear();
+            m_DummyObjectUBO.reset();
 
             if (m_ShadowPass) m_ShadowPass.reset();
             if (m_DescriptorManager) m_DescriptorManager.reset();
@@ -169,7 +171,8 @@ namespace VECTOR {
 
     void VulkanRenderer::BeginFrame() {
         if (m_FrameStarted) return;
-        
+        m_ObjectDataIndex = 0;
+        m_RenderQueue.clear();
         m_DrawCallCount = 0;
         
         VkDevice device = m_Context->GetDevice();
@@ -475,6 +478,32 @@ namespace VECTOR {
         } else {
             VECTOR_LOG_ERROR("Failed to allocate dummy material descriptor set!");
         }
+
+        // Create Dummy Object Set for Set 2 (Static Meshes)
+        m_DummyObjectUBO = std::make_unique<VulkanUniformBuffer>(sizeof(glm::mat4) * 100, 0);
+        std::vector<glm::mat4> dummyBones(100, glm::mat4(1.0f));
+        m_DummyObjectUBO->SetData(dummyBones.data(), sizeof(glm::mat4) * 100);
+
+        m_DummyObjectSet = m_DescriptorManager->AllocateObjectSet();
+        if (m_DummyObjectSet != VK_NULL_HANDLE) {
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = m_DummyObjectUBO->GetBuffer();
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(glm::mat4) * 100;
+
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = m_DummyObjectSet;
+            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pBufferInfo = &bufferInfo;
+
+            vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+        } else {
+            VECTOR_LOG_ERROR("Failed to allocate dummy object descriptor set!");
+        }
     }
 
     void VulkanRenderer::SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) {
@@ -504,9 +533,48 @@ namespace VECTOR {
         m_PerFrameUBOs[m_CurrentFrame]->SetData(&data, sizeof(PerFrameData), 0);
     }
 
-    void VulkanRenderer::SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model) {
+    void VulkanRenderer::SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model, const std::vector<glm::mat4>* boneTransforms) {
         if (!m_FrameStarted) BeginFrame();
-        m_RenderQueue.push_back({mesh, material, model});
+        
+        RenderCommand cmd;
+        cmd.mesh = mesh;
+        cmd.material = material;
+        cmd.model = model;
+        cmd.boneTransforms = boneTransforms;
+
+        if (boneTransforms && !boneTransforms->empty()) {
+            if (m_ObjectDataIndex >= m_ObjectDataPool.size()) {
+                ObjectData data;
+                data.ubo = std::make_unique<VulkanUniformBuffer>(sizeof(glm::mat4) * 100, 0);
+                data.descriptorSet = m_DescriptorManager->AllocateObjectSet();
+                
+                VkDescriptorBufferInfo bufferInfo{};
+                bufferInfo.buffer = data.ubo->GetBuffer();
+                bufferInfo.offset = 0;
+                bufferInfo.range = sizeof(glm::mat4) * 100;
+                
+                VkWriteDescriptorSet descriptorWrite{};
+                descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                descriptorWrite.dstSet = data.descriptorSet;
+                descriptorWrite.dstBinding = 0;
+                descriptorWrite.dstArrayElement = 0;
+                descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                descriptorWrite.descriptorCount = 1;
+                descriptorWrite.pBufferInfo = &bufferInfo;
+                
+                vkUpdateDescriptorSets(m_Context->GetDevice(), 1, &descriptorWrite, 0, nullptr);
+                
+                m_ObjectDataPool.push_back(std::move(data));
+            }
+            
+            m_ObjectDataPool[m_ObjectDataIndex].ubo->SetData(boneTransforms->data(), std::min((int)boneTransforms->size(), 100) * sizeof(glm::mat4));
+            cmd.objectDescriptorSet = m_ObjectDataPool[m_ObjectDataIndex].descriptorSet;
+            m_ObjectDataIndex++;
+        } else {
+            cmd.objectDescriptorSet = m_DummyObjectSet;
+        }
+
+        m_RenderQueue.push_back(std::move(cmd));
     }
 
     void VulkanRenderer::SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) {
@@ -573,8 +641,8 @@ namespace VECTOR {
         m_ShadowPass->GetDepthPipeline()->Bind(commandBuffer);
         
         for (const auto& cmd : m_RenderQueue) {
-            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame] };
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DescriptorManager->GetPipelineLayout(), 0, 1, sets, 0, nullptr);
+            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], m_DummyMaterialDescriptorSet, cmd.objectDescriptorSet };
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DescriptorManager->GetPipelineLayout(), 0, 3, sets, 0, nullptr);
             
             struct PushConstants {
                 glm::mat4 model;
@@ -658,14 +726,13 @@ namespace VECTOR {
         }
 
         for (const auto& cmd : m_RenderQueue) {
-            // Bind Descriptor Sets
             VkDescriptorSet materialSet = m_DummyMaterialDescriptorSet;
             if (cmd.material && cmd.material->albedoTexture) {
                 materialSet = GetOrCreateTextureDescriptorSet(cmd.material->albedoTexture.get());
             }
-            
-            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], materialSet };
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DescriptorManager->GetPipelineLayout(), 0, 2, sets, 0, nullptr);
+
+            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], materialSet, cmd.objectDescriptorSet };
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DescriptorManager->GetPipelineLayout(), 0, 3, sets, 0, nullptr);
             // Material Push Constants
             struct PushConstants {
                 glm::mat4 model;

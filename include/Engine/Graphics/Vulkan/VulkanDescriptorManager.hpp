@@ -21,11 +21,13 @@ namespace VECTOR {
 
         VkDescriptorSetLayout GetGlobalSetLayout() const { return m_GlobalSetLayout; }
         VkDescriptorSetLayout GetMaterialSetLayout() const { return m_MaterialSetLayout; }
+        VkDescriptorSetLayout GetObjectSetLayout() const { return m_ObjectSetLayout; }
         VkPipelineLayout GetPipelineLayout() const { return m_PipelineLayout; }
         VkDescriptorPool GetDescriptorPool() const { return m_MainDescriptorPool; }
 
         std::vector<VkDescriptorSet> AllocateGlobalSets();
         VkDescriptorSet AllocateMaterialSet();
+        VkDescriptorSet AllocateObjectSet();
 
     private:
         void CreateLayouts();
@@ -36,6 +38,7 @@ namespace VECTOR {
 
         VkDescriptorSetLayout m_GlobalSetLayout = VK_NULL_HANDLE;
         VkDescriptorSetLayout m_MaterialSetLayout = VK_NULL_HANDLE;
+        VkDescriptorSetLayout m_ObjectSetLayout = VK_NULL_HANDLE;
         VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
         VkDescriptorPool m_MainDescriptorPool = VK_NULL_HANDLE;
     };

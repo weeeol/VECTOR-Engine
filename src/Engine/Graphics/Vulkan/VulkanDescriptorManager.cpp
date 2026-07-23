@@ -39,6 +39,10 @@ namespace VECTOR {
             vkDestroyDescriptorSetLayout(device, m_MaterialSetLayout, nullptr);
             m_MaterialSetLayout = VK_NULL_HANDLE;
         }
+        if (m_ObjectSetLayout != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, m_ObjectSetLayout, nullptr);
+            m_ObjectSetLayout = VK_NULL_HANDLE;
+        }
     }
 
     void VulkanDescriptorManager::CreateLayouts() {
@@ -91,16 +95,33 @@ namespace VECTOR {
             VECTOR_LOG_ERROR("Failed to create material descriptor set layout!");
         }
 
-        // 3. Pipeline Layout
+        // 3. Object Set Layout (Set 2: Bones UBO)
+        VkDescriptorSetLayoutBinding objectLayoutBinding{};
+        objectLayoutBinding.binding = 0;
+        objectLayoutBinding.descriptorCount = 1;
+        objectLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        objectLayoutBinding.pImmutableSamplers = nullptr;
+        objectLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutCreateInfo objectLayoutInfo{};
+        objectLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        objectLayoutInfo.bindingCount = 1;
+        objectLayoutInfo.pBindings = &objectLayoutBinding;
+
+        if (vkCreateDescriptorSetLayout(device, &objectLayoutInfo, nullptr, &m_ObjectSetLayout) != VK_SUCCESS) {
+            VECTOR_LOG_ERROR("Failed to create object descriptor set layout!");
+        }
+
+        // 4. Pipeline Layout
         VkPushConstantRange pushConstant{};
         pushConstant.offset = 0;
         pushConstant.size = sizeof(glm::mat4) + sizeof(glm::vec4) + sizeof(uint32_t) * 2; // model + color + hasTexture + isUnlit
         pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        VkDescriptorSetLayout setLayouts[] = { m_GlobalSetLayout, m_MaterialSetLayout };
+        VkDescriptorSetLayout setLayouts[] = { m_GlobalSetLayout, m_MaterialSetLayout, m_ObjectSetLayout };
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 2;
+        pipelineLayoutInfo.setLayoutCount = 3;
         pipelineLayoutInfo.pSetLayouts = setLayouts;
         pipelineLayoutInfo.pushConstantRangeCount = 1;
         pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
@@ -115,7 +136,7 @@ namespace VECTOR {
 
         std::array<VkDescriptorPoolSize, 2> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[0].descriptorCount = static_cast<uint32_t>(m_FramesInFlight * 2); // 2 UBOs per frame
+        poolSizes[0].descriptorCount = static_cast<uint32_t>(m_FramesInFlight * 2 + 4096); // 2 UBOs per frame + object UBOs
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         poolSizes[1].descriptorCount = static_cast<uint32_t>(m_FramesInFlight + 1024); // max textures + shadow maps
 
@@ -123,7 +144,7 @@ namespace VECTOR {
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         poolInfo.pPoolSizes = poolSizes.data();
-        poolInfo.maxSets = static_cast<uint32_t>(m_FramesInFlight + 1024);
+        poolInfo.maxSets = static_cast<uint32_t>(m_FramesInFlight + 1024 + 4096);
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
         if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &m_MainDescriptorPool) != VK_SUCCESS) {
@@ -156,6 +177,21 @@ namespace VECTOR {
         VkDescriptorSet set;
         if (vkAllocateDescriptorSets(m_Context->GetDevice(), &allocInfo, &set) != VK_SUCCESS) {
             VECTOR_LOG_ERROR("Failed to allocate material descriptor set!");
+            return VK_NULL_HANDLE;
+        }
+        return set;
+    }
+
+    VkDescriptorSet VulkanDescriptorManager::AllocateObjectSet() {
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = m_MainDescriptorPool;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &m_ObjectSetLayout;
+
+        VkDescriptorSet set;
+        if (vkAllocateDescriptorSets(m_Context->GetDevice(), &allocInfo, &set) != VK_SUCCESS) {
+            VECTOR_LOG_ERROR("Failed to allocate object descriptor set!");
             return VK_NULL_HANDLE;
         }
         return set;

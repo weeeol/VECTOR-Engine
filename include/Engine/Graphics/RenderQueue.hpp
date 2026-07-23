@@ -19,6 +19,7 @@ namespace VECTOR {
         const Mesh* mesh = nullptr;
         const Material* material = nullptr;
         glm::mat4 modelMatrix = glm::mat4(1.0f);
+        const std::vector<glm::mat4>* boneTransforms = nullptr;
     };
 
     /**

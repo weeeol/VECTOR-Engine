@@ -492,7 +492,7 @@ namespace VECTOR {
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     }
 
-    void OpenGLRenderer::SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model) {
+    void OpenGLRenderer::SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model, const std::vector<glm::mat4>* boneTransforms) {
         if (!mesh) return;
 
         const AABB& localAABB = mesh->GetAABB();
@@ -521,14 +521,15 @@ namespace VECTOR {
         cmd.mesh = mesh;
         cmd.material = mat;
         cmd.modelMatrix = model;
+        cmd.boneTransforms = boneTransforms;
         m_MainQueue.Submit(cmd);
 
-        RenderCommand shadowCmd;
-        shadowCmd.sortKey = 0; 
-        shadowCmd.mesh = mesh;
-        shadowCmd.material = m_DepthMaterial.get();
-        shadowCmd.modelMatrix = model;
-        m_ShadowQueue.Submit(shadowCmd);
+        if (mat && !mat->isUnlit) {
+            RenderCommand shadowCmd = cmd;
+            shadowCmd.sortKey = 0;
+            shadowCmd.material = m_DepthMaterial.get();
+            m_ShadowQueue.Submit(shadowCmd);
+        }
     }
 
     void OpenGLRenderer::SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) {

@@ -34,7 +34,7 @@ namespace VECTOR {
 
         void SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) override;
 
-        void SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model) override;
+        virtual void SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model, const std::vector<glm::mat4>* boneTransforms = nullptr) override;
 
         void SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) override;
         void SetDirectionalLight(const glm::vec3& direction, const glm::vec3& color, float intensity) override;

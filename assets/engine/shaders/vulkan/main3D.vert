@@ -28,7 +28,7 @@ layout(push_constant) uniform PushConstants {
 const int MAX_BONES = 100;
 const int MAX_BONE_INFLUENCE = 4;
 
-layout(set = 1, binding = 0) uniform BoneData {
+layout(set = 2, binding = 0) uniform BoneData {
     mat4 finalBonesMatrices[MAX_BONES];
 } boneData;
 

@@ -41,6 +41,12 @@ namespace VECTOR {
             // Set per-object uniform (model matrix)
             if (currentShader) {
                 currentShader->SetMat4("model", cmd.modelMatrix);
+
+                if (cmd.boneTransforms && !cmd.boneTransforms->empty()) {
+                    for (int i = 0; i < std::min((int)cmd.boneTransforms->size(), 100); i++) {
+                        currentShader->SetMat4("finalBonesMatrices[" + std::to_string(i) + "]", (*cmd.boneTransforms)[i]);
+                    }
+                }
             }
 
             cmd.mesh->Draw();

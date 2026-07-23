@@ -17,6 +17,7 @@ namespace VECTOR {
         
         TransformComponent() : position(0.0f), rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)), scale(1.0f) {}
         TransformComponent(const glm::vec3& p) : position(p), rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)), scale(1.0f) {}
+        TransformComponent(const glm::vec3& p, const glm::quat& r, const glm::vec3& s) : position(p), rotation(r), scale(s) {}
     };
 
     struct RigidBodyComponent {
@@ -35,6 +36,15 @@ namespace VECTOR {
 
     struct MeshComponent {
         std::shared_ptr<class Mesh> mesh;
+    };
+
+    struct ModelComponent {
+        std::shared_ptr<class Model> model;
+    };
+
+    struct SkeletalAnimationComponent {
+        std::shared_ptr<class SkeletalAnimator> animator;
+        std::shared_ptr<class Animation> currentAnimation;
     };
 
     struct CameraComponent {
