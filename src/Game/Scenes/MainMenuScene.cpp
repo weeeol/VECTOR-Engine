@@ -1,4 +1,5 @@
 #include "Game/Scenes/MainMenuScene.hpp"
+#include "Game/Scenes/LoadingScene.hpp"
 #include "Game/Scenes/GameplayScene.hpp"
 #include "Engine/Core/SceneManager.hpp"
 #include "Engine/Input/InputManager.hpp"
@@ -74,9 +75,8 @@ namespace Game {
             glm::vec4(50/255.0f, 100/255.0f, 50/255.0f, 1.0f), 
             glm::vec4(100/255.0f, 200/255.0f, 100/255.0f, 1.0f),
             [this]() {
-                m_State = MainMenuState::Loading;
-                m_NeedsUIRefresh = true;
-                m_LoadingFrames = 2; // Wait two frames so the UI can draw "Loading..."
+                auto loadingScene = std::make_unique<LoadingScene>(m_Width, m_Height, m_InputManager, m_SelectedDifficulty);
+                VECTOR::SceneManager::Get().ChangeScene(std::move(loadingScene));
             }
         );
 

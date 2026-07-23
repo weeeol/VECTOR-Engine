@@ -299,11 +299,20 @@ namespace VECTOR {
     }
 
     VkSurfaceFormatKHR VulkanSwapchain::ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+        // Try to find an UNORM format to avoid double-gamma correction
         for (const auto& availableFormat : availableFormats) {
             if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
                 return availableFormat;
             }
         }
+        for (const auto& availableFormat : availableFormats) {
+            if (availableFormat.format == VK_FORMAT_R8G8B8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                return availableFormat;
+            }
+        }
+        
+        // If UNORM isn't found, fallback to whatever is first and print a warning
+        VECTOR_LOG_INFO("Warning: UNORM surface format not found. UI/Lighting might be affected by hardware gamma correction.");
         return availableFormats[0];
     }
 
