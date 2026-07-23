@@ -18,17 +18,24 @@ namespace VECTOR {
         
         VkDevice device = VulkanContext::Get()->GetDevice();
         vkDestroyRenderPass(device, m_OffscreenRenderPass, nullptr);
+        if (m_BloomRenderPass) {
+            vkDestroyRenderPass(device, m_BloomRenderPass, nullptr);
+        }
         
         // Destructors of VulkanPipeline handle pipeline destruction
     }
 
-    void VulkanPostProcessor::Recreate(uint32_t width, uint32_t height) {
+    void VulkanPostProcessor::Recreate(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass) {
         m_Width = width;
         m_Height = height;
+        m_SwapchainRenderPass = swapchainRenderPass;
         
         DestroyResources();
         CreateResources();
         CreateDescriptorSets();
+        
+        // Recreate pipelines because the swapchain render pass has changed
+        CreatePipelines();
     }
     
     namespace {
@@ -156,10 +163,6 @@ namespace VECTOR {
         }
         m_BloomFramebuffers.clear();
 
-        if (m_BloomRenderPass) {
-            vkDestroyRenderPass(device, m_BloomRenderPass, nullptr);
-            m_BloomRenderPass = VK_NULL_HANDLE;
-        }
 
         if (m_BloomSetLayout) {
             vkDestroyDescriptorSetLayout(device, m_BloomSetLayout, nullptr);

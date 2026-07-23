@@ -31,6 +31,7 @@ set(VECTOR_SOURCES
     src/Engine/Core/Logger.cpp
     src/Engine/Core/ResourceManager.cpp
     src/Engine/Core/SceneManager.cpp
+    src/Engine/Core/JobSystem.cpp
     src/Engine/Graphics/RendererAPI.cpp
     src/Engine/Graphics/Renderer.cpp
     src/Engine/Graphics/Shader.cpp

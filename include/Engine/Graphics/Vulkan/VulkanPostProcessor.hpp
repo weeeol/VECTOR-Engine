@@ -22,7 +22,7 @@ namespace VECTOR {
         VulkanPostProcessor(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass);
         ~VulkanPostProcessor();
 
-        void Recreate(uint32_t width, uint32_t height);
+        void Recreate(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass);
         
         // Call this during rendering
         void RenderBloom(VkCommandBuffer commandBuffer);

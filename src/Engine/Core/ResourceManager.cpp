@@ -1,6 +1,9 @@
 #include "Engine/Core/ResourceManager.hpp"
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Graphics/Shader.hpp"
+#include "Engine/Graphics/Model.hpp"
+#include "Engine/Graphics/Animation.hpp"
+#include "Engine/Core/JobSystem.hpp"
 #include <fstream>
 #include <sstream>
 
@@ -11,6 +14,7 @@ namespace VECTOR {
     }
 
     void ResourceManager::Shutdown() {
+        std::lock_guard<std::mutex> lock(m_ResourceMutex);
         for (auto& pair : m_Fonts) {
             if (pair.second) {
                 TTF_CloseFont(pair.second);
@@ -20,9 +24,12 @@ namespace VECTOR {
         m_Shaders.clear();
         m_Textures.clear();
         m_Materials.clear();
+        m_Models.clear();
+        m_Animations.clear();
     }
 
     TTF_Font* ResourceManager::GetFont(const std::string& fontPath, int fontSize) {
+        std::lock_guard<std::mutex> lock(m_ResourceMutex);
         std::string key = fontPath + "_" + std::to_string(fontSize);
 
         if (m_Fonts.find(key) == m_Fonts.end()) {
@@ -38,21 +45,22 @@ namespace VECTOR {
     }
 
     std::shared_ptr<Shader> ResourceManager::LoadShader(const std::string& name, const std::string& vertexPath, const std::string& fragmentPath) {
-        if (m_Shaders.find(name) != m_Shaders.end()) {
-            return m_Shaders[name];
+        {
+            std::lock_guard<std::mutex> lock(m_ResourceMutex);
+            if (m_Shaders.find(name) != m_Shaders.end()) {
+                return m_Shaders[name];
+            }
         }
 
-        auto shader = Shader::CreateFromFile(vertexPath, fragmentPath);
-        if (shader) {
-            m_Shaders[name] = shader;
-        } else {
-            VECTOR_LOG_ERROR("Failed to load shader: " + name);
-        }
-
+        std::shared_ptr<Shader> shader = Shader::CreateFromFile(vertexPath, fragmentPath);
+        
+        std::lock_guard<std::mutex> lock(m_ResourceMutex);
+        m_Shaders[name] = shader;
         return shader;
     }
 
     std::shared_ptr<Shader> ResourceManager::GetShader(const std::string& name) {
+        std::lock_guard<std::mutex> lock(m_ResourceMutex);
         if (m_Shaders.find(name) != m_Shaders.end()) {
             return m_Shaders[name];
         }
@@ -60,20 +68,26 @@ namespace VECTOR {
     }
 
     std::shared_ptr<Texture2D> ResourceManager::LoadTexture2D(const std::string& name, const std::string& filepath) {
-        if (m_Textures.find(name) != m_Textures.end()) {
-            return m_Textures[name];
+        {
+            std::lock_guard<std::mutex> lock(m_ResourceMutex);
+            if (m_Textures.find(name) != m_Textures.end()) {
+                return m_Textures[name];
+            }
         }
 
-        auto texture = Texture2D::Create(filepath);
+        std::shared_ptr<Texture2D> texture = Texture2D::Create(filepath);
         if (texture) {
+            std::lock_guard<std::mutex> lock(m_ResourceMutex);
             m_Textures[name] = texture;
-        } else {
-            VECTOR_LOG_ERROR("Failed to load Texture2D: " + filepath);
+            return texture;
         }
-        return texture;
+
+        VECTOR_LOG_ERROR("ResourceManager: Failed to load texture " + name);
+        return nullptr;
     }
 
     std::shared_ptr<Texture2D> ResourceManager::GetTexture2D(const std::string& name) {
+        std::lock_guard<std::mutex> lock(m_ResourceMutex);
         if (m_Textures.find(name) != m_Textures.end()) {
             return m_Textures[name];
         }
@@ -81,8 +95,11 @@ namespace VECTOR {
     }
 
     std::shared_ptr<Material> ResourceManager::LoadMaterial(const std::string& name, const std::string& filepath) {
-        if (m_Materials.find(name) != m_Materials.end()) {
-            return m_Materials[name];
+        {
+            std::lock_guard<std::mutex> lock(m_ResourceMutex);
+            if (m_Materials.find(name) != m_Materials.end()) {
+                return m_Materials[name];
+            }
         }
 
         std::ifstream file(filepath);
@@ -139,13 +156,69 @@ namespace VECTOR {
             }
         }
 
-        m_Materials[name] = mat;
+        {
+            std::lock_guard<std::mutex> lock(m_ResourceMutex);
+            m_Materials[name] = mat;
+        }
         return mat;
     }
 
     std::shared_ptr<Material> ResourceManager::GetMaterial(const std::string& name) {
+        std::lock_guard<std::mutex> lock(m_ResourceMutex);
         if (m_Materials.find(name) != m_Materials.end()) {
             return m_Materials[name];
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<Model> ResourceManager::LoadModel(const std::string& name, const std::string& filepath) {
+        {
+            std::lock_guard<std::mutex> lock(m_ResourceMutex);
+            if (m_Models.find(name) != m_Models.end()) {
+                return m_Models[name];
+            }
+        }
+
+        std::shared_ptr<Model> model = std::make_shared<Model>(filepath);
+        
+        std::lock_guard<std::mutex> lock(m_ResourceMutex);
+        m_Models[name] = model;
+        return model;
+    }
+
+    std::shared_ptr<Model> ResourceManager::GetModel(const std::string& name) {
+        std::lock_guard<std::mutex> lock(m_ResourceMutex);
+        if (m_Models.find(name) != m_Models.end()) {
+            return m_Models[name];
+        }
+        return nullptr;
+    }
+    
+    std::future<std::shared_ptr<Model>> ResourceManager::LoadModelAsync(const std::string& name, const std::string& filepath) {
+        return JobSystem::Get().Execute([this, name, filepath]() {
+            return LoadModel(name, filepath);
+        });
+    }
+
+    std::shared_ptr<Animation> ResourceManager::LoadAnimation(const std::string& name, const std::string& filepath, std::shared_ptr<Model> targetModel) {
+        {
+            std::lock_guard<std::mutex> lock(m_ResourceMutex);
+            if (m_Animations.find(name) != m_Animations.end()) {
+                return m_Animations[name];
+            }
+        }
+
+        std::shared_ptr<Animation> animation = std::make_shared<Animation>(filepath, targetModel.get());
+        
+        std::lock_guard<std::mutex> lock(m_ResourceMutex);
+        m_Animations[name] = animation;
+        return animation;
+    }
+
+    std::shared_ptr<Animation> ResourceManager::GetAnimation(const std::string& name) {
+        std::lock_guard<std::mutex> lock(m_ResourceMutex);
+        if (m_Animations.find(name) != m_Animations.end()) {
+            return m_Animations[name];
         }
         return nullptr;
     }

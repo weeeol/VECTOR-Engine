@@ -44,7 +44,11 @@ namespace VECTOR {
                 btTransform trans;
                 rb.body->getMotionState()->getWorldTransform(trans);
                 t.position.x = trans.getOrigin().getX();
-                t.position.y = trans.getOrigin().getY();
+                if (registry.HasComponent<CameraComponent>(entity)) {
+                    t.position.y = trans.getOrigin().getY() + 0.6f;
+                } else {
+                    t.position.y = trans.getOrigin().getY();
+                }
                 t.position.z = trans.getOrigin().getZ();
 
                 t.rotation.w = trans.getRotation().getW();

@@ -224,31 +224,33 @@ namespace Game {
         m_Registry.AddComponent(m_Player, VECTOR::TransformComponent{glm::vec3(0.0f, 2.0f, 5.0f)});
         m_Registry.AddComponent(m_Player, VECTOR::CameraComponent{});
 
+        btCollisionShape* playerShape = new btCapsuleShape(0.5f, 1.5f);
         btTransform playerStartTransform;
         playerStartTransform.setIdentity();
         playerStartTransform.setOrigin(btVector3(0.0f, 2.0f, 5.0f));
 
-        auto ghostObject = std::make_shared<btPairCachingGhostObject>();
-        ghostObject->setWorldTransform(playerStartTransform);
-        btConvexShape* capsule = new btCapsuleShape(0.5f, 1.5f);
-        ghostObject->setCollisionShape(capsule);
-        ghostObject->setCollisionFlags(btCollisionObject::CF_CHARACTER_OBJECT);
+        btVector3 localInertia(0, 0, 0);
+        playerShape->calculateLocalInertia(75.0f, localInertia);
 
-        auto character = std::make_shared<btKinematicCharacterController>(ghostObject.get(), capsule, 0.35f, btVector3(0,1,0));
-        character->setUseGhostSweepTest(false);
-
-        m_PhysicsSystem->GetWorld()->addCollisionObject(ghostObject.get(), btBroadphaseProxy::CharacterFilter, btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter);
-        m_PhysicsSystem->GetWorld()->addAction(character.get());
-
-        VECTOR::CharacterControllerComponent kcc;
-        kcc.ghostObject = ghostObject;
-        kcc.character = character;
-        kcc.walkSpeed = 10.0f;
-        kcc.jumpSpeed = 10.0f;
-        character->setJumpSpeed(kcc.jumpSpeed);
-        character->setFallSpeed(kcc.fallSpeed);
+        btDefaultMotionState* playerMotionState = new btDefaultMotionState(playerStartTransform);
+        btRigidBody::btRigidBodyConstructionInfo playerRbInfo(75.0f, playerMotionState, playerShape, localInertia);
         
-        m_Registry.AddComponent(m_Player, kcc);
+        auto rbDeleter = [world = m_PhysicsSystem->GetWorld()](btRigidBody* body) {
+            if (world && body) {
+                world->removeRigidBody(body);
+                delete body->getMotionState();
+                delete body->getCollisionShape();
+                delete body;
+            }
+        };
+
+        std::shared_ptr<btRigidBody> playerBody(new btRigidBody(playerRbInfo), rbDeleter);
+        playerBody->setAngularFactor(btVector3(0, 0, 0)); // Prevent tipping over
+        playerBody->setFriction(0.0f); // Character shouldn't stick to walls
+        playerBody->setActivationState(DISABLE_DEACTIVATION);
+
+        m_PhysicsSystem->GetWorld()->addRigidBody(playerBody.get());
+        m_Registry.AddComponent(m_Player, VECTOR::RigidBodyComponent(playerBody));
 
         // Floor
         CreateCube(glm::vec3(0, -1, 0), glm::vec3(50, 1, 50), 0.0f, "assets/materials/floor.vmat");
@@ -275,7 +277,7 @@ namespace Game {
         VECTOR::Entity animatedEntity = m_Registry.CreateEntity();
         m_Registry.AddComponent(animatedEntity, VECTOR::TransformComponent{glm::vec3(0.0f, 0.0f, -5.0f), glm::quat(glm::vec3(0, 0, 0)), glm::vec3(1.0f)});
         
-        auto daeModel = std::make_shared<VECTOR::Model>("assets/models/Walking.dae");
+        auto daeModel = VECTOR::ResourceManager::Get().LoadModel("PlayerModel", "assets/models/Walking.dae");
         auto daeMaterial = std::make_shared<VECTOR::Material>();
         daeMaterial->shader = VECTOR::ResourceManager::Get().GetShader("Main3D");
         daeMaterial->albedoColor = glm::vec4(1.0f, 0.8f, 0.2f, 1.0f); // Gold color
@@ -284,7 +286,7 @@ namespace Game {
         m_Registry.AddComponent(animatedEntity, VECTOR::RenderComponent{daeMaterial});
         m_Registry.AddComponent(animatedEntity, VECTOR::ModelComponent{daeModel});
         
-        auto daeAnim = std::make_shared<VECTOR::Animation>("assets/models/Walking.dae", daeModel.get());
+        auto daeAnim = VECTOR::ResourceManager::Get().LoadAnimation("PlayerWalkAnim", "assets/models/Walking.dae", daeModel);
         auto daeAnimator = std::make_shared<VECTOR::SkeletalAnimator>(daeAnim.get());
         m_Registry.AddComponent(animatedEntity, VECTOR::SkeletalAnimationComponent{daeAnimator, daeAnim});
         

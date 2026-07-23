@@ -3,6 +3,7 @@
 #include "Engine/Core/ResourceManager.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include "Engine/Core/SceneManager.hpp"
+#include "Engine/Core/JobSystem.hpp"
 #include <SDL3/SDL.h>
 #include <imgui_impl_sdl3.h>
 
@@ -35,6 +36,7 @@ namespace VECTOR {
         }
 
         ResourceManager::Get().Initialize();
+        JobSystem::Get().Initialize();
         
         if (!AudioManager::Get().Initialize()) {
             return false;
@@ -131,6 +133,7 @@ namespace VECTOR {
         SceneManager::Get().Clear();
         
         ResourceManager::Get().Shutdown();
+        JobSystem::Get().Shutdown();
         AudioManager::Get().Shutdown();
 
         if (m_Renderer) {

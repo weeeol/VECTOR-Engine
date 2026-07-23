@@ -91,7 +91,9 @@ namespace Game {
                     vel.setX(moveDir.x * velocityMag);
                     vel.setZ(moveDir.z * velocityMag);
                     if (m_InputManager->IsKeyPressed(SDL_SCANCODE_SPACE)) {
-                        vel.setY(5.0f);
+                        if (std::abs(vel.y()) < 0.1f) {
+                            vel.setY(5.0f);
+                        }
                     }
                     rb.body->setLinearVelocity(vel);
                 }

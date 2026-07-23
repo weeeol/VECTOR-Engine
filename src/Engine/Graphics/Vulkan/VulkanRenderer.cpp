@@ -25,7 +25,7 @@ namespace VECTOR {
     bool VulkanRenderer::Initialize(const std::string& title, int width, int height) {
         VECTOR_LOG_INFO("VulkanRenderer::Initialize called");
         
-        m_Window = SDL_CreateWindow(title.c_str(), width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+        m_Window = SDL_CreateWindow(title.c_str(), width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
         if (!m_Window) {
             VECTOR_LOG_ERROR(std::string("Failed to create SDL window for Vulkan: ") + SDL_GetError());
             return false;
@@ -37,7 +37,10 @@ namespace VECTOR {
             return false;
         }
 
-        m_Swapchain = std::make_unique<VulkanSwapchain>(m_Context.get(), width, height);
+        int pixelWidth, pixelHeight;
+        SDL_GetWindowSizeInPixels(m_Window, &pixelWidth, &pixelHeight);
+
+        m_Swapchain = std::make_unique<VulkanSwapchain>(m_Context.get(), pixelWidth, pixelHeight);
         m_FramesInFlight = static_cast<uint32_t>(m_Swapchain->GetImageCount());
 
         m_DescriptorManager = std::make_unique<VulkanDescriptorManager>(m_Context.get(), m_FramesInFlight);
@@ -53,7 +56,7 @@ namespace VECTOR {
         CreateUniformBuffers();
         CreateDescriptorSets();
 
-        m_PostProcessor = std::make_unique<VulkanPostProcessor>(width, height, m_Swapchain->GetRenderPass());
+        m_PostProcessor = std::make_unique<VulkanPostProcessor>(pixelWidth, pixelHeight, m_Swapchain->GetRenderPass());
 
         VECTOR_LOG_INFO("Loading Shaders...");
         ResourceManager::Get().LoadShader("Default3D", "assets/engine/shaders/vulkan/main3D.vert.spv", "assets/engine/shaders/vulkan/main3D.frag.spv");
@@ -337,7 +340,7 @@ namespace VECTOR {
 
         m_Swapchain->Recreate(width, height);
         if (m_PostProcessor) {
-            m_PostProcessor->Recreate(width, height);
+            m_PostProcessor->Recreate(width, height, m_Swapchain->GetRenderPass());
         }
     }
 
@@ -843,6 +846,9 @@ namespace VECTOR {
     void VulkanRenderer::SetFullscreen(bool fullscreen, bool borderless) {
         if (m_Window) {
             SDL_SetWindowFullscreen(m_Window, fullscreen);
+            if (!fullscreen) {
+                SDL_SetWindowBordered(m_Window, !borderless);
+            }
         }
     }
 
