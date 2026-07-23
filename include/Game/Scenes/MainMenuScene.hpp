@@ -26,13 +26,15 @@ namespace Game {
 
         enum class MainMenuState {
             Main,
-            Settings
+            Settings,
+            Loading
         };
 
     private:
         void CreateUI();
         void CreateMainMenuUI();
         void CreateSettingsMenuUI();
+        void CreateLoadingUI();
         void ClearUI();
 
         VECTOR::Entity CreateButtonEntity(int x, int y, int width, int height, const std::string& text, 
@@ -48,6 +50,7 @@ namespace Game {
         
         MainMenuState m_State = MainMenuState::Main;
         bool m_NeedsUIRefresh = false;
+        int m_LoadingFrames = 0;
         AIDifficulty m_SelectedDifficulty;
     };
 

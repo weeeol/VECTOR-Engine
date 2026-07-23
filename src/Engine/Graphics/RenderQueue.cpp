@@ -94,6 +94,12 @@ namespace VECTOR {
 
             if (gBufferShader) {
                 gBufferShader->SetMat4("model", cmd.modelMatrix);
+                
+                if (cmd.boneTransforms && !cmd.boneTransforms->empty()) {
+                    for (int i = 0; i < std::min((int)cmd.boneTransforms->size(), 100); i++) {
+                        gBufferShader->SetMat4("finalBonesMatrices[" + std::to_string(i) + "]", (*cmd.boneTransforms)[i]);
+                    }
+                }
             }
 
             cmd.mesh->Draw();

@@ -10,6 +10,7 @@
 #include "Engine/Core/Application.hpp"
 #include "Engine/Core/ResourceManager.hpp"
 #include "Engine/ECS/Components.hpp"
+#include "Engine/Physics/CharacterControllerComponent.hpp"
 #include "Engine/ECS/UIComponents.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 // #include <GL/glew.h> Removed
@@ -25,8 +26,11 @@
 #include "Engine/Graphics/Frustum.hpp"
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Scene/SceneSerializer.hpp"
+#include "Engine/Graphics/RendererAPI.hpp"
 #include <imgui.h>
 #include <SDL3/SDL.h>
+#include <btBulletDynamicsCommon.h>
+#include <BulletCollision/CollisionDispatch/btGhostObject.h>
 
 namespace Game {
 
@@ -36,6 +40,7 @@ namespace Game {
         m_Registry.RegisterComponent<VECTOR::TagComponent>();
         m_Registry.RegisterComponent<VECTOR::TransformComponent>();
         m_Registry.RegisterComponent<VECTOR::RigidBodyComponent>();
+        m_Registry.RegisterComponent<VECTOR::CharacterControllerComponent>();
         m_Registry.RegisterComponent<VECTOR::RenderComponent>();
         m_Registry.RegisterComponent<VECTOR::MeshComponent>();
         m_Registry.RegisterComponent<VECTOR::ModelComponent>();
@@ -219,34 +224,31 @@ namespace Game {
         m_Registry.AddComponent(m_Player, VECTOR::TransformComponent{glm::vec3(0.0f, 2.0f, 5.0f)});
         m_Registry.AddComponent(m_Player, VECTOR::CameraComponent{});
 
-        btCollisionShape* playerShape = new btCapsuleShape(0.5f, 1.0f);
         btTransform playerStartTransform;
         playerStartTransform.setIdentity();
         playerStartTransform.setOrigin(btVector3(0.0f, 2.0f, 5.0f));
 
-        btScalar playerMass(50.0f);
-        btVector3 playerLocalInertia(0, 0, 0);
-        playerShape->calculateLocalInertia(playerMass, playerLocalInertia);
+        auto ghostObject = std::make_shared<btPairCachingGhostObject>();
+        ghostObject->setWorldTransform(playerStartTransform);
+        btConvexShape* capsule = new btCapsuleShape(0.5f, 1.5f);
+        ghostObject->setCollisionShape(capsule);
+        ghostObject->setCollisionFlags(btCollisionObject::CF_CHARACTER_OBJECT);
 
-        btDefaultMotionState* playerMotionState = new btDefaultMotionState(playerStartTransform);
-        btRigidBody::btRigidBodyConstructionInfo playerRbInfo(playerMass, playerMotionState, playerShape, playerLocalInertia);
-        btRigidBody* playerBody = new btRigidBody(playerRbInfo);
-        playerBody->setFriction(0.8f); // Added friction
-        // lock rotations
-        playerBody->setAngularFactor(btVector3(0,0,0));
+        auto character = std::make_shared<btKinematicCharacterController>(ghostObject.get(), capsule, 0.35f, btVector3(0,1,0));
+        character->setUseGhostSweepTest(false);
+
+        m_PhysicsSystem->GetWorld()->addCollisionObject(ghostObject.get(), btBroadphaseProxy::CharacterFilter, btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter);
+        m_PhysicsSystem->GetWorld()->addAction(character.get());
+
+        VECTOR::CharacterControllerComponent kcc;
+        kcc.ghostObject = ghostObject;
+        kcc.character = character;
+        kcc.walkSpeed = 10.0f;
+        kcc.jumpSpeed = 10.0f;
+        character->setJumpSpeed(kcc.jumpSpeed);
+        character->setFallSpeed(kcc.fallSpeed);
         
-        auto deleter = [world = m_PhysicsSystem->GetWorld()](btRigidBody* rb) {
-            if (world && rb) world->removeRigidBody(rb);
-            if (rb) {
-                if (rb->getMotionState()) delete rb->getMotionState();
-                if (rb->getCollisionShape()) delete rb->getCollisionShape();
-                delete rb;
-            }
-        };
-        std::shared_ptr<btRigidBody> bodyPtr(playerBody, deleter);
-
-        m_PhysicsSystem->GetWorld()->addRigidBody(playerBody);
-        m_Registry.AddComponent(m_Player, VECTOR::RigidBodyComponent{bodyPtr});
+        m_Registry.AddComponent(m_Player, kcc);
 
         // Floor
         CreateCube(glm::vec3(0, -1, 0), glm::vec3(50, 1, 50), 0.0f, "assets/materials/floor.vmat");
@@ -262,8 +264,12 @@ namespace Game {
             "assets/sky_top.hdr", "assets/sky_bottom.hdr",
             "assets/sky_front.hdr", "assets/sky_back.hdr"
         };
-        auto skybox = std::make_shared<VECTOR::VulkanCubemap>(skyboxFaces);
-        VECTOR::Application::Get().GetRenderer()->SubmitSkybox(skybox.get());
+        if (VECTOR::RendererAPI::GetAPI() == VECTOR::RendererAPI::API::Vulkan) {
+            auto skybox = std::make_shared<VECTOR::VulkanCubemap>(skyboxFaces);
+            VECTOR::Application::Get().GetRenderer()->SubmitSkybox(skybox.get());
+            // Store skybox to keep it alive
+            m_Skybox = skybox;
+        }
         
         // Load dae model
         VECTOR::Entity animatedEntity = m_Registry.CreateEntity();
@@ -282,8 +288,6 @@ namespace Game {
         auto daeAnimator = std::make_shared<VECTOR::SkeletalAnimator>(daeAnim.get());
         m_Registry.AddComponent(animatedEntity, VECTOR::SkeletalAnimationComponent{daeAnimator, daeAnim});
         
-        // Store skybox to keep it alive
-        m_Skybox = skybox;
     }
 
     void GameplayScene::CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy) {

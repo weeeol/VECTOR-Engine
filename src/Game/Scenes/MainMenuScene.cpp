@@ -39,6 +39,8 @@ namespace Game {
             CreateMainMenuUI();
         } else if (m_State == MainMenuState::Settings) {
             CreateSettingsMenuUI();
+        } else if (m_State == MainMenuState::Loading) {
+            CreateLoadingUI();
         }
     }
 
@@ -72,9 +74,9 @@ namespace Game {
             glm::vec4(50/255.0f, 100/255.0f, 50/255.0f, 1.0f), 
             glm::vec4(100/255.0f, 200/255.0f, 100/255.0f, 1.0f),
             [this]() {
-                m_SelectedDifficulty = AIDifficulty::Medium;
-                auto gameplayScene = std::make_unique<GameplayScene>(m_Width, m_Height, m_InputManager, m_SelectedDifficulty);
-                VECTOR::SceneManager::Get().ChangeScene(std::move(gameplayScene));
+                m_State = MainMenuState::Loading;
+                m_NeedsUIRefresh = true;
+                m_LoadingFrames = 2; // Wait two frames so the UI can draw "Loading..."
             }
         );
 
@@ -135,7 +137,23 @@ namespace Game {
         );
     }
 
+    void MainMenuScene::CreateLoadingUI() {
+        // Nothing here, we just draw the text directly in Render!
+    }
+
     void MainMenuScene::Update(float deltaTime) {
+        if (m_State == MainMenuState::Loading) {
+            if (m_LoadingFrames > 0) {
+                m_LoadingFrames--;
+            } else {
+                // Actually start the game
+                m_SelectedDifficulty = AIDifficulty::Medium;
+                auto gameplayScene = std::make_unique<GameplayScene>(m_Width, m_Height, m_InputManager, m_SelectedDifficulty);
+                VECTOR::SceneManager::Get().ChangeScene(std::move(gameplayScene));
+                return;
+            }
+        }
+
         m_UISystem->Update(m_Registry, deltaTime);
         if (m_NeedsUIRefresh) {
             CreateUI();
@@ -150,8 +168,10 @@ namespace Game {
         if (m_State == MainMenuState::Main) {
             renderer->DrawUIText("PONG", m_Width / 2 - 60, m_Height / 2 - 150, glm::vec4(1.0f), 48);
             renderer->DrawUIText("Volume", m_Width / 2 - 40, m_Height / 2 + 155, glm::vec4(200/255.0f, 200/255.0f, 200/255.0f, 1.0f), 18);
-        } else {
+        } else if (m_State == MainMenuState::Settings) {
             renderer->DrawUIText("Settings", m_Width / 2 - 80, m_Height / 2 - 150, glm::vec4(1.0f), 48);
+        } else if (m_State == MainMenuState::Loading) {
+            renderer->DrawUIText("Loading...", m_Width / 2 - 80, m_Height / 2 - 20, glm::vec4(1.0f), 48);
         }
 
         // UI Components

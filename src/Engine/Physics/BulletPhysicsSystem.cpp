@@ -1,5 +1,6 @@
 #include "Engine/Physics/BulletPhysicsSystem.hpp"
 #include "Engine/ECS/Components.hpp"
+#include "Engine/Physics/CharacterControllerComponent.hpp"
 
 namespace VECTOR {
 
@@ -7,6 +8,10 @@ namespace VECTOR {
         m_CollisionConfiguration = std::make_unique<btDefaultCollisionConfiguration>();
         m_Dispatcher = std::make_unique<btCollisionDispatcher>(m_CollisionConfiguration.get());
         m_OverlappingPairCache = std::make_unique<btDbvtBroadphase>();
+        
+        m_GhostPairCallback = std::make_unique<btGhostPairCallback>();
+        m_OverlappingPairCache->getOverlappingPairCache()->setInternalGhostPairCallback(m_GhostPairCallback.get());
+
         m_Solver = std::make_unique<btSequentialImpulseConstraintSolver>();
 
         m_DynamicsWorld = std::make_unique<btDiscreteDynamicsWorld>(
@@ -24,7 +29,6 @@ namespace VECTOR {
             int remaining = m_DynamicsWorld->getNumCollisionObjects();
             if (remaining > 0) {
                 // Should not happen if ECS components cleaned up properly
-                // But if it does, log or handle
             }
         }
     }
@@ -47,6 +51,19 @@ namespace VECTOR {
                 t.rotation.x = trans.getRotation().getX();
                 t.rotation.y = trans.getRotation().getY();
                 t.rotation.z = trans.getRotation().getZ();
+            }
+        });
+
+        registry.View<TransformComponent, CharacterControllerComponent>([&](Entity entity) {
+            auto& kcc = registry.GetComponent<CharacterControllerComponent>(entity);
+            auto& t = registry.GetComponent<TransformComponent>(entity);
+
+            if (kcc.ghostObject) {
+                btTransform trans = kcc.ghostObject->getWorldTransform();
+                t.position.x = trans.getOrigin().getX();
+                // Offset the camera to eye level instead of capsule center
+                t.position.y = trans.getOrigin().getY() + 0.6f;
+                t.position.z = trans.getOrigin().getZ();
             }
         });
     }

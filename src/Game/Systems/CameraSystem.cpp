@@ -1,5 +1,6 @@
 #include "Game/Systems/CameraSystem.hpp"
 #include "Engine/ECS/Components.hpp"
+#include "Engine/Physics/CharacterControllerComponent.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <btBulletDynamicsCommon.h>
 #include <algorithm>
@@ -67,13 +68,31 @@ namespace Game {
                 moveDir = glm::normalize(moveDir);
             }
 
-            if (registry.HasComponent<VECTOR::RigidBodyComponent>(entity)) {
+            if (registry.HasComponent<VECTOR::CharacterControllerComponent>(entity)) {
+                auto& kcc = registry.GetComponent<VECTOR::CharacterControllerComponent>(entity);
+                if (kcc.character) {
+                    // setWalkDirection expects displacement per physics tick (which runs at 60Hz).
+                    // We shouldn't multiply by variable deltaTime, but by the fixed timestep.
+                    float fixedTimeStep = 1.0f / 60.0f;
+                    btVector3 walkDir(moveDir.x * kcc.walkSpeed * fixedTimeStep, 0.0f, moveDir.z * kcc.walkSpeed * fixedTimeStep);
+                    kcc.character->setWalkDirection(walkDir);
+
+                    if (m_InputManager->IsKeyPressed(SDL_SCANCODE_SPACE)) {
+                        if (kcc.character->canJump()) {
+                            kcc.character->jump();
+                        }
+                    }
+                }
+            } else if (registry.HasComponent<VECTOR::RigidBodyComponent>(entity)) {
                 auto& rb = registry.GetComponent<VECTOR::RigidBodyComponent>(entity);
                 if (rb.body) {
                     rb.body->activate(true);
                     btVector3 vel = rb.body->getLinearVelocity();
                     vel.setX(moveDir.x * velocityMag);
                     vel.setZ(moveDir.z * velocityMag);
+                    if (m_InputManager->IsKeyPressed(SDL_SCANCODE_SPACE)) {
+                        vel.setY(5.0f);
+                    }
                     rb.body->setLinearVelocity(vel);
                 }
             } else {

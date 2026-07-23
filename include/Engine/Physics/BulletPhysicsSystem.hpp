@@ -3,6 +3,7 @@
 #include "Engine/ECS/ECS.hpp"
 #include "Engine/ECS/System.hpp"
 #include <btBulletDynamicsCommon.h>
+#include <BulletCollision/CollisionDispatch/btGhostObject.h>
 #include <memory>
 
 namespace VECTOR {
@@ -22,6 +23,7 @@ namespace VECTOR {
         std::unique_ptr<btBroadphaseInterface> m_OverlappingPairCache;
         std::unique_ptr<btSequentialImpulseConstraintSolver> m_Solver;
         std::unique_ptr<btDiscreteDynamicsWorld> m_DynamicsWorld;
+        std::unique_ptr<btGhostPairCallback> m_GhostPairCallback;
     };
 
 } // namespace VECTOR
