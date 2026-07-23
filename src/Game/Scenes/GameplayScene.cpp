@@ -21,8 +21,10 @@
 #include "Engine/Graphics/Texture2D.hpp"
 #include "Engine/Graphics/Vulkan/VulkanCubemap.hpp"
 #include "Engine/Audio/AudioManager.hpp"
-#include <SDL3/SDL.h>
+#include "Game/Systems/ShootingSystem.hpp"
+#include "Engine/Graphics/Frustum.hpp"
 #include <imgui.h>
+#include <SDL3/SDL.h>
 
 namespace Game {
 
@@ -413,17 +415,36 @@ namespace Game {
             renderer->SubmitPointLight(t.position, l.radius, l.color, l.intensity);
         });
 
+        m_TotalEntities = 0;
+        m_RenderedEntities = 0;
+
+        VECTOR::Frustum cameraFrustum = VECTOR::CreateFrustumFromMatrix(projection * view);
+
         // Submit all renderable mesh entities
         m_Registry.View<VECTOR::TransformComponent, VECTOR::MeshComponent, VECTOR::RenderComponent>([&](VECTOR::Entity entity) {
             auto& t = m_Registry.GetComponent<VECTOR::TransformComponent>(entity);
             auto& m = m_Registry.GetComponent<VECTOR::MeshComponent>(entity);
             auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
 
+            m_TotalEntities++;
+
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, t.position);
             model = model * glm::mat4_cast(t.rotation);
             model = glm::scale(model, t.scale);
 
+            // Frustum Culling
+            if (m.mesh) {
+                VECTOR::AABB transformedAABB = m.mesh->GetAABB();
+                transformedAABB.center = glm::vec3(model * glm::vec4(transformedAABB.center, 1.0f));
+                transformedAABB.extents = transformedAABB.extents * t.scale;
+
+                if (!VECTOR::IsOnFrustum(cameraFrustum, transformedAABB)) {
+                    return; // Skip rendering
+                }
+            }
+
+            m_RenderedEntities++;
             renderer->SubmitMesh(m.mesh.get(), r.material.get(), model);
         });
 
@@ -433,10 +454,24 @@ namespace Game {
             auto& m = m_Registry.GetComponent<VECTOR::ModelComponent>(entity);
             auto& r = m_Registry.GetComponent<VECTOR::RenderComponent>(entity);
 
+            m_TotalEntities++;
+
             glm::mat4 modelMatrix = glm::mat4(1.0f);
             modelMatrix = glm::translate(modelMatrix, t.position);
             modelMatrix = modelMatrix * glm::mat4_cast(t.rotation);
             modelMatrix = glm::scale(modelMatrix, t.scale);
+
+            // Simple culling for models (using an approximate AABB based on scale/position)
+            // Ideally Model would have a pre-calculated global AABB. We'll approximate one:
+            VECTOR::AABB approxAABB;
+            approxAABB.center = t.position;
+            approxAABB.extents = glm::vec3(1.5f) * t.scale; // rough estimate for the animation model
+            
+            if (!VECTOR::IsOnFrustum(cameraFrustum, approxAABB)) {
+                return; // Skip rendering
+            }
+
+            m_RenderedEntities++;
 
             const std::vector<glm::mat4>* boneTransforms = nullptr;
             if (m_Registry.HasComponent<VECTOR::SkeletalAnimationComponent>(entity)) {
@@ -534,6 +569,16 @@ namespace Game {
                 ImGui::Text("CPU Cores: %d", SDL_GetNumLogicalCPUCores());
                 ImGui::Text("System RAM: %d MB", SDL_GetSystemRAM());
             }
+
+            if (m_DebugMode) {
+            ImGui::Begin("Debug Info");
+            ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+            ImGui::Text("Player Pos: %.1f, %.1f, %.1f", camT.position.x, camT.position.y, camT.position.z);
+            ImGui::Text("Total Entities: %d", m_TotalEntities);
+            ImGui::Text("Rendered Entities: %d", m_RenderedEntities);
+            ImGui::Text("Culled Entities: %d", m_TotalEntities - m_RenderedEntities);
+            ImGui::End();
+        }
 
             if (m_CameraSystem && ImGui::CollapsingHeader("Player & Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
                 ImGui::Text("Position: X:%.2f, Y:%.2f, Z:%.2f", camT.position.x, camT.position.y, camT.position.z);

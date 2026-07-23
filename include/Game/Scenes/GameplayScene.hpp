@@ -67,5 +67,9 @@ namespace Game {
 
         // Unlit material for objects that shouldn't receive lighting (sun)
         std::shared_ptr<VECTOR::Material> m_UnlitMaterial;
+
+        // Frustum Culling Statistics
+        int m_TotalEntities = 0;
+        int m_RenderedEntities = 0;
     };
 }
