@@ -13,7 +13,6 @@ namespace VECTOR {
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
             VMA_MEMORY_USAGE_CPU_TO_GPU
         );
-        VECTOR_LOG_INFO("Created Vulkan Uniform Buffer (size: " + std::to_string(size) + " bytes)");
     }
 
     VulkanUniformBuffer::~VulkanUniformBuffer() {
@@ -24,7 +23,6 @@ namespace VECTOR {
         // If an offset is needed, we'd need a more advanced Map implementation, but right now
         // the engine only calls SetData with the full data and offset 0.
         if (offset != 0) {
-            VECTOR_LOG_ERROR("VulkanUniformBuffer::SetData with offset > 0 is not yet supported!");
             return;
         }
         m_Buffer->UploadData(data, size);

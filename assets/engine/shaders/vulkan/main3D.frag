@@ -4,7 +4,11 @@ layout (location = 1) in vec3 Normal;
 layout (location = 2) in vec2 TexCoords;
 layout (location = 3) in vec4 FragPosLightSpace;
 
+layout (location = 4) in vec4 CurrentClipPos;
+layout (location = 5) in vec4 PreviousClipPos;
+
 layout (location = 0) out vec4 FragColor;
+layout (location = 1) out vec2 OutVelocity;
 
 // Set 0: PerFrameData and LightData
 layout(set = 0, binding = 0) uniform PerFrameData {
@@ -17,6 +21,10 @@ layout(set = 0, binding = 0) uniform PerFrameData {
     vec4 lightPos;
     vec4 lightColor;
     int ssaoEnabled;
+    int padding;
+    vec2 jitter;
+    mat4 prevView;
+    mat4 prevProjection;
 } pfd;
 
 #define MAX_POINT_LIGHTS 64
@@ -233,4 +241,9 @@ void main() {
     vec3 color = ambient + Lo;
 
     FragColor = vec4(color, alpha);
+
+    // Calculate velocity
+    vec2 currentNDC = (CurrentClipPos.xy / CurrentClipPos.w) * 0.5 + 0.5;
+    vec2 previousNDC = (PreviousClipPos.xy / PreviousClipPos.w) * 0.5 + 0.5;
+    OutVelocity = currentNDC - previousNDC;
 }

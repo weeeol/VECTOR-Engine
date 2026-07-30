@@ -90,6 +90,9 @@ namespace VECTOR {
         virtual void SetSSAOEnabled(bool enabled) override { m_SSAOEnabled = enabled; }
         virtual bool IsSSAOEnabled() const override { return m_SSAOEnabled; }
 
+        virtual void SetTAAEnabled(bool enabled) override { m_TAAEnabled = enabled; }
+        virtual bool IsTAAEnabled() const override { return m_TAAEnabled; }
+
         struct RenderCommand {
             const Mesh* mesh;
             const Material* material;
@@ -129,6 +132,13 @@ namespace VECTOR {
         bool m_MainPassActive = false;
         glm::vec4 m_ClearColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
         ImFont* m_GameFont = nullptr;
+        
+        // TAA State
+        uint32_t m_TAAJitterIndex = 0;
+        glm::vec2 m_TAAJitter{0.0f, 0.0f};
+        glm::mat4 m_PrevView{1.0f};
+        glm::mat4 m_PrevProjection{1.0f};
+        bool m_TAAEnabled = true;
         
         std::vector<VkDescriptorSet> m_GlobalDescriptorSets;
         std::vector<std::unique_ptr<UniformBuffer>> m_PerFrameUBOs;

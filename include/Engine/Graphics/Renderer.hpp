@@ -69,6 +69,9 @@ namespace VECTOR {
         virtual void SetSSAOEnabled(bool enabled) {}
         virtual bool IsSSAOEnabled() const { return false; }
 
+        virtual void SetTAAEnabled(bool enabled) {}
+        virtual bool IsTAAEnabled() const { return false; }
+
         static std::unique_ptr<Renderer> Create();
     };
 

@@ -9,6 +9,8 @@ layout (location = 0) out vec3 FragPos;
 layout (location = 1) out vec3 Normal;
 layout (location = 2) out vec2 TexCoords;
 layout (location = 3) out vec4 FragPosLightSpace;
+layout (location = 4) out vec4 CurrentClipPos;
+layout (location = 5) out vec4 PreviousClipPos;
 
 layout(set = 0, binding = 0) uniform PerFrameData {
     mat4 view;
@@ -19,6 +21,11 @@ layout(set = 0, binding = 0) uniform PerFrameData {
     vec4 sunColor;
     vec4 lightPos;
     vec4 lightColor;
+    int ssaoEnabled;
+    int padding;
+    vec2 jitter;
+    mat4 prevView;
+    mat4 prevProjection;
 } pfd;
 
 layout(push_constant) uniform PushConstants {
@@ -62,5 +69,16 @@ void main() {
     Normal = mat3(transpose(inverse(pc.model))) * totalNormal;
     TexCoords = aTexCoords;
     FragPosLightSpace = pfd.lightSpaceMatrix * vec4(FragPos, 1.0);
+
+    // Remove jitter from projection matrix for the current position used for velocity calculation
+    mat4 unjitteredProj = pfd.projection;
+    unjitteredProj[2][0] -= pfd.jitter.x;
+    unjitteredProj[2][1] -= pfd.jitter.y;
+
+    CurrentClipPos = unjitteredProj * pfd.view * vec4(FragPos, 1.0);
+    // Since we don't have prevModel, we assume static for now or use current model. 
+    // For skinned meshes we should ideally use previous bone matrices, but we'll use current for simplicity unless added later.
+    PreviousClipPos = pfd.prevProjection * pfd.prevView * vec4(FragPos, 1.0);
+    
     gl_Position = pfd.projection * pfd.view * vec4(FragPos, 1.0);
 }

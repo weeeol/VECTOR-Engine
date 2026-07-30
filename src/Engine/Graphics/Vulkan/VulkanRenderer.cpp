@@ -265,6 +265,9 @@ namespace VECTOR {
         vkCmdEndRenderPass(commandBuffer);
         m_MainPassActive = false;
 
+        // 1.5 Process TAA
+        m_PostProcessor->ProcessTAA(commandBuffer, m_TAAEnabled);
+
         // 2. Render Bloom (does its own RenderPasses)
         m_PostProcessor->RenderBloom(commandBuffer);
 
@@ -556,18 +559,60 @@ namespace VECTOR {
         }
     }
 
+    namespace {
+        float Halton(int index, int base) {
+            float f = 1.0f;
+            float r = 0.0f;
+            int current = index;
+            while (current > 0) {
+                f = f / base;
+                r = r + f * (current % base);
+                current = current / base;
+            }
+            return r;
+        }
+    }
+
     void VulkanRenderer::SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) {
         if (!m_FrameStarted) BeginFrame();
+
+        m_PrevView = m_CachedView;
+        m_PrevProjection = m_CachedProjection;
 
         m_CachedView = view;
         m_CachedProjection = projection;
 
+        glm::mat4 jitteredProjection = projection;
+
+        if (m_TAAEnabled) {
+            m_TAAJitterIndex = (m_TAAJitterIndex + 1) % 16;
+            float jitterX = (Halton(m_TAAJitterIndex + 1, 2) - 0.5f);
+            float jitterY = (Halton(m_TAAJitterIndex + 1, 3) - 0.5f);
+
+            int width, height;
+            SDL_GetWindowSizeInPixels(m_Window, &width, &height);
+
+            m_TAAJitter = glm::vec2(jitterX * 2.0f / width, jitterY * 2.0f / height);
+
+            jitteredProjection[2][0] += m_TAAJitter.x;
+            jitteredProjection[2][1] += m_TAAJitter.y;
+        } else {
+            m_TAAJitter = glm::vec2(0.0f);
+        }
+
         PerFrameData data{};
         data.view = view;
-        data.projection = projection;
+        data.projection = jitteredProjection;
         // The Y axis is flipped in Vulkan clip space compared to OpenGL
         data.projection[1][1] *= -1.0f;
         
+        data.prevView = m_PrevView;
+        data.prevProjection = m_PrevProjection;
+        // If m_PrevProjection wasn't flipped, we flip it here:
+        data.prevProjection[1][1] *= -1.0f;
+        
+        data.jitter = m_TAAJitter;
+
         glm::vec3 sunDir = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.3f));
         glm::vec3 lightPos = sunDir * 80.0f;
         glm::mat4 lightProjection = glm::ortho(-60.0f, 60.0f, -60.0f, 60.0f, 1.0f, 150.0f);

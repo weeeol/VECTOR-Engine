@@ -211,8 +211,24 @@ namespace Game {
                 }
             ));
 
+            VECTOR::Entity taaBtn = m_UIRegistry.CreateEntity();
+            m_UIRegistry.AddComponent(taaBtn, VECTOR::UIRectComponent(startX, startY + 240, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
+            bool taaOn = VECTOR::Application::Get().GetRenderer()->IsTAAEnabled();
+            std::string taaTextStr = taaOn ? "TAA: ON" : "TAA: OFF";
+            m_UIRegistry.AddComponent(taaBtn, VECTOR::UITextComponent(taaTextStr, 24, glm::vec4(1.0f)));
+            auto& taaText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(taaBtn);
+            taaText.offsetX = (btnWidth / 2) - (taaTextStr.length() * 6);
+            taaText.offsetY = (btnHeight / 2) - 12;
+            m_UIRegistry.AddComponent(taaBtn, VECTOR::UIButtonComponent(
+                glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+                [this, taaOn]() {
+                    VECTOR::Application::Get().GetRenderer()->SetTAAEnabled(!taaOn);
+                    m_NeedsUIRefresh = true;
+                }
+            ));
+
             VECTOR::Entity backBtn = m_UIRegistry.CreateEntity();
-            m_UIRegistry.AddComponent(backBtn, VECTOR::UIRectComponent(startX, startY + 240, btnWidth, btnHeight, glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
+            m_UIRegistry.AddComponent(backBtn, VECTOR::UIRectComponent(startX, startY + 300, btnWidth, btnHeight, glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
             m_UIRegistry.AddComponent(backBtn, VECTOR::UITextComponent("Back", 24, glm::vec4(1.0f)));
             auto& bText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(backBtn);
             bText.offsetX = (btnWidth / 2) - (std::string("Back").length() * 6);

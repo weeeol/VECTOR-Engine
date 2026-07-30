@@ -47,6 +47,7 @@ namespace VECTOR {
         CreateNoiseTexture();
         
         m_UBO = std::make_unique<VulkanUniformBuffer>(sizeof(SSAOData), 0);
+        m_UBO->SetData(&m_SSAOData, sizeof(SSAOData), 0);
         
         CreateDescriptorSets();
         CreatePipelines();

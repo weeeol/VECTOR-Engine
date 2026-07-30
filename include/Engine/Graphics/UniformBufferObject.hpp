@@ -23,9 +23,12 @@ namespace VECTOR {
         glm::vec4 lightPos;          // offset 240, size 16  (vec3 + padding)
         glm::vec4 lightColor;        // offset 256, size 16  (vec3 + padding)
         int ssaoEnabled;             // offset 272, size 4
-        int padding[3];              // padding to 16 bytes for std140
+        int padding;                 // offset 276, size 4
+        glm::vec2 jitter;            // offset 280, size 8
+        glm::mat4 prevView;          // offset 288, size 64
+        glm::mat4 prevProjection;    // offset 352, size 64
     };
-    // Total: 272 bytes
+    // Total: 416 bytes
 
     #define MAX_POINT_LIGHTS 64
 

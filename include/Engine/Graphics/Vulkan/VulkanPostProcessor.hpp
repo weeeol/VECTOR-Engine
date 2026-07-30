@@ -27,6 +27,7 @@ namespace VECTOR {
         void Recreate(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass);
         
         // Call this during rendering
+        void ProcessTAA(VkCommandBuffer commandBuffer, bool taaEnabled);
         void RenderBloom(VkCommandBuffer commandBuffer);
         void RenderFinal(VkCommandBuffer commandBuffer, VkDescriptorSet globalSet, uint32_t currentFrame);
 
@@ -60,6 +61,10 @@ namespace VECTOR {
         VmaAllocation m_OffscreenColorAlloc = VK_NULL_HANDLE;
         VkImageView m_OffscreenColorView = VK_NULL_HANDLE;
         
+        VkImage m_OffscreenVelocityImage = VK_NULL_HANDLE;
+        VmaAllocation m_OffscreenVelocityAlloc = VK_NULL_HANDLE;
+        VkImageView m_OffscreenVelocityView = VK_NULL_HANDLE;
+        
         VkImage m_OffscreenDepthImage = VK_NULL_HANDLE;
         VmaAllocation m_OffscreenDepthAlloc = VK_NULL_HANDLE;
         VkImageView m_OffscreenDepthView = VK_NULL_HANDLE;
@@ -91,6 +96,20 @@ namespace VECTOR {
         std::vector<VkDescriptorSet> m_BloomDescriptorSets;
         
         VkSampler m_ColorSampler = VK_NULL_HANDLE;
+
+        // TAA History Buffers (Ping-Pong)
+        VkImage m_TAAHistoryImage[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+        VmaAllocation m_TAAHistoryAlloc[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+        VkImageView m_TAAHistoryView[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+        uint32_t m_TAAHistoryIndex = 0;
+
+        // TAA Pass
+        VkRenderPass m_TAARenderPass = VK_NULL_HANDLE;
+        VkFramebuffer m_TAAFramebuffer[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+        std::unique_ptr<VulkanPipeline> m_TAAPipeline;
+        VkPipelineLayout m_TAAPipelineLayout = VK_NULL_HANDLE;
+        VkDescriptorSetLayout m_TAASetLayout = VK_NULL_HANDLE;
+        VkDescriptorSet m_TAADescriptorSets[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
     };
 
 } // namespace VECTOR

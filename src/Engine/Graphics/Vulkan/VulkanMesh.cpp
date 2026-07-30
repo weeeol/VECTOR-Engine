@@ -7,13 +7,10 @@ namespace VECTOR {
 
     // Helper to upload via staging buffer
     static void UploadBufferData(VulkanBuffer& destBuffer, const void* data, size_t size) {
-        VECTOR_LOG_INFO("UploadBufferData: Allocating staging buffer...");
         VulkanBuffer stagingBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
-        VECTOR_LOG_INFO("UploadBufferData: Uploading data to staging buffer...");
         stagingBuffer.UploadData(data, size);
 
         VkDevice device = VulkanContext::Get()->GetDevice();
-        VECTOR_LOG_INFO("UploadBufferData: Creating command pool...");
         VkCommandPool tempPool;
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -21,7 +18,6 @@ namespace VECTOR {
         poolInfo.queueFamilyIndex = VulkanContext::Get()->GetGraphicsQueueFamilyIndex();
         vkCreateCommandPool(device, &poolInfo, nullptr, &tempPool);
 
-        VECTOR_LOG_INFO("UploadBufferData: Allocating command buffer...");
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -31,7 +27,6 @@ namespace VECTOR {
         VkCommandBuffer cmd;
         vkAllocateCommandBuffers(device, &allocInfo, &cmd);
 
-        VECTOR_LOG_INFO("UploadBufferData: Recording command buffer...");
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -43,7 +38,6 @@ namespace VECTOR {
 
         vkEndCommandBuffer(cmd);
 
-        VECTOR_LOG_INFO("UploadBufferData: Submitting to queue...");
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.commandBufferCount = 1;
@@ -54,14 +48,11 @@ namespace VECTOR {
             std::lock_guard<std::mutex> lock(VulkanContext::Get()->GetGraphicsQueueMutex());
             vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
             
-            VECTOR_LOG_INFO("UploadBufferData: Waiting for queue idle...");
             vkQueueWaitIdle(graphicsQueue); // Wait for transfer to complete
         }
 
-        VECTOR_LOG_INFO("UploadBufferData: Freeing resources...");
         vkFreeCommandBuffers(device, tempPool, 1, &cmd);
         vkDestroyCommandPool(device, tempPool, nullptr);
-        VECTOR_LOG_INFO("UploadBufferData: Done!");
     }
 
     VulkanMesh::VulkanMesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices) 

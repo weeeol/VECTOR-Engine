@@ -138,7 +138,17 @@ namespace Game {
             }
         );
 
-        CreateButtonEntity(startX, startY + 240, btnWidth, btnHeight, "Back", 
+        bool taaOn = VECTOR::Application::Get().GetRenderer()->IsTAAEnabled();
+        std::string taaTextStr = taaOn ? "TAA: ON" : "TAA: OFF";
+        CreateButtonEntity(startX, startY + 240, btnWidth, btnHeight, taaTextStr, 
+            glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
+            [this, taaOn]() { 
+                VECTOR::Application::Get().GetRenderer()->SetTAAEnabled(!taaOn); 
+                m_NeedsUIRefresh = true;
+            }
+        );
+
+        CreateButtonEntity(startX, startY + 300, btnWidth, btnHeight, "Back", 
             glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(200/255.0f, 100/255.0f, 100/255.0f, 1.0f),
             [this]() {
                 m_State = MainMenuState::Main;
