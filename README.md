@@ -1,6 +1,6 @@
 <div align="center">
   
-  <h1 align="center">VECTOR Engine & Pong </h1>
+  <h1 align="center">VECTOR Engine & FPS </h1>
   <p align="center">
     <strong>Velocity Engine for C++ Texturing and Object Rendering</strong>
   </p>
@@ -56,11 +56,13 @@ Ensure you have the following installed before building:
 
 | Action | Key |
 | :--- | :--- |
-| **Player 1** | `W` (Up) and `S` (Down) |
-| **Player 2** | *Controlled by AI* 🤖 |
+| **Movement** | `W` `A` `S` `D` |
+| **Look Around** | `Mouse` 🖱️ |
+| **Jump** | `Space` |
+| **Shoot** | `Left Click` 🖱️ |
+| **Adjust FOV** | `Up` / `Down` Arrows |
 | **Pause** | `P` or `ESC` |
 | **Toggle Debug UI** | `F3` |
-| **UI Interaction** | `Mouse` 🖱️ (Select Game Mode, Select Difficulty, Adjust Settings) |
 
 ---
 
