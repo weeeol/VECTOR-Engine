@@ -27,7 +27,23 @@ vec3 YCoCgToRGB(vec3 ycocg) {
 
 void main() {
     vec3 currentColor = texture(currentColorMap, TexCoords).rgb;
+    // Velocity Dilation: Find the longest velocity vector in the 3x3 neighborhood
+    // This pushes the foreground velocity outward to prevent background bleeding
+    vec2 texelSize = 1.0 / textureSize(currentColorMap, 0);
     vec2 velocity = texture(velocityMap, TexCoords).xy;
+    float maxVelocitySq = dot(velocity, velocity);
+
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            if (x == 0 && y == 0) continue;
+            vec2 v = texture(velocityMap, TexCoords + vec2(x, y) * texelSize).xy;
+            float vSq = dot(v, v);
+            if (vSq > maxVelocitySq) {
+                maxVelocitySq = vSq;
+                velocity = v;
+            }
+        }
+    }
 
     vec2 historyTexCoords = TexCoords - velocity;
 
@@ -40,7 +56,6 @@ void main() {
     vec3 historyColor = texture(historyColorMap, historyTexCoords).rgb;
 
     // Neighborhood Clipping (AABB around current color)
-    vec2 texelSize = 1.0 / textureSize(currentColorMap, 0);
     vec3 minColor = currentColor;
     vec3 maxColor = currentColor;
 
@@ -53,15 +68,17 @@ void main() {
         }
     }
 
-    // Clip history color to bounding box of 3x3 neighborhood
-    // Convert to YCoCg for better clipping
-    vec3 historyYCoCg = RGBToYCoCg(historyColor);
-    vec3 currentYCoCg = RGBToYCoCg(currentColor);
-    vec3 minYCoCg = RGBToYCoCg(minColor);
-    vec3 maxYCoCg = RGBToYCoCg(maxColor);
+    // Clip history color to bounding box of 3x3 neighborhood using ClipAABB
+    vec3 p_clip = 0.5 * (maxColor + minColor);
+    vec3 e_clip = 0.5 * (maxColor - minColor) + 0.0001; // add epsilon to prevent division by zero
+    vec3 v_clip = historyColor - p_clip;
+    vec3 v_unit = v_clip / e_clip;
+    vec3 a_unit = abs(v_unit);
+    float ma_unit = max(a_unit.x, max(a_unit.y, a_unit.z));
 
-    historyYCoCg = clamp(historyYCoCg, minYCoCg, maxYCoCg);
-    historyColor = YCoCgToRGB(historyYCoCg);
+    if (ma_unit > 1.0) {
+        historyColor = p_clip + v_clip / ma_unit;
+    }
 
     // Dynamic blend factor based on velocity
     float velocityLength = length(velocity);
