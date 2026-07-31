@@ -3,6 +3,7 @@
 #include "Engine/Core/Logger.hpp"
 #include <fstream>
 #include <iostream>
+#include <cstdlib>
 
 namespace VECTOR {
 
@@ -21,7 +22,12 @@ namespace VECTOR {
             if (pos != std::string::npos) {
                 vPath.replace(pos, 8, "shaders/vulkan/");
             }
+            std::string sourcePath = vPath;
             vPath += ".spv";
+            std::string command = "glslc \"" + sourcePath + "\" -o \"" + vPath + "\"";
+            if (std::system(command.c_str()) != 0) {
+                VECTOR_LOG_ERROR("Failed to compile shader at runtime: " + sourcePath);
+            }
         }
         
         if (fPath.find(".spv") == std::string::npos) {
@@ -29,7 +35,12 @@ namespace VECTOR {
             if (pos != std::string::npos) {
                 fPath.replace(pos, 8, "shaders/vulkan/");
             }
+            std::string sourcePath = fPath;
             fPath += ".spv";
+            std::string command = "glslc \"" + sourcePath + "\" -o \"" + fPath + "\"";
+            if (std::system(command.c_str()) != 0) {
+                VECTOR_LOG_ERROR("Failed to compile shader at runtime: " + sourcePath);
+            }
         }
 
         auto vertCode = ReadFile(vPath);

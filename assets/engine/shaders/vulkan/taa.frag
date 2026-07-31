@@ -55,14 +55,17 @@ void main() {
 
     vec3 historyColor = texture(historyColorMap, historyTexCoords).rgb;
 
-    // Neighborhood Clipping (AABB around current color)
-    vec3 minColor = currentColor;
-    vec3 maxColor = currentColor;
+    vec3 currentYCoCg = RGBToYCoCg(currentColor);
+    vec3 historyYCoCg = RGBToYCoCg(historyColor);
+
+    // Neighborhood Clipping (AABB around current color) in YCoCg space
+    vec3 minColor = currentYCoCg;
+    vec3 maxColor = currentYCoCg;
 
     for (int y = -1; y <= 1; ++y) {
         for (int x = -1; x <= 1; ++x) {
             if (x == 0 && y == 0) continue;
-            vec3 neighbor = texture(currentColorMap, TexCoords + vec2(x, y) * texelSize).rgb;
+            vec3 neighbor = RGBToYCoCg(texture(currentColorMap, TexCoords + vec2(x, y) * texelSize).rgb);
             minColor = min(minColor, neighbor);
             maxColor = max(maxColor, neighbor);
         }
@@ -71,14 +74,16 @@ void main() {
     // Clip history color to bounding box of 3x3 neighborhood using ClipAABB
     vec3 p_clip = 0.5 * (maxColor + minColor);
     vec3 e_clip = 0.5 * (maxColor - minColor) + 0.0001; // add epsilon to prevent division by zero
-    vec3 v_clip = historyColor - p_clip;
+    vec3 v_clip = historyYCoCg - p_clip;
     vec3 v_unit = v_clip / e_clip;
     vec3 a_unit = abs(v_unit);
     float ma_unit = max(a_unit.x, max(a_unit.y, a_unit.z));
 
     if (ma_unit > 1.0) {
-        historyColor = p_clip + v_clip / ma_unit;
+        historyYCoCg = p_clip + v_clip / ma_unit;
     }
+
+    historyColor = YCoCgToRGB(historyYCoCg);
 
     // Dynamic blend factor based on velocity
     float velocityLength = length(velocity);

@@ -72,6 +72,10 @@ namespace VECTOR {
 
         PipelineConfigInfo pipelineConfig{};
         VulkanPipeline::DefaultPipelineConfigInfo(pipelineConfig);
+        
+        VkPipelineColorBlendAttachmentState velocityBlendAttachment = pipelineConfig.colorBlendAttachments[0];
+        pipelineConfig.colorBlendAttachments.push_back(velocityBlendAttachment);
+        
         pipelineConfig.renderPass = m_PostProcessor->GetOffscreenRenderPass();
         pipelineConfig.pipelineLayout = m_DescriptorManager->GetPipelineLayout();
         
@@ -85,6 +89,7 @@ namespace VECTOR {
         skyboxConfig.depthStencilInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
         skyboxConfig.depthStencilInfo.depthWriteEnable = VK_FALSE;
         skyboxConfig.rasterizationInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
+        skyboxConfig.emptyVertexInput = true;
         m_SkyboxPipeline = std::make_unique<VulkanPipeline>("assets/engine/shaders/vulkan/skybox.vert.spv", "assets/engine/shaders/vulkan/skybox.frag.spv", skyboxConfig);
 
         // Create Descriptor Pool for ImGui
@@ -837,9 +842,10 @@ namespace VECTOR {
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = m_Swapchain->GetExtent();
         
-        std::vector<VkClearValue> clearValues(2);
+        std::vector<VkClearValue> clearValues(3);
         clearValues[0].color = {{m_ClearColor.r, m_ClearColor.g, m_ClearColor.b, m_ClearColor.a}};
-        clearValues[1].depthStencil = {1.0f, 0};
+        clearValues[1].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+        clearValues[2].depthStencil = {1.0f, 0};
         
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();

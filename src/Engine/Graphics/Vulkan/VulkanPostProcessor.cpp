@@ -442,26 +442,26 @@ namespace VECTOR {
         
         // 1. Create Offscreen Color Image
         CreateImage(m_Width, m_Height, VK_FORMAT_R16G16B16A16_SFLOAT,
-                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                     m_OffscreenColorImage, m_OffscreenColorAlloc);
         m_OffscreenColorView = CreateImageView(m_OffscreenColorImage, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
         
         // 1.5 Create Offscreen Velocity Image
         CreateImage(m_Width, m_Height, VK_FORMAT_R16G16_SFLOAT,
-                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                     m_OffscreenVelocityImage, m_OffscreenVelocityAlloc);
         m_OffscreenVelocityView = CreateImageView(m_OffscreenVelocityImage, VK_FORMAT_R16G16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
         
         // 2. Create Offscreen Depth Image
         CreateImage(m_Width, m_Height, VK_FORMAT_D32_SFLOAT,
-                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                     m_OffscreenDepthImage, m_OffscreenDepthAlloc);
         m_OffscreenDepthView = CreateImageView(m_OffscreenDepthImage, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
 
         // 2.5 Create TAA History Images
         for (int i = 0; i < 2; i++) {
             CreateImage(m_Width, m_Height, VK_FORMAT_R16G16B16A16_SFLOAT,
-                        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                         m_TAAHistoryImage[i], m_TAAHistoryAlloc[i]);
             m_TAAHistoryView[i] = CreateImageView(m_TAAHistoryImage[i], VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
         }
@@ -910,6 +910,27 @@ namespace VECTOR {
     
     void VulkanPostProcessor::ProcessTAA(VkCommandBuffer commandBuffer, bool taaEnabled) {
         if (!taaEnabled) return;
+        
+        if (m_FirstTAAFrame) {
+            VkImageMemoryBarrier barriers[2] = {};
+            for (int i = 0; i < 2; i++) {
+                barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                barriers[i].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barriers[i].image = m_TAAHistoryImage[i];
+                barriers[i].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                barriers[i].subresourceRange.baseMipLevel = 0;
+                barriers[i].subresourceRange.levelCount = 1;
+                barriers[i].subresourceRange.baseArrayLayer = 0;
+                barriers[i].subresourceRange.layerCount = 1;
+                barriers[i].srcAccessMask = 0;
+                barriers[i].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            }
+            vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 2, barriers);
+            m_FirstTAAFrame = false;
+        }
 
         m_TAAPipeline->Bind(commandBuffer);
 

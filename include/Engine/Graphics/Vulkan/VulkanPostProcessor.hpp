@@ -102,6 +102,7 @@ namespace VECTOR {
         VmaAllocation m_TAAHistoryAlloc[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
         VkImageView m_TAAHistoryView[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
         uint32_t m_TAAHistoryIndex = 0;
+        bool m_FirstTAAFrame = true;
 
         // TAA Pass
         VkRenderPass m_TAARenderPass = VK_NULL_HANDLE;
