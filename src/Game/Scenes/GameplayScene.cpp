@@ -20,7 +20,7 @@
 #include "Engine/Graphics/SkeletalAnimator.hpp"
 #include "Engine/Graphics/Shader.hpp"
 #include "Engine/Graphics/Texture2D.hpp"
-#include "Engine/Graphics/Vulkan/VulkanCubemap.hpp"
+#include "Engine/Graphics/Cubemap.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include "Game/Systems/ShootingSystem.hpp"
 #include "Engine/Graphics/Frustum.hpp"
@@ -298,13 +298,9 @@ namespace Game {
             "assets/sky_top.hdr", "assets/sky_bottom.hdr",
             "assets/sky_front.hdr", "assets/sky_back.hdr"
         };
-        if (VECTOR::RendererAPI::GetAPI() == VECTOR::RendererAPI::API::Vulkan) {
-            auto skybox = std::make_shared<VECTOR::VulkanCubemap>(skyboxFaces);
-            VECTOR::Application::Get().GetRenderer()->SubmitSkybox(skybox.get());
-            // Store skybox to keep it alive
-            m_Skybox = skybox;
-        }
-        
+        auto skybox = VECTOR::Cubemap::Create(skyboxFaces);
+        VECTOR::Application::Get().GetRenderer()->SubmitSkybox(skybox.get());
+        m_Skybox = skybox;
         // Load dae model
         VECTOR::Entity animatedEntity = m_Registry.CreateEntity();
         m_Registry.AddComponent(animatedEntity, VECTOR::TransformComponent{glm::vec3(0.0f, 0.0f, -5.0f), glm::quat(glm::vec3(0, 0, 0)), glm::vec3(1.0f)});
@@ -460,6 +456,10 @@ namespace Game {
         
         renderer->SetViewProjection(camT.position, view, projection);
         
+        renderer->Clear(220, 230, 240); // Very light, whitish sky blue
+
+        m_RenderedEntities = 0;
+        
         if (m_Skybox) {
             renderer->SubmitSkybox(m_Skybox.get());
         }
@@ -547,17 +547,7 @@ namespace Game {
             }
         });
 
-        // Submit the sun (unlit)
-        glm::mat4 sunModel = glm::mat4(1.0f);
-        sunModel = glm::translate(sunModel, sunDir * 80.0f);
-        sunModel = glm::scale(sunModel, glm::vec3(10.0f, 10.0f, 10.0f));
-        
-        VECTOR::Material sunMat;
-        sunMat.isUnlit = true;
-        sunMat.albedoColor = glm::vec4(3.0f, 3.0f, 2.4f, 1.0f);
-        sunMat.shader = VECTOR::ResourceManager::Get().GetShader("Default3D");
-        // It will be drawn in the main pass
-        renderer->SubmitMesh(m_CubeMesh.get(), &sunMat, sunModel);
+        // The sun is now drawn procedurally in the skybox shader!
 
         // PASS 1: SHADOW MAP
         renderer->BeginShadowPass();
@@ -569,7 +559,6 @@ namespace Game {
 
         // PASS 2: MAIN POST-PROCESS FBO
         renderer->BeginMainPass();
-        renderer->Clear(135, 206, 235); // Sky blue
         
         renderer->SetWireframeMode(m_DebugMode);
 

@@ -26,6 +26,9 @@ find_package(Vulkan REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(directx-headers CONFIG REQUIRED)
+find_package(directx-dxc CONFIG REQUIRED)
+find_package(D3D12MemoryAllocator CONFIG REQUIRED)
 set(VECTOR_SOURCES
     src/Engine/Core/Application.cpp
     src/Engine/Core/Logger.cpp
@@ -41,6 +44,7 @@ set(VECTOR_SOURCES
     src/Engine/Graphics/Bone.cpp
     src/Engine/Graphics/SkeletalAnimator.cpp
     src/Engine/Graphics/Texture2D.cpp
+    src/Engine/Graphics/Cubemap.cpp
     src/Engine/Graphics/Frustum.cpp
     src/Engine/Graphics/Material.cpp
     src/Engine/Graphics/RenderQueue.cpp
@@ -71,12 +75,27 @@ set(VECTOR_SOURCES
     src/Engine/Physics/BulletPhysicsSystem.cpp
     src/Engine/UI/UISystem.cpp
     src/Engine/Scene/SceneSerializer.cpp
+    src/Engine/Graphics/DirectX12/DirectX12Context.cpp
+    src/Engine/Graphics/DirectX12/DirectX12Swapchain.cpp
+    src/Engine/Graphics/DirectX12/DirectX12Renderer.cpp
+    src/Engine/Graphics/DirectX12/DirectX12DescriptorManager.cpp
+    src/Engine/Graphics/DirectX12/DirectX12Buffer.cpp
+    src/Engine/Graphics/DirectX12/DirectX12UniformBuffer.cpp
+    src/Engine/Graphics/DirectX12/DirectX12Texture2D.cpp
+    src/Engine/Graphics/DirectX12/DirectX12Cubemap.cpp
+    src/Engine/Graphics/DirectX12/DirectX12Shader.cpp
+    src/Engine/Graphics/DirectX12/DirectX12Pipeline.cpp
+    src/Engine/Graphics/DirectX12/DirectX12Prepass.cpp
+    src/Engine/Graphics/DirectX12/DirectX12ShadowPass.cpp
+    src/Engine/Graphics/DirectX12/DirectX12SSAO.cpp
+    src/Engine/Graphics/DirectX12/DirectX12PostProcessor.cpp
+    src/Engine/Graphics/DirectX12/DirectX12Mesh.cpp
 )
 
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
 target_include_directories(VECTOR PUBLIC include src ${VECTOR_SDL_INCLUDES} ${BULLET_ROOT_DIR}/${BULLET_INCLUDE_DIRS})
 target_link_directories(VECTOR PUBLIC ${BULLET_ROOT_DIR}/${BULLET_LIBRARY_DIRS})
-target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES} imgui::imgui Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator assimp::assimp nlohmann_json::nlohmann_json)
+target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES} imgui::imgui Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator assimp::assimp nlohmann_json::nlohmann_json Microsoft::DirectX-Headers Microsoft::DirectXShaderCompiler GPUOpen::D3D12MemoryAllocator d3d12.lib dxgi.lib dxguid.lib)
 
 # ==============================================================================
 # PONG GAME EXECUTABLE

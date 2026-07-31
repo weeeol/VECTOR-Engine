@@ -7,7 +7,7 @@ namespace VECTOR {
     class RendererAPI {
     public:
         enum class API {
-            None = 0, OpenGL = 1, Vulkan = 2
+            None = 0, OpenGL = 1, Vulkan = 2, DirectX12 = 3
         };
 
         inline static API GetAPI() { return s_API; }

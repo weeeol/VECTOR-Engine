@@ -14,6 +14,9 @@ int main(int argc, char* argv[]) {
         } else if (arg == "--vulkan") {
             VECTOR::RendererAPI::SetAPI(VECTOR::RendererAPI::API::Vulkan);
             std::cout << "Command Line: Forcing Vulkan Backend" << std::endl;
+        } else if (arg == "--dx12" || arg == "--directx12") {
+            VECTOR::RendererAPI::SetAPI(VECTOR::RendererAPI::API::DirectX12);
+            std::cout << "Command Line: Forcing DirectX 12 Backend" << std::endl;
         }
     }
 

@@ -6,11 +6,15 @@
 #include <fstream>
 #include <sstream>
 
+#include "Engine/Graphics/DirectX12/DirectX12Shader.hpp"
+
 namespace VECTOR {
 
     std::shared_ptr<Shader> Shader::CreateFromFile(const std::string& vertexPath, const std::string& fragmentPath) {
         if (RendererAPI::GetAPI() == RendererAPI::API::Vulkan) {
             return std::make_shared<VulkanShader>(vertexPath, fragmentPath);
+        } else if (RendererAPI::GetAPI() == RendererAPI::API::DirectX12) {
+            return std::make_shared<DirectX12Shader>(vertexPath, fragmentPath);
         }
 
         std::string vertexCode;

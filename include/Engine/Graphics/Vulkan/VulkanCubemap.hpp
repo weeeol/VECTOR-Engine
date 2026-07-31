@@ -3,10 +3,11 @@
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <vector>
+#include "Engine/Graphics/Cubemap.hpp"
 
 namespace VECTOR {
 
-    class VulkanCubemap {
+    class VulkanCubemap : public Cubemap {
     public:
         // Loads 6 separate HDR faces for the cubemap.
         // Order: Right, Left, Top, Bottom, Front, Back

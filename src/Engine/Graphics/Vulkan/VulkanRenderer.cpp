@@ -720,8 +720,8 @@ namespace VECTOR {
         // UI rendering handled by ImGui
     }
 
-    void VulkanRenderer::SubmitSkybox(VulkanCubemap* cubemap) {
-        m_CurrentSkybox = cubemap;
+    void VulkanRenderer::SubmitSkybox(Cubemap* cubemap) {
+        m_CurrentSkybox = dynamic_cast<VulkanCubemap*>(cubemap);
     }
 
     void VulkanRenderer::BeginImGuiFrame() {

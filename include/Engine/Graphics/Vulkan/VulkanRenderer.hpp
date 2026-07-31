@@ -55,7 +55,7 @@ namespace VECTOR {
         virtual void SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) override;
         virtual void SetDirectionalLight(const glm::vec3& direction, const glm::vec3& color, float intensity) override;
 
-        virtual void SubmitSkybox(class VulkanCubemap* cubemap) override;
+        virtual void SubmitSkybox(class Cubemap* cubemap) override;
 
         virtual void BeginUI() override;
         virtual void DrawUIRect(int x, int y, int w, int h, const glm::vec4& color) override;

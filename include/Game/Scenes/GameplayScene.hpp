@@ -13,7 +13,7 @@
 namespace VECTOR {
     class InputManager;
     class Material;
-    class VulkanCubemap;
+    class Cubemap;
 }
 
 namespace Game {
@@ -60,7 +60,7 @@ namespace Game {
         bool m_WasOPressed = false;
         bool m_NeedsUIRefresh = false;
         
-        std::shared_ptr<VECTOR::VulkanCubemap> m_Skybox;
+        std::shared_ptr<VECTOR::Cubemap> m_Skybox;
         
         bool m_DebugMode = false;
         bool m_WasF3Pressed = false;
