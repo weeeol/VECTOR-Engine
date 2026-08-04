@@ -59,17 +59,23 @@ namespace VECTOR {
         
         virtual void BeginMainPass() override;
         virtual void FlushMainPass() override;
-        virtual void EndPostProcessPass() override {}
+        virtual void EndPostProcessPass() override;
 
-        virtual const glm::mat4& GetLightSpaceMatrix() const override { return m_DummyMatrix; }
+        virtual const glm::mat4& GetLightSpaceMatrix() const override { return m_LightSpaceMatrix; }
         virtual Shader* GetDepthShader() const override { return nullptr; }
         virtual Material* GetDefaultMaterial() const override { return nullptr; }
         virtual void SetUnlitMode(bool unlit) override {}
         
-        virtual void SetWireframeMode(bool enabled) override { m_WireframeMode = enabled; }
+        virtual void SetWireframeMode(bool enabled) override;
         virtual std::string GetRendererInfo() const override { return "DirectX 12 Renderer"; }
 
         virtual uint32_t GetDrawCallCount() const override { return 0; }
+
+        virtual void SetSSAOEnabled(bool enabled) override { m_SSAOEnabled = enabled; }
+        virtual bool IsSSAOEnabled() const override { return m_SSAOEnabled; }
+
+        virtual void SetBloomEnabled(bool enabled) override;
+        virtual bool IsBloomEnabled() const override;
 
         // Transition helper utilizing Enhanced Barriers if available, or fallback to legacy
         void TransitionResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList7> cmdList, ID3D12Resource* resource, D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter);
@@ -132,6 +138,7 @@ namespace VECTOR {
         std::unique_ptr<DirectX12ShadowPass> m_ShadowPass;
         std::unique_ptr<DirectX12Prepass> m_Prepass;
         std::unique_ptr<DirectX12SSAO> m_SSAO;
+        std::unique_ptr<class DirectX12PostProcessor> m_PostProcessor;
         class DirectX12Cubemap* m_CurrentSkybox = nullptr;
         glm::mat4 m_LightSpaceMatrix = glm::mat4(1.0f);
 
@@ -143,6 +150,7 @@ namespace VECTOR {
         glm::mat4 m_CurrentProjection = glm::mat4(1.0f);
         bool m_FrameStarted = false;
         bool m_WireframeMode = false;
+        bool m_SSAOEnabled = true;
         ImFont* m_GameFont = nullptr;
         std::unique_ptr<DirectX12Pipeline> m_WireframePipeline;
     };

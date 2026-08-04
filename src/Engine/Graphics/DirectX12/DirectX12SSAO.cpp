@@ -213,6 +213,7 @@ namespace VECTOR {
         config.rtvFormats[0] = DXGI_FORMAT_R8_UNORM;
         config.isDepthOnly = false;
         config.dsvFormat = DXGI_FORMAT_UNKNOWN; // No depth buffer for fullscreen pass
+        config.emptyInputLayout = true;
 
         auto ssaoShader = ResourceManager::Get().LoadShader("SSAO", "assets/engine/shaders/dx12/fullscreen.hlsl", "assets/engine/shaders/dx12/ssao.hlsl");
         m_SSAOPipeline = std::make_unique<DirectX12Pipeline>(dynamic_cast<DirectX12Shader*>(ssaoShader.get()), config);

@@ -17,8 +17,7 @@ set(VECTOR_SDL_LIBS
 )
 set(VECTOR_SDL_INCLUDES "")
 
-find_package(OpenGL REQUIRED)
-find_package(GLEW REQUIRED)
+
 find_package(glm CONFIG REQUIRED)
 find_package(Bullet CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
@@ -49,11 +48,7 @@ set(VECTOR_SOURCES
     src/Engine/Graphics/Material.cpp
     src/Engine/Graphics/RenderQueue.cpp
     src/Engine/Graphics/UniformBufferObject.cpp
-    src/Engine/Graphics/OpenGL/OpenGLTexture2D.cpp
-    src/Engine/Graphics/OpenGL/OpenGLShader.cpp
-    src/Engine/Graphics/OpenGL/OpenGLMesh.cpp
-    src/Engine/Graphics/OpenGL/OpenGLUniformBuffer.cpp
-    src/Engine/Graphics/OpenGL/OpenGLRenderer.cpp
+
     src/Engine/Graphics/Vulkan/VulkanRenderer.cpp
     src/Engine/Graphics/Vulkan/VulkanDescriptorManager.cpp
     src/Engine/Graphics/Vulkan/VulkanShadowPass.cpp
@@ -95,7 +90,7 @@ set(VECTOR_SOURCES
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
 target_include_directories(VECTOR PUBLIC include src ${VECTOR_SDL_INCLUDES} ${BULLET_ROOT_DIR}/${BULLET_INCLUDE_DIRS})
 target_link_directories(VECTOR PUBLIC ${BULLET_ROOT_DIR}/${BULLET_LIBRARY_DIRS})
-target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} OpenGL::GL GLEW::GLEW glm::glm ${BULLET_LIBRARIES} imgui::imgui Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator assimp::assimp nlohmann_json::nlohmann_json Microsoft::DirectX-Headers Microsoft::DirectXShaderCompiler GPUOpen::D3D12MemoryAllocator d3d12.lib dxgi.lib dxguid.lib)
+target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} glm::glm ${BULLET_LIBRARIES} imgui::imgui Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator assimp::assimp nlohmann_json::nlohmann_json Microsoft::DirectX-Headers Microsoft::DirectXShaderCompiler GPUOpen::D3D12MemoryAllocator d3d12.lib dxgi.lib dxguid.lib)
 
 # ==============================================================================
 # PONG GAME EXECUTABLE

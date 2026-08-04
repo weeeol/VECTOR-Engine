@@ -30,7 +30,7 @@ float3 ReconstructViewPosition(float2 texCoords, float depth) {
         1.0f
     );
     
-    float4 viewPos = mul(ndc, ssaoData.invProjection);
+    float4 viewPos = mul(ssaoData.invProjection, ndc);
     return viewPos.xyz / viewPos.w;
 }
 
@@ -68,7 +68,7 @@ float4 PSMain(VSOutput input) : SV_Target {
         
         // project sample position
         float4 offset = float4(samplePos, 1.0f);
-        offset = mul(offset, ssaoData.projection); // view to clip
+        offset = mul(ssaoData.projection, offset); // view to clip
         offset.xyz /= offset.w; // perspective divide
         
         // clip to texcoord

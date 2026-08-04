@@ -40,12 +40,18 @@ struct PerObjectData {
 
 struct MaterialData {
     float4 albedoColor;
-    float specularStrength;
-    float shininess;
+    int hasAlbedoMap;
+    int hasNormalMap;
+    int hasMetallicRoughnessMap;
+    int hasAOMap;
+    float metallicFactor;
+    float roughnessFactor;
     int isUnlit;
-    int hasTexture;
-    int diffuseTextureIndex;
-    int padding[3];
+    int padding;
+    int albedoMapIndex;
+    int normalMapIndex;
+    int metallicRoughnessMapIndex;
+    int aoMapIndex;
 };
 
 ConstantBuffer<PerFrameData> pfd : register(b0);
@@ -139,81 +145,163 @@ float ShadowCalculation(float4 fragPosLightSpace, float3 normal, float3 lightDir
     return 1.0f - shadow;
 }
 
-float3 CalcDirectionalLight(DirectionalLightData light, float3 normal, float3 viewDir, float matSpecStr, float matShininess, float4 fragPosLightSpace) {
-    float3 lightDir = normalize(-light.direction.xyz);
-    float3 lightColor = light.colorAndIntensity.xyz * light.colorAndIntensity.w;
-    
-    float diff = max(dot(normal, lightDir), 0.0f);
-    
-    float3 halfwayDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(normal, halfwayDir), 0.0f), matShininess);
-    
-    float3 diffuse = diff * lightColor;
-    float3 specular = matSpecStr * spec * lightColor;
-    
-    float shadow = ShadowCalculation(fragPosLightSpace, normal, lightDir);
-    
-    return (1.0f - shadow) * (diffuse + specular);
+static const float PI = 3.14159265359f;
+
+float DistributionGGX(float3 N, float3 H, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0f);
+    float NdotH2 = NdotH * NdotH;
+
+    float num = a2;
+    float denom = (NdotH2 * (a2 - 1.0f) + 1.0f);
+    denom = PI * denom * denom;
+
+    return num / denom;
 }
 
-float3 CalcPointLight(PointLightData light, float3 normal, float3 viewDir, float matSpecStr, float matShininess, float3 fragPos) {
-    float3 lightDir = normalize(light.positionAndRadius.xyz - fragPos);
-    float3 lightColor = light.colorAndIntensity.xyz * light.colorAndIntensity.w;
-    float radius = light.positionAndRadius.w;
-    
-    float diff = max(dot(normal, lightDir), 0.0f);
-    
-    float3 halfwayDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(normal, halfwayDir), 0.0f), matShininess);
-    
-    float distance = length(light.positionAndRadius.xyz - fragPos);
-    if(distance > radius) return float3(0.0f, 0.0f, 0.0f);
-    
-    float attenuation = pow(max(1.0f - (distance / radius), 0.0f), 2.0f);
-    
-    float3 diffuse = diff * lightColor;
-    float3 specular = matSpecStr * spec * lightColor;
-    
-    return (diffuse + specular) * attenuation;
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0f);
+    float k = (r * r) / 8.0f;
+
+    float num = NdotV;
+    float denom = NdotV * (1.0f - k) + k;
+
+    return num / denom;
+}
+
+float GeometrySmith(float3 N, float3 V, float3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0f);
+    float NdotL = max(dot(N, L), 0.0f);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+
+float3 fresnelSchlick(float cosTheta, float3 F0) {
+    return F0 + (1.0f - F0) * pow(clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
+}
+
+float3 getNormalFromMap(float3 fragNormal, float2 texCoords, float3 fragPos) {
+    Texture2D normalMapTex = ResourceDescriptorHeap[material.normalMapIndex];
+    float3 tangentNormal = normalMapTex.Sample(defaultSampler, texCoords).xyz * 2.0f - 1.0f;
+
+    float3 Q1  = ddx(fragPos);
+    float3 Q2  = ddy(fragPos);
+    float2 st1 = ddx(texCoords);
+    float2 st2 = ddy(texCoords);
+
+    float3 N   = normalize(fragNormal);
+    float3 T   = normalize(Q1 * st2.y - Q2 * st1.y);
+    float3 B   = -normalize(cross(N, T));
+    float3x3 TBN = float3x3(T, B, N);
+
+    return normalize(mul(tangentNormal, TBN)); // In HLSL, vector * matrix or mul(vec, mat). Actually it's TBN is column vectors.
+    // wait! T, B, N are rows in TBN if float3x3(T, B, N). So we should mul(tangentNormal, TBN).
 }
 
 float4 PSMain(VSOutput input) : SV_TARGET {
-    float3 baseObjectColor = material.albedoColor.rgb;
-    float matSpecStr = material.specularStrength;
-    float matShininess = material.shininess;
-    bool matIsUnlit = material.isUnlit != 0;
-    bool matHasTexture = material.hasTexture != 0;
-    float3 vPos = pfd.viewPos.xyz;
-
-    float3 baseColor = baseObjectColor;
-    if (matHasTexture && material.diffuseTextureIndex >= 0) {
-        Texture2D diffuseTex = ResourceDescriptorHeap[material.diffuseTextureIndex];
-        baseColor = diffuseTex.Sample(defaultSampler, input.TexCoords).rgb * baseObjectColor;
+    float4 albedoTex = float4(1.0f, 1.0f, 1.0f, 1.0f);
+    if (material.hasAlbedoMap != 0 && material.albedoMapIndex >= 0) {
+        Texture2D diffuseTex = ResourceDescriptorHeap[material.albedoMapIndex];
+        albedoTex = diffuseTex.Sample(defaultSampler, input.TexCoords);
     }
-
-    if (matIsUnlit) {
-        return float4(baseColor, 1.0f);
-    }
-
-    float3 norm = normalize(input.Normal);
-    float3 viewDir = normalize(vPos - input.FragPos);
-
-    float3 totalLighting = float3(0.0f, 0.0f, 0.0f);
     
-    float ambientFactor = 1.0f;
+    // gamma correction for albedo map
+    float3 albedo = pow(albedoTex.rgb * material.albedoColor.rgb, float3(2.2f, 2.2f, 2.2f));
+    float alpha = albedoTex.a * material.albedoColor.a;
+
+    if (material.isUnlit != 0) {
+        return float4(albedo, alpha);
+    }
+
+    float metallic = material.metallicFactor;
+    float roughness = material.roughnessFactor;
+    if (material.hasMetallicRoughnessMap != 0 && material.metallicRoughnessMapIndex >= 0) {
+        Texture2D mrTex = ResourceDescriptorHeap[material.metallicRoughnessMapIndex];
+        float4 mr = mrTex.Sample(defaultSampler, input.TexCoords);
+        metallic *= mr.b;
+        roughness *= mr.g;
+    }
+
+    float ao = 1.0f;
+    if (material.hasAOMap != 0 && material.aoMapIndex >= 0) {
+        Texture2D aoTex = ResourceDescriptorHeap[material.aoMapIndex];
+        ao = aoTex.Sample(defaultSampler, input.TexCoords).r;
+    }
+
+    float3 N = normalize(input.Normal);
+    if (material.hasNormalMap != 0 && material.normalMapIndex >= 0) {
+        N = getNormalFromMap(input.Normal, input.TexCoords, input.FragPos);
+    }
+    
+    float3 V = normalize(pfd.viewPos.xyz - input.FragPos);
+
+    float3 F0 = float3(0.04f, 0.04f, 0.04f); 
+    F0 = lerp(F0, albedo, metallic);
+
+    float3 Lo = float3(0.0f, 0.0f, 0.0f);
+
+    // Directional light
+    {
+        float3 L = normalize(-lightData.dirLight.direction.xyz);
+        float3 H = normalize(V + L);
+        float3 radiance = lightData.dirLight.colorAndIntensity.xyz * lightData.dirLight.colorAndIntensity.w;
+
+        float NDF = DistributionGGX(N, H, roughness);       
+        float G   = GeometrySmith(N, V, L, roughness);      
+        float3 F  = fresnelSchlick(max(dot(H, V), 0.0f), F0);       
+
+        float3 kS = F;
+        float3 kD = float3(1.0f, 1.0f, 1.0f) - kS;
+        kD *= 1.0f - metallic;    
+
+        float3 numerator    = NDF * G * F;
+        float denominator = 4.0f * max(dot(N, V), 0.0f) * max(dot(N, L), 0.0f) + 0.0001f;
+        float3 specular     = numerator / denominator;  
+
+        float NdotL = max(dot(N, L), 0.0f);        
+        
+        float shadow = ShadowCalculation(input.FragPosLightSpace, N, L);
+        Lo += (1.0f - shadow) * (kD * albedo / PI + specular) * radiance * NdotL;
+    }
+
+    // Point lights
+    for (int i = 0; i < lightData.numPointLights; ++i) {
+        float3 lightPos = lightData.pointLights[i].positionAndRadius.xyz;
+        float3 L = normalize(lightPos - input.FragPos);
+        float3 H = normalize(V + L);
+        
+        float distance = length(lightPos - input.FragPos);
+        float attenuation = 1.0f / (distance * distance);
+        float3 radiance = lightData.pointLights[i].colorAndIntensity.xyz * lightData.pointLights[i].colorAndIntensity.w * attenuation;
+        
+        float NDF = DistributionGGX(N, H, roughness);       
+        float G   = GeometrySmith(N, V, L, roughness);      
+        float3 F  = fresnelSchlick(max(dot(H, V), 0.0f), F0);       
+
+        float3 kS = F;
+        float3 kD = float3(1.0f, 1.0f, 1.0f) - kS;
+        kD *= 1.0f - metallic;    
+
+        float3 numerator    = NDF * G * F;
+        float denominator = 4.0f * max(dot(N, V), 0.0f) * max(dot(N, L), 0.0f) + 0.0001f;
+        float3 specular     = numerator / denominator;  
+
+        float NdotL = max(dot(N, L), 0.0f);                
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+    }
+
+    float ssao = 1.0f;
     if (pfd.ssaoTexIndex >= 0) {
         Texture2D ssaoTex = ResourceDescriptorHeap[pfd.ssaoTexIndex];
-        ambientFactor = ssaoTex.Load(int3(input.Pos.xy, 0)).r;
+        ssao = ssaoTex.Load(int3(input.Pos.xy, 0)).r;
     }
+
+    float3 ambient = float3(0.03f, 0.03f, 0.03f) * albedo * ao * ssao;
     
-    totalLighting += 0.3f * lightData.dirLight.colorAndIntensity.xyz * ambientFactor;
+    float3 color = ambient + Lo;
 
-    totalLighting += CalcDirectionalLight(lightData.dirLight, norm, viewDir, matSpecStr, matShininess, input.FragPosLightSpace);
-
-    for (int i = 0; i < lightData.numPointLights; i++) {
-        totalLighting += CalcPointLight(lightData.pointLights[i], norm, viewDir, matSpecStr, matShininess, input.FragPos);
-    }
-
-    float3 result = totalLighting * baseColor;
-    return float4(result, 1.0f);
+    return float4(color, alpha);
 }

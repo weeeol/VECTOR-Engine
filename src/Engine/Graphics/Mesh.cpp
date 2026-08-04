@@ -1,6 +1,6 @@
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/RendererAPI.hpp"
-#include "Engine/Graphics/OpenGL/OpenGLMesh.hpp"
+
 #include "Engine/Graphics/Vulkan/VulkanMesh.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12Mesh.hpp"
 #include "Engine/Core/Logger.hpp"
@@ -12,8 +12,7 @@ namespace VECTOR {
             case RendererAPI::API::None:
                 VECTOR_LOG_ERROR("RendererAPI::None is currently not supported!");
                 return nullptr;
-            case RendererAPI::API::OpenGL:
-                return std::make_shared<OpenGLMesh>(vertices, indices);
+
             case RendererAPI::API::Vulkan:
                 return std::make_shared<VulkanMesh>(vertices, indices);
             case RendererAPI::API::DirectX12:

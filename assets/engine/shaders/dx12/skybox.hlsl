@@ -56,12 +56,18 @@ SamplerState defaultSampler : register(s0);
 
 struct MaterialData {
     float4 albedoColor;
-    float specularStrength;
-    float shininess;
+    int hasAlbedoMap;
+    int hasNormalMap;
+    int hasMetallicRoughnessMap;
+    int hasAOMap;
+    float metallicFactor;
+    float roughnessFactor;
     int isUnlit;
-    int hasTexture;
-    int diffuseTextureIndex;
-    int padding[3];
+    int padding;
+    int albedoMapIndex;
+    int normalMapIndex;
+    int metallicRoughnessMapIndex;
+    int aoMapIndex;
 };
 
 ConstantBuffer<MaterialData> material : register(b3);
@@ -70,23 +76,23 @@ float4 PSMain(VSOutput input) : SV_TARGET {
     float3 dir = normalize(input.TexCoords);
     float3 color = float3(0.1f, 0.1f, 0.12f);
     
-    if (material.diffuseTextureIndex >= 0) {
-        TextureCube skyboxTex = ResourceDescriptorHeap[material.diffuseTextureIndex];
+    if (material.hasAlbedoMap != 0 && material.albedoMapIndex >= 0) {
+        TextureCube skyboxTex = ResourceDescriptorHeap[material.albedoMapIndex];
         color = skyboxTex.Sample(defaultSampler, dir).rgb;
     }
     
     // Procedural Sun
     // sunDir points towards the sun (from origin)
     float sunHit = dot(dir, normalize(pfd.sunDir.xyz));
-    if (sunHit > 0.9998) {
-        // Sun core (very bright, pure white)
-        color = float3(1.0, 1.0, 1.0) * 10.0;
-    } else if (sunHit > 0.9980) {
-        // Sun halo / glow (smooth falloff, slightly warm white)
-        float glow = (sunHit - 0.9980) / (0.9998 - 0.9980);
+    if (sunHit > 0.99995) {
+        // Sun core (very bright, pure white, smaller)
+        color = float3(1.0, 1.0, 1.0) * 15.0;
+    } else if (sunHit > 0.9995) {
+        // Sun halo / glow (smooth falloff, slightly warm white, smaller)
+        float glow = (sunHit - 0.9995) / (0.99995 - 0.9995);
         // Exponential falloff for a more natural glow
-        glow = pow(glow, 2.0);
-        color += pfd.sunColor.rgb * glow * 3.0 + float3(0.5, 0.5, 0.5) * glow;
+        glow = pow(glow, 3.0);
+        color += float3(1.0, 0.9, 0.8) * pfd.sunColor.rgb * glow * 5.0 + float3(0.5, 0.5, 0.5) * glow;
     }
     
     return float4(color, 1.0);

@@ -169,7 +169,7 @@ namespace VECTOR {
             psoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
         } else {
             psoDesc.NumRenderTargets = 1;
-            psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+            psoDesc.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
         }
         
         psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
@@ -209,7 +209,11 @@ namespace VECTOR {
         };
 
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-        psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+        if (config.emptyInputLayout) {
+            psoDesc.InputLayout = { nullptr, 0 };
+        } else {
+            psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+        }
         psoDesc.pRootSignature = m_RootSignature.Get();
         
         if (shader->GetVertexBlob()) {
@@ -233,21 +237,23 @@ namespace VECTOR {
         }
 
         psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-        if (!config.blendEnable) {
-            // Default blend state (disabled)
-        } else {
+        if (config.blendEnable) {
             psoDesc.BlendState.RenderTarget[0].BlendEnable = TRUE;
-            psoDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
-            psoDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-            psoDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-            psoDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-            psoDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
-            psoDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+            psoDesc.BlendState.RenderTarget[0].SrcBlend = config.srcBlend;
+            psoDesc.BlendState.RenderTarget[0].DestBlend = config.destBlend;
+            psoDesc.BlendState.RenderTarget[0].BlendOp = config.blendOp;
+            psoDesc.BlendState.RenderTarget[0].SrcBlendAlpha = config.srcBlendAlpha;
+            psoDesc.BlendState.RenderTarget[0].DestBlendAlpha = config.destBlendAlpha;
+            psoDesc.BlendState.RenderTarget[0].BlendOpAlpha = config.blendOpAlpha;
             psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
         }
 
         psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
         psoDesc.DepthStencilState.DepthFunc = config.depthFunc;
+        if (config.dsvFormat == DXGI_FORMAT_UNKNOWN) {
+            psoDesc.DepthStencilState.DepthEnable = FALSE;
+            psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+        }
         psoDesc.SampleMask = UINT_MAX;
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
         

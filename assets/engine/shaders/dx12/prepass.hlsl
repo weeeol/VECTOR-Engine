@@ -52,11 +52,11 @@ VSOutput VSMain(VSInput input) {
         hasBones = true;
         
         matrix boneMatrix = objectData.finalBonesMatrices[input.boneIds[i]];
-        float4 localPosition = mul(float4(input.position, 1.0f), boneMatrix);
+        float4 localPosition = mul(boneMatrix, float4(input.position, 1.0f));
         totalPosition += localPosition * input.weights[i];
         
         float3x3 boneRot = (float3x3)boneMatrix;
-        float3 localNormal = mul(input.normal, boneRot);
+        float3 localNormal = mul(boneRot, input.normal);
         totalNormal += localNormal * input.weights[i];
     }
 
@@ -65,14 +65,14 @@ VSOutput VSMain(VSInput input) {
         totalNormal = input.normal;
     }
 
-    float4 worldPos = mul(totalPosition, objectData.model);
-    float4 viewPos = mul(worldPos, pfd.view);
+    float4 worldPos = mul(objectData.model, totalPosition);
+    float4 viewPos = mul(pfd.view, worldPos);
     
-    output.position = mul(viewPos, pfd.projection);
+    output.position = mul(pfd.projection, viewPos);
     
-    matrix modelView = mul(objectData.model, pfd.view);
+    matrix modelView = mul(pfd.view, objectData.model);
     float3x3 normalMatrix = (float3x3)modelView;
-    output.viewNormal = normalize(mul(totalNormal, normalMatrix));
+    output.viewNormal = normalize(mul(normalMatrix, totalNormal));
     
     output.viewPos = viewPos.xyz;
     

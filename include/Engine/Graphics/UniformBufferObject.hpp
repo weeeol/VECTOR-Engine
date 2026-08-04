@@ -66,8 +66,6 @@ namespace VECTOR {
         virtual void Unbind() const = 0;
 
         virtual uint32_t GetBindingPoint() const = 0;
-
-        static void BindShaderBlock(uint32_t shaderProgramID, const char* blockName, uint32_t bindingPoint);
         static std::unique_ptr<UniformBuffer> Create(uint32_t size, uint32_t bindingPoint);
     };
 

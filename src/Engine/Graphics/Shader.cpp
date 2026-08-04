@@ -1,6 +1,6 @@
 #include "Engine/Graphics/Shader.hpp"
 #include "Engine/Graphics/RendererAPI.hpp"
-#include "Engine/Graphics/OpenGL/OpenGLShader.hpp"
+
 #include "Engine/Graphics/Vulkan/VulkanShader.hpp"
 #include "Engine/Core/Logger.hpp"
 #include <fstream>
@@ -51,8 +51,7 @@ namespace VECTOR {
             case RendererAPI::API::None:
                 VECTOR_LOG_ERROR("RendererAPI::None is currently not supported!");
                 return nullptr;
-            case RendererAPI::API::OpenGL:
-                return std::make_shared<OpenGLShader>(vertexSrc, fragmentSrc);
+
             case RendererAPI::API::Vulkan:
                 VECTOR_LOG_ERROR("VulkanShader doesn't support CreateFromSource (requires SPIR-V file path)!");
                 return nullptr;

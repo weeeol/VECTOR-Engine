@@ -69,6 +69,9 @@ namespace VECTOR {
         virtual void SetSSAOEnabled(bool enabled) {}
         virtual bool IsSSAOEnabled() const { return false; }
 
+        virtual void SetBloomEnabled(bool enabled) {}
+        virtual bool IsBloomEnabled() const { return false; }
+
         virtual void SetTAAEnabled(bool enabled) {}
         virtual bool IsTAAEnabled() const { return false; }
 

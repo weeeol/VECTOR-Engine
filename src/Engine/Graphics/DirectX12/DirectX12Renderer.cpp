@@ -2,6 +2,9 @@
 #include "Engine/Graphics/DirectX12/DirectX12Renderer.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12Context.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12Mesh.hpp"
+#include "Engine/Graphics/DirectX12/DirectX12Prepass.hpp"
+#include "Engine/Graphics/DirectX12/DirectX12SSAO.hpp"
+#include "Engine/Graphics/DirectX12/DirectX12PostProcessor.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12Texture2D.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12Cubemap.hpp"
 #include "Engine/Core/ResourceManager.hpp"
@@ -66,15 +69,21 @@ namespace VECTOR {
         // Create Pipeline
         VECTOR_LOG_INFO("Creating DirectX 12 Pipeline...");
         auto shader = ResourceManager::Get().LoadShader("Default3D", "assets/engine/shaders/dx12/main3D.hlsl", "assets/engine/shaders/dx12/main3D.hlsl");
-        ResourceManager::Get().LoadShader("Main3D", "assets/engine/shaders/dx12/main3D.hlsl", "assets/engine/shaders/dx12/main3D.hlsl");
-        m_Pipeline = std::make_unique<DirectX12Pipeline>(dynamic_cast<DirectX12Shader*>(shader.get()), D3D12_COMPARISON_FUNC_LESS_EQUAL);
-        
-        VECTOR_LOG_INFO("Creating DirectX 12 Wireframe Pipeline...");
-        m_WireframePipeline = std::make_unique<DirectX12Pipeline>(dynamic_cast<DirectX12Shader*>(shader.get()), D3D12_COMPARISON_FUNC_LESS_EQUAL, false, true);
+        DirectX12PipelineConfig mainConfig;
+        mainConfig.rtvFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        m_Pipeline = std::make_unique<DirectX12Pipeline>(dynamic_cast<DirectX12Shader*>(shader.get()), mainConfig);
+
+        DirectX12PipelineConfig wireframeConfig;
+        wireframeConfig.wireframe = true;
+        wireframeConfig.rtvFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        m_WireframePipeline = std::make_unique<DirectX12Pipeline>(dynamic_cast<DirectX12Shader*>(shader.get()), wireframeConfig);
 
         VECTOR_LOG_INFO("Creating DirectX 12 Skybox Pipeline...");
         auto skyboxShader = ResourceManager::Get().LoadShader("Skybox", "assets/engine/shaders/dx12/skybox.hlsl", "assets/engine/shaders/dx12/skybox.hlsl");
-        m_SkyboxPipeline = std::make_unique<DirectX12Pipeline>(dynamic_cast<DirectX12Shader*>(skyboxShader.get()), D3D12_COMPARISON_FUNC_LESS_EQUAL);
+        DirectX12PipelineConfig skyboxConfig;
+        skyboxConfig.depthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        skyboxConfig.rtvFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        m_SkyboxPipeline = std::make_unique<DirectX12Pipeline>(dynamic_cast<DirectX12Shader*>(skyboxShader.get()), skyboxConfig);
 
         VECTOR_LOG_INFO("Initializing DirectX 12 Shadow Pass...");
         m_ShadowPass = std::make_unique<DirectX12ShadowPass>(m_Context.get());
@@ -85,6 +94,10 @@ namespace VECTOR {
 
         m_SSAO = std::make_unique<DirectX12SSAO>(m_Context.get(), width, height);
         m_SSAO->Initialize();
+
+        VECTOR_LOG_INFO("Initializing DirectX 12 PostProcessor...");
+        m_PostProcessor = std::make_unique<DirectX12PostProcessor>(m_Context.get(), width, height);
+        m_PostProcessor->Initialize();
 
         VECTOR_LOG_INFO("DirectX 12 Renderer Initialized.");
         return true;
@@ -117,7 +130,12 @@ namespace VECTOR {
         m_ObjectDataPool.clear();
         
         m_Pipeline.reset();
+        m_WireframePipeline.reset();
         m_SkyboxPipeline.reset();
+        m_ShadowPass.reset();
+        m_Prepass.reset();
+        m_SSAO.reset();
+        m_PostProcessor.reset();
         m_DescriptorManager.reset();
 
         m_Swapchain.reset();
@@ -189,6 +207,7 @@ namespace VECTOR {
             m_CommandAllocators[m_FrameIndex]->Reset();
             m_CommandList->Reset(m_CommandAllocators[m_FrameIndex].Get(), nullptr);
             TransitionResource(m_CommandList, backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+            m_PostProcessor->TransitionToRenderTarget(m_CommandList.Get());
 
             m_ObjectDataIndex = 0;
             m_MaterialDataIndex = 0;
@@ -200,14 +219,23 @@ namespace VECTOR {
             m_CommandList->RSSetViewports(1, &viewport);
             m_CommandList->RSSetScissorRects(1, &scissorRect);
             
-            ID3D12DescriptorHeap* descriptorHeaps[] = { DirectX12DescriptorManager::Get()->GetSRVHeap() };
+            ID3D12DescriptorHeap* descriptorHeaps[] = { 
+                DirectX12DescriptorManager::Get()->GetSRVHeap(),
+                DirectX12DescriptorManager::Get()->GetSamplerHeap()
+            };
             m_CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
             
             m_FrameStarted = true;
         }
 
         float clearColor[] = { r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f };
-        m_CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV = m_PostProcessor->GetRTV();
+        m_CommandList->ClearRenderTargetView(hdrRTV, clearColor, 0, nullptr);
+        
+        // Also clear the backbuffer, because if a scene doesn't call EndPostProcessPass, the backbuffer will have garbage
+        D3D12_CPU_DESCRIPTOR_HANDLE backbufferRTV = m_Swapchain->GetBackBufferRTV(m_Swapchain->AcquireNextImage());
+        m_CommandList->ClearRenderTargetView(backbufferRTV, clearColor, 0, nullptr);
+        
         m_CommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
     }
 
@@ -250,6 +278,10 @@ namespace VECTOR {
     void DirectX12Renderer::SetResolution(int width, int height) {
         WaitIdle();
         m_Swapchain->Recreate(width, height);
+        
+        if (m_PostProcessor) m_PostProcessor->Recreate(width, height);
+        if (m_Prepass) m_Prepass->Resize(width, height);
+        if (m_SSAO) m_SSAO->Resize(width, height);
     }
 
     void DirectX12Renderer::SetFullscreen(bool fullscreen, bool borderless) {
@@ -378,7 +410,7 @@ namespace VECTOR {
         pfd.lightPos = glm::vec4(0.0f);
         pfd.lightColor = glm::vec4(1.0f);
         pfd.shadowMapIndex = m_ShadowPass ? m_ShadowPass->GetSRVIndex() : -1;
-        pfd.ssaoTexIndex = m_SSAO ? m_SSAO->GetSSAOSRVIndex() : -1;
+        pfd.ssaoTexIndex = (m_SSAO && m_SSAOEnabled) ? m_SSAO->GetSSAOSRVIndex() : -1;
 
         m_PerFrameUBOs[m_FrameIndex]->SetData(&pfd, sizeof(PerFrameData), 0);
     }
@@ -427,26 +459,37 @@ namespace VECTOR {
 
             struct MaterialData {
                 glm::vec4 albedoColor;
-                float specularStrength;
-                float shininess;
+                int hasAlbedoMap;
+                int hasNormalMap;
+                int hasMetallicRoughnessMap;
+                int hasAOMap;
+                float metallicFactor;
+                float roughnessFactor;
                 int isUnlit;
-                int hasTexture;
-                int diffuseTextureIndex;
-                int padding[3];
+                int padding;
+                int albedoMapIndex;
+                int normalMapIndex;
+                int metallicRoughnessMapIndex;
+                int aoMapIndex;
             } matData;
             
             matData.albedoColor = material->albedoColor;
-            matData.specularStrength = material->metallic;
-            matData.shininess = material->roughness;
+            matData.metallicFactor = material->metallic;
+            matData.roughnessFactor = material->roughness;
             matData.isUnlit = material->isUnlit ? 1 : 0;
+            matData.padding = 0;
             
-            if (material->albedoTexture) {
-                matData.hasTexture = 1;
-                matData.diffuseTextureIndex = static_cast<DirectX12Texture2D*>(material->albedoTexture.get())->GetDescriptorIndex();
-            } else {
-                matData.hasTexture = 0;
-                matData.diffuseTextureIndex = -1;
-            }
+            matData.hasAlbedoMap = material->albedoTexture ? 1 : 0;
+            matData.albedoMapIndex = material->albedoTexture ? static_cast<DirectX12Texture2D*>(material->albedoTexture.get())->GetDescriptorIndex() : -1;
+
+            matData.hasNormalMap = material->normalTexture ? 1 : 0;
+            matData.normalMapIndex = material->normalTexture ? static_cast<DirectX12Texture2D*>(material->normalTexture.get())->GetDescriptorIndex() : -1;
+
+            matData.hasMetallicRoughnessMap = material->metallicRoughnessTexture ? 1 : 0;
+            matData.metallicRoughnessMapIndex = material->metallicRoughnessTexture ? static_cast<DirectX12Texture2D*>(material->metallicRoughnessTexture.get())->GetDescriptorIndex() : -1;
+
+            matData.hasAOMap = material->aoTexture ? 1 : 0;
+            matData.aoMapIndex = material->aoTexture ? static_cast<DirectX12Texture2D*>(material->aoTexture.get())->GetDescriptorIndex() : -1;
 
             m_MaterialDataPool[m_MaterialDataIndex].ubo->SetData(&matData, sizeof(MaterialData));
             cmd.materialDataAddress = static_cast<DirectX12UniformBuffer*>(m_MaterialDataPool[m_MaterialDataIndex].ubo.get())->GetGPUVirtualAddress();
@@ -473,10 +516,8 @@ namespace VECTOR {
         if (!m_FrameStarted) return;
         m_LightUBOs[m_FrameIndex]->SetData(&m_LightData, sizeof(LightUBOData));
         
-        uint32_t backBufferIndex = m_Swapchain->AcquireNextImage();
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_Swapchain->GetBackBufferRTV(backBufferIndex);
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_Swapchain->GetDepthBufferDSV();
-        m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+        m_PostProcessor->BeginMainPass(m_CommandList.Get(), dsvHandle);
 
         m_CommandList->SetGraphicsRootSignature(m_Pipeline->GetRootSignature());
         m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -604,18 +645,25 @@ namespace VECTOR {
 
             struct MaterialData {
                 glm::vec4 albedoColor;
-                float specularStrength;
-                float shininess;
+                int hasAlbedoMap;
+                int hasNormalMap;
+                int hasMetallicRoughnessMap;
+                int hasAOMap;
+                float metallicFactor;
+                float roughnessFactor;
                 int isUnlit;
-                int hasTexture;
-                int diffuseTextureIndex;
-                int padding[3];
+                int padding;
+                int albedoMapIndex;
+                int normalMapIndex;
+                int metallicRoughnessMapIndex;
+                int aoMapIndex;
             } matData;
             
+            memset(&matData, 0, sizeof(MaterialData));
             matData.albedoColor = glm::vec4(1.0f);
             matData.isUnlit = 1;
-            matData.hasTexture = 1;
-            matData.diffuseTextureIndex = m_CurrentSkybox->GetDescriptorIndex();
+            matData.hasAlbedoMap = 1;
+            matData.albedoMapIndex = m_CurrentSkybox->GetDescriptorIndex();
 
             m_MaterialDataPool[m_MaterialDataIndex].ubo->SetData(&matData, sizeof(MaterialData), 0);
             D3D12_GPU_VIRTUAL_ADDRESS skyboxMatAddress = static_cast<DirectX12UniformBuffer*>(m_MaterialDataPool[m_MaterialDataIndex].ubo.get())->GetGPUVirtualAddress();
@@ -635,6 +683,40 @@ namespace VECTOR {
 
     void DirectX12Renderer::SubmitSkybox(Cubemap* cubemap) {
         m_CurrentSkybox = dynamic_cast<DirectX12Cubemap*>(cubemap);
+    }
+
+    void DirectX12Renderer::EndPostProcessPass() {
+        if (!m_FrameStarted) return;
+        
+        Microsoft::WRL::ComPtr<IDXGISwapChain3> swapchain3;
+        uint32_t backBufferIndex = 0;
+        if (SUCCEEDED(m_Swapchain->GetSwapchain().As(&swapchain3))) {
+            backBufferIndex = swapchain3->GetCurrentBackBufferIndex();
+        }
+        
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_Swapchain->GetBackBufferRTV(backBufferIndex);
+        
+        m_PostProcessor->Resolve(m_CommandList.Get(), rtvHandle, m_Swapchain->GetWidth(), m_Swapchain->GetHeight());
+    }
+
+    void DirectX12Renderer::SetWireframeMode(bool enabled) {
+        if (m_WireframeMode != enabled) {
+            WaitIdle(); // Ensure GPU is done before changing state
+            m_WireframeMode = enabled;
+        }
+    }
+
+    void DirectX12Renderer::SetBloomEnabled(bool enabled) {
+        if (m_PostProcessor) {
+            m_PostProcessor->m_BloomEnabled = enabled;
+        }
+    }
+
+    bool DirectX12Renderer::IsBloomEnabled() const {
+        if (m_PostProcessor) {
+            return m_PostProcessor->m_BloomEnabled;
+        }
+        return false;
     }
 
 } // namespace VECTOR
