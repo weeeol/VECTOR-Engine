@@ -75,7 +75,7 @@ This engine uses a **universal CMake configuration**. It is highly recommended t
 Using [vcpkg](https://vcpkg.io/):
 
 ```bash
-vcpkg install sdl3 sdl3-ttf sdl3-image sdl3-mixer bullet3 glm assimp nlohmann-json vulkan-memory-allocator
+vcpkg install sdl3 sdl3-ttf sdl3-image sdl3-mixer bullet3 glm assimp nlohmann-json vulkan-memory-allocator directx-headers directx-dxc d3d12-memory-allocator
 mkdir build && cd build
 cmake -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake ..
 cmake --build .
@@ -85,7 +85,7 @@ cmake --build .
 If using MSYS2 (UCRT64), install the dependencies (example):
 
 ```bash
-pacman -S mingw-w64-ucrt-x86_64-SDL3 mingw-w64-ucrt-x86_64-SDL3_ttf mingw-w64-ucrt-x86_64-SDL3_image mingw-w64-ucrt-x86_64-SDL3_mixer mingw-w64-ucrt-x86_64-bullet mingw-w64-ucrt-x86_64-glm mingw-w64-ucrt-x86_64-assimp mingw-w64-ucrt-x86_64-nlohmann-json mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-vulkan-memory-allocator
+pacman -S mingw-w64-ucrt-x86_64-SDL3 mingw-w64-ucrt-x86_64-SDL3_ttf mingw-w64-ucrt-x86_64-SDL3_image mingw-w64-ucrt-x86_64-SDL3_mixer mingw-w64-ucrt-x86_64-bullet mingw-w64-ucrt-x86_64-glm mingw-w64-ucrt-x86_64-assimp mingw-w64-ucrt-x86_64-nlohmann-json mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-vulkan-memory-allocator mingw-w64-ucrt-x86_64-directx-headers mingw-w64-ucrt-x86_64-directx-dxc mingw-w64-ucrt-x86_64-d3d12-memory-allocator
 ```
 
 Then configure and build via CMake:
