@@ -55,10 +55,10 @@ namespace VECTOR {
         // Create UBOs
         for (int i = 0; i < s_FrameCount; ++i) {
             m_PerFrameUBOs.push_back(std::make_unique<DirectX12UniformBuffer>(512, 0)); // Increased for shadow mapping fields
-            m_LightUBOs.push_back(std::make_unique<DirectX12UniformBuffer>(sizeof(LightUBOData), 1));
+            m_LightUBOs.push_back(std::make_unique<DirectX12UniformBuffer>(static_cast<uint32_t>(sizeof(LightUBOData)), 1));
         }
         // Dummy Object Data
-        m_DummyObjectUBO = std::make_unique<DirectX12UniformBuffer>(sizeof(glm::mat4) * 101, 2);
+        m_DummyObjectUBO = std::make_unique<DirectX12UniformBuffer>(static_cast<uint32_t>(sizeof(glm::mat4) * 101), 2);
 
         // m_MaterialDataPool is used for materials
 
@@ -282,6 +282,8 @@ namespace VECTOR {
 
     void DirectX12Renderer::SetResolution(int width, int height) {
         WaitIdle();
+        SDL_SetWindowSize(m_Window, width, height);
+        SDL_SetWindowPosition(m_Window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
         m_Swapchain->Recreate(width, height);
         
         if (m_PostProcessor) m_PostProcessor->Recreate(width, height);
@@ -291,6 +293,9 @@ namespace VECTOR {
 
     void DirectX12Renderer::SetFullscreen(bool fullscreen, bool borderless) {
         SDL_SetWindowFullscreen(m_Window, fullscreen);
+        if (!fullscreen) {
+            SDL_SetWindowBordered(m_Window, !borderless);
+        }
     }
 
     void DirectX12Renderer::InitImGui() {
@@ -409,6 +414,8 @@ namespace VECTOR {
         glm::mat4 dx12Projection = projection;
         dx12Projection[2][2] = 0.5f * projection[2][2] + 0.5f * projection[2][3];
         dx12Projection[3][2] = 0.5f * projection[3][2] + 0.5f * projection[3][3];
+        
+        m_UnjitteredProjection = dx12Projection;
 
         m_PreviousJitter = m_Jitter;
         if (m_TAAEnabled) {
@@ -460,7 +467,7 @@ namespace VECTOR {
     void DirectX12Renderer::BindObjectAndMaterial(const RenderCommand& cmd, bool bindMaterial) {
         if (m_ObjectDataIndex >= m_ObjectDataPool.size()) {
             ObjectData data;
-            data.ubo = std::make_unique<DirectX12UniformBuffer>(sizeof(glm::mat4) * 101, 2);
+            data.ubo = std::make_unique<DirectX12UniformBuffer>(static_cast<uint32_t>(sizeof(glm::mat4) * 101), 2);
             m_ObjectDataPool.push_back(std::move(data));
         }
         
@@ -490,7 +497,7 @@ namespace VECTOR {
         if (bindMaterial && cmd.material) {
             if (m_MaterialDataIndex >= m_MaterialDataPool.size()) {
                 MaterialDataBlock matBlock;
-                matBlock.ubo = std::make_unique<DirectX12UniformBuffer>(sizeof(float) * 16, 2);
+                matBlock.ubo = std::make_unique<DirectX12UniformBuffer>(static_cast<uint32_t>(sizeof(float) * 16), 2);
                 m_MaterialDataPool.push_back(std::move(matBlock));
             }
 
@@ -611,7 +618,7 @@ namespace VECTOR {
         m_SSAO->Generate(m_CommandList.Get(), 
                          m_Prepass->GetNormalSRVIndex(), 
                          m_Prepass->GetDepthSRVIndex(), 
-                         m_CurrentProjection,
+                         m_UnjitteredProjection,
                          m_CurrentView);
     }
 
@@ -669,7 +676,7 @@ namespace VECTOR {
             
             if (m_MaterialDataIndex >= m_MaterialDataPool.size()) {
                 MaterialDataBlock data;
-                data.ubo = std::make_unique<DirectX12UniformBuffer>(sizeof(float) * 16, 2);
+                data.ubo = std::make_unique<DirectX12UniformBuffer>(static_cast<uint32_t>(sizeof(float) * 16), 2);
                 m_MaterialDataPool.push_back(std::move(data));
             }
 

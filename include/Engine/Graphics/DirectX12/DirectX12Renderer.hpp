@@ -145,9 +145,9 @@ namespace VECTOR {
         Microsoft::WRL::ComPtr<ID3D12Fence> m_Fence;
         uint64_t m_FenceValues[s_FrameCount] = {0};
         HANDLE m_FenceEvent;
-        glm::mat4 m_DummyMatrix = glm::mat4(1.0f);
         glm::mat4 m_CurrentView = glm::mat4(1.0f);
         glm::mat4 m_CurrentProjection = glm::mat4(1.0f);
+        glm::mat4 m_UnjitteredProjection = glm::mat4(1.0f);
         bool m_FrameStarted = false;
         bool m_WireframeMode = false;
         bool m_SSAOEnabled = true;

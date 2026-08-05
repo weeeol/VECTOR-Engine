@@ -149,6 +149,17 @@ namespace VECTOR {
             ImGui_ImplSDL3_ProcessEvent(&event);
             if (event.type == SDL_EVENT_QUIT) {
                 Quit();
+            } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+                int width = event.window.data1;
+                int height = event.window.data2;
+                if (width != m_Width || height != m_Height) {
+                    m_Width = width;
+                    m_Height = height;
+                    if (m_Renderer) {
+                        m_Renderer->SetResolution(width, height);
+                    }
+                    SceneManager::Get().OnResize(width, height);
+                }
             }
         }
         

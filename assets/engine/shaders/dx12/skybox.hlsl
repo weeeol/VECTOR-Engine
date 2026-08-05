@@ -1,12 +1,18 @@
 struct PerFrameData {
     matrix view;
     matrix projection;
+    matrix previousView;
+    matrix previousProjection;
     matrix lightSpaceMatrix;
     float4 viewPos;
     float4 sunDir;
     float4 sunColor;
     float4 lightPos;
     float4 lightColor;
+    int shadowMapIndex;
+    int ssaoTexIndex;
+    float2 jitter;
+    float2 previousJitter;
 };
 
 ConstantBuffer<PerFrameData> pfd : register(b0);
@@ -84,15 +90,15 @@ float4 PSMain(VSOutput input) : SV_TARGET {
     // Procedural Sun
     // sunDir points towards the sun (from origin)
     float sunHit = dot(dir, normalize(pfd.sunDir.xyz));
-    if (sunHit > 0.99995) {
-        // Sun core (very bright, pure white, smaller)
+    if (sunHit > 0.9999) {
+        // Sun core (very bright, pure white)
         color = float3(1.0, 1.0, 1.0) * 15.0;
-    } else if (sunHit > 0.9995) {
-        // Sun halo / glow (smooth falloff, slightly warm white, smaller)
-        float glow = (sunHit - 0.9995) / (0.99995 - 0.9995);
-        // Exponential falloff for a more natural glow
-        glow = pow(glow, 3.0);
-        color += float3(1.0, 0.9, 0.8) * pfd.sunColor.rgb * glow * 5.0 + float3(0.5, 0.5, 0.5) * glow;
+    } else if (sunHit > 0.998) {
+        // Sun halo / glow (smooth falloff, pure white/neutral)
+        float glow = (sunHit - 0.998) / (0.9999 - 0.998);
+        // Exponential falloff for a more natural atmospheric scatter
+        glow = pow(glow, 2.5);
+        color += pfd.sunColor.rgb * glow * 4.0;
     }
     
     return float4(color, 1.0);
