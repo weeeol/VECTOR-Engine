@@ -32,3 +32,8 @@ compile_commands.json
 
 # Ignore compiled shaders
 *.spv
+
+# Runtime generated files
+imgui.ini
+save.dat
+*.log
