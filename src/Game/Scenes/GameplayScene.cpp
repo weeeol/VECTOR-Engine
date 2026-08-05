@@ -549,25 +549,7 @@ namespace Game {
 
         // The sun is now drawn procedurally in the skybox shader!
 
-        // PASS 1: SHADOW MAP
-        renderer->BeginShadowPass();
-        renderer->FlushShadowPass();
-
-        // PASS 1.5: Z-PREPASS (Normal/Depth for SSAO)
-        renderer->BeginPrepass();
-        renderer->FlushPrepass();
-
-        // PASS 2: MAIN POST-PROCESS FBO
-        renderer->BeginMainPass();
-        
         renderer->SetWireframeMode(m_DebugMode);
-
-        renderer->FlushMainPass();
-
-        // PASS 3: POST PROCESS SCREEN QUAD
-        renderer->SetWireframeMode(false);
-        renderer->EndPostProcessPass();
-
         renderer->BeginUI();
         // Crosshair
         renderer->DrawUIRect(m_Width / 2 - 2, m_Height / 2 - 2, 4, 4, glm::vec4(1.0f, 1.0f, 1.0f, 200/255.0f));

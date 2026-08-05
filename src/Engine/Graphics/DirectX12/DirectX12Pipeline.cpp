@@ -273,6 +273,22 @@ namespace VECTOR {
         HRESULT hr = device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineState));
         if (FAILED(hr)) {
             VECTOR_LOG_ERROR("Failed to create Graphics Pipeline State with config.");
+            Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
+            if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
+                UINT64 numMessages = infoQueue->GetNumStoredMessagesAllowedByRetrievalFilter();
+                for (UINT64 i = 0; i < numMessages; ++i) {
+                    SIZE_T messageLength = 0;
+                    infoQueue->GetMessage(i, nullptr, &messageLength);
+                    if (messageLength > 0) {
+                        D3D12_MESSAGE* message = (D3D12_MESSAGE*)malloc(messageLength);
+                        if (SUCCEEDED(infoQueue->GetMessage(i, message, &messageLength))) {
+                            VECTOR_LOG_ERROR(std::string("D3D12 Error: ") + message->pDescription);
+                        }
+                        free(message);
+                    }
+                }
+                infoQueue->ClearStoredMessages();
+            }
         }
     }
 

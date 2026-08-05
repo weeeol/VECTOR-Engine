@@ -29,7 +29,7 @@ namespace VECTOR {
 
         virtual void SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) = 0;
 
-        virtual void SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model, const std::vector<glm::mat4>* boneTransforms = nullptr) = 0;
+        virtual void SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model, const std::vector<glm::mat4>* boneTransforms = nullptr);
 
         virtual void SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) = 0;
         virtual void SetDirectionalLight(const glm::vec3& direction, const glm::vec3& color, float intensity) = 0;
@@ -46,12 +46,13 @@ namespace VECTOR {
 
         virtual SDL_Window* GetWindow() const = 0;
 
-        // Multi-Pass Rendering Methods
+        // Multi-Pass Rendering Methods (Protected/Internal hooks for the backends)
         virtual void BeginShadowPass() = 0;
         virtual void FlushShadowPass() = 0;
         
         virtual void BeginPrepass() {}
         virtual void FlushPrepass() {}
+        
         virtual void BeginMainPass() = 0;
         virtual void FlushMainPass() = 0;
         virtual void EndPostProcessPass() = 0;
@@ -76,6 +77,20 @@ namespace VECTOR {
         virtual bool IsTAAEnabled() const { return false; }
 
         static std::unique_ptr<Renderer> Create();
+
+        // --- Render Pipeline ---
+        // Executes the entire rendering loop
+        virtual void ExecuteRenderPipeline();
+
+    protected:
+        struct RenderCommand {
+            const Mesh* mesh;
+            const Material* material;
+            glm::mat4 model;
+            const std::vector<glm::mat4>* boneTransforms = nullptr;
+        };
+
+        std::vector<RenderCommand> m_RenderQueue;
     };
 
 } // namespace VECTOR

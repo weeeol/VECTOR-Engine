@@ -18,14 +18,16 @@ namespace VECTOR {
         void Recreate(uint32_t width, uint32_t height);
 
         void TransitionToRenderTarget(ID3D12GraphicsCommandList* commandList);
+        void TransitionHDRToSRV(ID3D12GraphicsCommandList* commandList);
 
         // Sets the HDR offscreen render target as the current RTV
         void BeginMainPass(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle);
         
         // Resolves the HDR offscreen render target to the backbuffer using Tone Mapping and Gamma Correction
-        void Resolve(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE backbufferRTV, uint32_t width, uint32_t height);
+        void Resolve(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE backbufferRTV, uint32_t width, uint32_t height, uint32_t inputSRVIndex);
 
         D3D12_CPU_DESCRIPTOR_HANDLE GetRTV() const { return m_RTVHeap->GetCPUDescriptorHandleForHeapStart(); }
+        uint32_t GetHDRTextureSRVIndex() const { return m_HDRTextureSRVIndex; }
 
         float GetExposure() const { return m_Exposure; }
         void SetExposure(float exposure) { m_Exposure = exposure; }
@@ -36,7 +38,7 @@ namespace VECTOR {
         void CreateResources(uint32_t width, uint32_t height);
         void CreateDescriptors();
         void CreatePipeline();
-        void RenderBloom(ID3D12GraphicsCommandList* commandList);
+        void RenderBloom(ID3D12GraphicsCommandList* commandList, uint32_t inputSRVIndex);
 
         DirectX12Context* m_Context;
         uint32_t m_Width;

@@ -4,6 +4,7 @@
 #include "Engine/Graphics/DirectX12/DirectX12Mesh.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12Prepass.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12SSAO.hpp"
+#include "Engine/Graphics/DirectX12/DirectX12TAA.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12PostProcessor.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12Texture2D.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12Cubemap.hpp"
@@ -91,9 +92,12 @@ namespace VECTOR {
 
         m_Prepass = std::make_unique<DirectX12Prepass>(m_Context.get(), width, height);
         m_Prepass->Initialize();
-
+        
         m_SSAO = std::make_unique<DirectX12SSAO>(m_Context.get(), width, height);
         m_SSAO->Initialize();
+
+        m_TAA = std::make_unique<DirectX12TAA>(m_Context.get(), width, height);
+        m_TAA->Initialize();
 
         VECTOR_LOG_INFO("Initializing DirectX 12 PostProcessor...");
         m_PostProcessor = std::make_unique<DirectX12PostProcessor>(m_Context.get(), width, height);
@@ -135,6 +139,7 @@ namespace VECTOR {
         m_ShadowPass.reset();
         m_Prepass.reset();
         m_SSAO.reset();
+        m_TAA.reset();
         m_PostProcessor.reset();
         m_DescriptorManager.reset();
 
@@ -365,12 +370,25 @@ namespace VECTOR {
         // UI rendering handled by ImGui
     }
 
+    static float Halton(int index, int base) {
+        float f = 1.0f;
+        float r = 0.0f;
+        while (index > 0) {
+            f = f / (float)base;
+            r = r + f * (float)(index % base);
+            index = index / base;
+        }
+        return r;
+    }
+
     void DirectX12Renderer::SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) {
         if (!m_FrameStarted) return; 
 
         struct PerFrameData {
             glm::mat4 view;
             glm::mat4 projection;
+            glm::mat4 previousView;
+            glm::mat4 previousProjection;
             glm::mat4 lightSpaceMatrix;
             glm::vec4 viewPos;
             glm::vec4 sunDir;
@@ -379,7 +397,8 @@ namespace VECTOR {
             glm::vec4 lightColor;
             int shadowMapIndex;
             int ssaoTexIndex;
-            int padding[2];
+            glm::vec2 jitter;
+            glm::vec2 previousJitter;
         } pfd;
 
         glm::vec3 sunDir = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.3f));
@@ -390,6 +409,21 @@ namespace VECTOR {
         glm::mat4 dx12Projection = projection;
         dx12Projection[2][2] = 0.5f * projection[2][2] + 0.5f * projection[2][3];
         dx12Projection[3][2] = 0.5f * projection[3][2] + 0.5f * projection[3][3];
+
+        m_PreviousJitter = m_Jitter;
+        if (m_TAAEnabled) {
+            m_TAAFrameIndex++;
+            int jitterPhaseCount = 8;
+            int jitterIndex = m_TAAFrameIndex % jitterPhaseCount;
+            float jitterX = (Halton(jitterIndex + 1, 2) - 0.5f) / (float)m_Swapchain->GetWidth();
+            float jitterY = (Halton(jitterIndex + 1, 3) - 0.5f) / (float)m_Swapchain->GetHeight();
+            m_Jitter = glm::vec2(jitterX, jitterY);
+            
+            dx12Projection[2][0] += m_Jitter.x * 2.0f;
+            dx12Projection[2][1] += m_Jitter.y * 2.0f;
+        } else {
+            m_Jitter = glm::vec2(0.0f);
+        }
         
         glm::mat4 dx12LightProj = lightProjection;
         dx12LightProj[2][2] = 0.5f * lightProjection[2][2] + 0.5f * lightProjection[2][3];
@@ -403,6 +437,14 @@ namespace VECTOR {
 
         pfd.view = view;
         pfd.projection = dx12Projection;
+        pfd.previousView = m_PreviousView;
+        pfd.previousProjection = m_PreviousProjection;
+        pfd.jitter = m_Jitter;
+        pfd.previousJitter = m_PreviousJitter;
+        
+        m_PreviousView = view;
+        m_PreviousProjection = dx12Projection;
+
         pfd.lightSpaceMatrix = m_LightSpaceMatrix;
         pfd.viewPos = glm::vec4(viewPos, 1.0f);
         pfd.sunDir = glm::vec4(sunDir, 0.0f);
@@ -415,13 +457,7 @@ namespace VECTOR {
         m_PerFrameUBOs[m_FrameIndex]->SetData(&pfd, sizeof(PerFrameData), 0);
     }
 
-    void DirectX12Renderer::SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model, const std::vector<glm::mat4>* boneTransforms) {
-        RenderCommand cmd;
-        cmd.mesh = mesh;
-        cmd.material = material;
-        cmd.model = model;
-        cmd.boneTransforms = boneTransforms;
-
+    void DirectX12Renderer::BindObjectAndMaterial(const RenderCommand& cmd, bool bindMaterial) {
         if (m_ObjectDataIndex >= m_ObjectDataPool.size()) {
             ObjectData data;
             data.ubo = std::make_unique<DirectX12UniformBuffer>(sizeof(glm::mat4) * 101, 2);
@@ -433,12 +469,12 @@ namespace VECTOR {
             glm::mat4 bones[100];
         } data;
         
-        data.model = model;
+        data.model = cmd.model;
         
-        if (boneTransforms && !boneTransforms->empty()) {
-            size_t count = (std::min)((size_t)100, boneTransforms->size());
+        if (cmd.boneTransforms && !cmd.boneTransforms->empty()) {
+            size_t count = (std::min)((size_t)100, cmd.boneTransforms->size());
             for (size_t i = 0; i < count; ++i) {
-                data.bones[i] = (*boneTransforms)[i];
+                data.bones[i] = (*cmd.boneTransforms)[i];
             }
         } else {
             for (size_t i = 0; i < 100; ++i) {
@@ -447,14 +483,15 @@ namespace VECTOR {
         }
         
         m_ObjectDataPool[m_ObjectDataIndex].ubo->SetData(&data, sizeof(PerObjectData));
-        cmd.objectDataAddress = static_cast<DirectX12UniformBuffer*>(m_ObjectDataPool[m_ObjectDataIndex].ubo.get())->GetGPUVirtualAddress();
+        D3D12_GPU_VIRTUAL_ADDRESS objectDataAddress = static_cast<DirectX12UniformBuffer*>(m_ObjectDataPool[m_ObjectDataIndex].ubo.get())->GetGPUVirtualAddress();
+        m_CommandList->SetGraphicsRootConstantBufferView(2, objectDataAddress);
         m_ObjectDataIndex++;
 
-        if (material) {
+        if (bindMaterial && cmd.material) {
             if (m_MaterialDataIndex >= m_MaterialDataPool.size()) {
-                MaterialDataBlock data;
-                data.ubo = std::make_unique<DirectX12UniformBuffer>(sizeof(float) * 16, 2);
-                m_MaterialDataPool.push_back(std::move(data));
+                MaterialDataBlock matBlock;
+                matBlock.ubo = std::make_unique<DirectX12UniformBuffer>(sizeof(float) * 16, 2);
+                m_MaterialDataPool.push_back(std::move(matBlock));
             }
 
             struct MaterialData {
@@ -473,30 +510,29 @@ namespace VECTOR {
                 int aoMapIndex;
             } matData;
             
-            matData.albedoColor = material->albedoColor;
-            matData.metallicFactor = material->metallic;
-            matData.roughnessFactor = material->roughness;
-            matData.isUnlit = material->isUnlit ? 1 : 0;
+            matData.albedoColor = cmd.material->albedoColor;
+            matData.metallicFactor = cmd.material->metallic;
+            matData.roughnessFactor = cmd.material->roughness;
+            matData.isUnlit = cmd.material->isUnlit ? 1 : 0;
             matData.padding = 0;
             
-            matData.hasAlbedoMap = material->albedoTexture ? 1 : 0;
-            matData.albedoMapIndex = material->albedoTexture ? static_cast<DirectX12Texture2D*>(material->albedoTexture.get())->GetDescriptorIndex() : -1;
+            matData.hasAlbedoMap = cmd.material->albedoTexture ? 1 : 0;
+            matData.albedoMapIndex = cmd.material->albedoTexture ? static_cast<DirectX12Texture2D*>(cmd.material->albedoTexture.get())->GetDescriptorIndex() : -1;
 
-            matData.hasNormalMap = material->normalTexture ? 1 : 0;
-            matData.normalMapIndex = material->normalTexture ? static_cast<DirectX12Texture2D*>(material->normalTexture.get())->GetDescriptorIndex() : -1;
+            matData.hasNormalMap = cmd.material->normalTexture ? 1 : 0;
+            matData.normalMapIndex = cmd.material->normalTexture ? static_cast<DirectX12Texture2D*>(cmd.material->normalTexture.get())->GetDescriptorIndex() : -1;
 
-            matData.hasMetallicRoughnessMap = material->metallicRoughnessTexture ? 1 : 0;
-            matData.metallicRoughnessMapIndex = material->metallicRoughnessTexture ? static_cast<DirectX12Texture2D*>(material->metallicRoughnessTexture.get())->GetDescriptorIndex() : -1;
+            matData.hasMetallicRoughnessMap = cmd.material->metallicRoughnessTexture ? 1 : 0;
+            matData.metallicRoughnessMapIndex = cmd.material->metallicRoughnessTexture ? static_cast<DirectX12Texture2D*>(cmd.material->metallicRoughnessTexture.get())->GetDescriptorIndex() : -1;
 
-            matData.hasAOMap = material->aoTexture ? 1 : 0;
-            matData.aoMapIndex = material->aoTexture ? static_cast<DirectX12Texture2D*>(material->aoTexture.get())->GetDescriptorIndex() : -1;
+            matData.hasAOMap = cmd.material->aoTexture ? 1 : 0;
+            matData.aoMapIndex = cmd.material->aoTexture ? static_cast<DirectX12Texture2D*>(cmd.material->aoTexture.get())->GetDescriptorIndex() : -1;
 
             m_MaterialDataPool[m_MaterialDataIndex].ubo->SetData(&matData, sizeof(MaterialData));
-            cmd.materialDataAddress = static_cast<DirectX12UniformBuffer*>(m_MaterialDataPool[m_MaterialDataIndex].ubo.get())->GetGPUVirtualAddress();
+            D3D12_GPU_VIRTUAL_ADDRESS materialDataAddress = static_cast<DirectX12UniformBuffer*>(m_MaterialDataPool[m_MaterialDataIndex].ubo.get())->GetGPUVirtualAddress();
+            m_CommandList->SetGraphicsRootConstantBufferView(3, materialDataAddress);
             m_MaterialDataIndex++;
         }
-
-        m_RenderQueue.push_back(std::move(cmd));
     }
 
     void DirectX12Renderer::SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) {
@@ -555,7 +591,7 @@ namespace VECTOR {
         if (!m_FrameStarted) return;
         
         for (const auto& cmd : m_RenderQueue) {
-            m_CommandList->SetGraphicsRootConstantBufferView(2, cmd.objectDataAddress);
+            BindObjectAndMaterial(cmd, false); // Prepass only needs object data, materials could be bound if alpha testing but we don't have it yet
 
             auto pfdAddress = static_cast<DirectX12UniformBuffer*>(m_PerFrameUBOs[m_FrameIndex].get())->GetGPUVirtualAddress();
             m_CommandList->SetGraphicsRootConstantBufferView(0, pfdAddress);
@@ -588,7 +624,7 @@ namespace VECTOR {
         if (!m_FrameStarted) return;
         
         for (const auto& cmd : m_RenderQueue) {
-            m_CommandList->SetGraphicsRootConstantBufferView(2, cmd.objectDataAddress);
+            BindObjectAndMaterial(cmd, false); // Shadow pass doesn't need material data
 
             // Bind b0 for shadow pass (PerFrameData with light space matrix)
             auto pfdAddress = static_cast<DirectX12UniformBuffer*>(m_PerFrameUBOs[m_FrameIndex].get())->GetGPUVirtualAddress();
@@ -616,13 +652,7 @@ namespace VECTOR {
         }
 
         for (const auto& cmd : m_RenderQueue) {
-            // Bind b2 (ObjectData)
-            m_CommandList->SetGraphicsRootConstantBufferView(2, cmd.objectDataAddress);
-
-            // Bind b3 (MaterialData)
-            if (cmd.materialDataAddress != 0) {
-                m_CommandList->SetGraphicsRootConstantBufferView(3, cmd.materialDataAddress);
-            }
+            BindObjectAndMaterial(cmd, true); // Main pass needs object and material data
             
             if (cmd.mesh) {
                 const DirectX12Mesh* dx12Mesh = dynamic_cast<const DirectX12Mesh*>(cmd.mesh);
@@ -694,9 +724,29 @@ namespace VECTOR {
             backBufferIndex = swapchain3->GetCurrentBackBufferIndex();
         }
         
+        uint32_t postProcessInputSRV = m_PostProcessor->GetHDRTextureSRVIndex();
+        
+        m_PostProcessor->TransitionHDRToSRV(m_CommandList.Get());
+
+        if (m_TAAEnabled) {
+            // TAA Resolve passes:
+            // 1. Current frame HDR image (from PostProcessor's HDR buffer before bloom/tonemap)
+            // 2. Motion vectors (from Prepass)
+            // 3. Depth buffer (from Prepass)
+            m_TAA->Resolve(
+                m_CommandList.Get(), 
+                m_PostProcessor->GetHDRTextureSRVIndex(), 
+                m_Prepass->GetMotionVectorSRVIndex(), 
+                m_Prepass->GetDepthSRVIndex()
+            );
+
+            // Output of TAA is now the input for Bloom / Tonemapping
+            postProcessInputSRV = m_TAA->GetResolvedSRVIndex();
+        }
+
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_Swapchain->GetBackBufferRTV(backBufferIndex);
         
-        m_PostProcessor->Resolve(m_CommandList.Get(), rtvHandle, m_Swapchain->GetWidth(), m_Swapchain->GetHeight());
+        m_PostProcessor->Resolve(m_CommandList.Get(), rtvHandle, m_Swapchain->GetWidth(), m_Swapchain->GetHeight(), postProcessInputSRV);
     }
 
     void DirectX12Renderer::SetWireframeMode(bool enabled) {

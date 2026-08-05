@@ -55,6 +55,8 @@ void PongGame::Render() {
 
   VECTOR::SceneManager::Get().Render(m_Renderer.get());
 
+  m_Renderer->ExecuteRenderPipeline();
+
   m_Renderer->EndImGuiFrame();
 
   m_Renderer->Present();

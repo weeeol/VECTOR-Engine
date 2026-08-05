@@ -637,16 +637,8 @@ namespace VECTOR {
         m_PerFrameUBOs[m_CurrentFrame]->SetData(&data, sizeof(PerFrameData), 0);
     }
 
-    void VulkanRenderer::SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model, const std::vector<glm::mat4>* boneTransforms) {
-        if (!m_FrameStarted) BeginFrame();
-        
-        RenderCommand cmd;
-        cmd.mesh = mesh;
-        cmd.material = material;
-        cmd.model = model;
-        cmd.boneTransforms = boneTransforms;
-
-        if (boneTransforms && !boneTransforms->empty()) {
+    VkDescriptorSet VulkanRenderer::GetOrCreateObjectDescriptorSet(const RenderCommand& cmd) {
+        if (cmd.boneTransforms && !cmd.boneTransforms->empty()) {
             if (m_ObjectDataIndex >= m_ObjectDataPool.size()) {
                 ObjectData data;
                 data.ubo = std::make_unique<VulkanUniformBuffer>(sizeof(glm::mat4) * 100, 0);
@@ -671,14 +663,12 @@ namespace VECTOR {
                 m_ObjectDataPool.push_back(std::move(data));
             }
             
-            m_ObjectDataPool[m_ObjectDataIndex].ubo->SetData(boneTransforms->data(), std::min((int)boneTransforms->size(), 100) * sizeof(glm::mat4));
-            cmd.objectDescriptorSet = m_ObjectDataPool[m_ObjectDataIndex].descriptorSet;
+            m_ObjectDataPool[m_ObjectDataIndex].ubo->SetData(cmd.boneTransforms->data(), std::min((int)cmd.boneTransforms->size(), 100) * sizeof(glm::mat4));
+            VkDescriptorSet set = m_ObjectDataPool[m_ObjectDataIndex].descriptorSet;
             m_ObjectDataIndex++;
-        } else {
-            cmd.objectDescriptorSet = m_DummyObjectSet;
+            return set;
         }
-
-        m_RenderQueue.push_back(std::move(cmd));
+        return m_DummyObjectSet;
     }
 
     void VulkanRenderer::SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) {
@@ -749,7 +739,8 @@ namespace VECTOR {
         m_ShadowPass->GetDepthPipeline()->Bind(commandBuffer);
         
         for (const auto& cmd : m_RenderQueue) {
-            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], m_DummyMaterialDescriptorSet, cmd.objectDescriptorSet };
+            VkDescriptorSet objSet = GetOrCreateObjectDescriptorSet(cmd);
+            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], m_DummyMaterialDescriptorSet, objSet };
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DescriptorManager->GetPipelineLayout(), 0, 3, sets, 0, nullptr);
             
             struct PushConstants {
@@ -790,7 +781,8 @@ namespace VECTOR {
         m_Prepass->GetPipeline()->Bind(commandBuffer);
         
         for (const auto& cmd : m_RenderQueue) {
-            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], m_DummyMaterialDescriptorSet, cmd.objectDescriptorSet };
+            VkDescriptorSet objSet = GetOrCreateObjectDescriptorSet(cmd);
+            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], m_DummyMaterialDescriptorSet, objSet };
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DescriptorManager->GetPipelineLayout(), 0, 3, sets, 0, nullptr);
             
             struct PushConstants {
@@ -887,12 +879,9 @@ namespace VECTOR {
         }
 
         for (const auto& cmd : m_RenderQueue) {
-            VkDescriptorSet materialSet = m_DummyMaterialDescriptorSet;
-            if (cmd.material) {
-                materialSet = GetOrCreateMaterialDescriptorSet(cmd.material);
-            }
-
-            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], materialSet, cmd.objectDescriptorSet };
+            VkDescriptorSet objSet = GetOrCreateObjectDescriptorSet(cmd);
+            VkDescriptorSet materialSet = cmd.material ? GetOrCreateMaterialDescriptorSet(cmd.material) : m_DummyMaterialDescriptorSet;
+            VkDescriptorSet sets[] = { m_GlobalDescriptorSets[m_CurrentFrame], materialSet, objSet };
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DescriptorManager->GetPipelineLayout(), 0, 3, sets, 0, nullptr);
             // Material Push Constants
             struct PushConstants {

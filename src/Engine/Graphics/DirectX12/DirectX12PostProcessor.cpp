@@ -203,16 +203,17 @@ namespace VECTOR {
         commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
     }
 
-    void DirectX12PostProcessor::RenderBloom(ID3D12GraphicsCommandList* commandList) {
-        if (!m_BloomEnabled || m_BloomMips.empty()) return;
-
-        // Transition HDR to SRV
+    void DirectX12PostProcessor::TransitionHDRToSRV(ID3D12GraphicsCommandList* commandList) {
         auto hdrToSRV = CD3DX12_RESOURCE_BARRIER::Transition(
             m_HDRTexture.Get(),
             D3D12_RESOURCE_STATE_RENDER_TARGET,
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
         );
         commandList->ResourceBarrier(1, &hdrToSRV);
+    }
+
+    void DirectX12PostProcessor::RenderBloom(ID3D12GraphicsCommandList* commandList, uint32_t inputSRVIndex) {
+        if (!m_BloomEnabled || m_BloomMips.empty()) return;
 
         // --- Downsample Pass ---
         commandList->SetPipelineState(m_BloomDownsamplePipeline->GetPipelineState());
@@ -240,7 +241,7 @@ namespace VECTOR {
             if (i == 0) {
                 data.params[0] = (float)m_Width;
                 data.params[1] = (float)m_Height;
-                data.srcTexIndex = m_HDRTextureSRVIndex;
+                data.srcTexIndex = inputSRVIndex;
             } else {
                 data.params[0] = (float)m_BloomMips[i-1].width;
                 data.params[1] = (float)m_BloomMips[i-1].height;
@@ -307,16 +308,9 @@ namespace VECTOR {
         }
     }
 
-    void DirectX12PostProcessor::Resolve(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE backbufferRTV, uint32_t width, uint32_t height) {
+    void DirectX12PostProcessor::Resolve(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE backbufferRTV, uint32_t width, uint32_t height, uint32_t inputSRVIndex) {
         if (m_BloomEnabled && !m_BloomMips.empty()) {
-            RenderBloom(commandList);
-        } else {
-            auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-                m_HDRTexture.Get(),
-                D3D12_RESOURCE_STATE_RENDER_TARGET,
-                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-            );
-            commandList->ResourceBarrier(1, &barrier);
+            RenderBloom(commandList, inputSRVIndex);
         }
 
         commandList->OMSetRenderTargets(1, &backbufferRTV, FALSE, nullptr);
@@ -331,7 +325,7 @@ namespace VECTOR {
 
         PostProcessData ppData;
         ppData.exposure = m_Exposure;
-        ppData.hdrTexIndex = m_HDRTextureSRVIndex;
+        ppData.hdrTexIndex = inputSRVIndex;
         if (m_BloomEnabled && !m_BloomMips.empty()) {
             ppData.bloomTexIndex = m_BloomMips[0].srvIndex;
             ppData.useBloom = 1;

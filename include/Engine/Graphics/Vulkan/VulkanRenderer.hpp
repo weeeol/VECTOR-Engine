@@ -50,7 +50,6 @@ namespace VECTOR {
 
         virtual void SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) override;
 
-        virtual void SubmitMesh(const Mesh* mesh, const Material* material, const glm::mat4& model, const std::vector<glm::mat4>* boneTransforms = nullptr) override;
 
         virtual void SubmitPointLight(const glm::vec3& position, float radius, const glm::vec3& color, float intensity) override;
         virtual void SetDirectionalLight(const glm::vec3& direction, const glm::vec3& color, float intensity) override;
@@ -93,16 +92,7 @@ namespace VECTOR {
         virtual void SetTAAEnabled(bool enabled) override { m_TAAEnabled = enabled; }
         virtual bool IsTAAEnabled() const override { return m_TAAEnabled; }
 
-        struct RenderCommand {
-            const Mesh* mesh;
-            const Material* material;
-            glm::mat4 model;
-            const std::vector<glm::mat4>* boneTransforms = nullptr;
-            VkDescriptorSet objectDescriptorSet = VK_NULL_HANDLE;
-        };
-
     private:
-        std::vector<RenderCommand> m_RenderQueue;
         
         SDL_Window* m_Window = nullptr;
         std::unique_ptr<VulkanContext> m_Context;
@@ -177,6 +167,7 @@ namespace VECTOR {
 
         std::unordered_map<MaterialTextures, VkDescriptorSet, MaterialTexturesHash> m_MaterialDescriptorSets;
         VkDescriptorSet GetOrCreateMaterialDescriptorSet(const Material* material);
+        VkDescriptorSet GetOrCreateObjectDescriptorSet(const RenderCommand& cmd);
 
         void CreateCommandPool();
         void CreateCommandBuffers();

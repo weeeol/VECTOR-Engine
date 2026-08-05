@@ -4,6 +4,8 @@
 struct PerFrameData {
     matrix view;
     matrix projection;
+    matrix previousView;
+    matrix previousProjection;
     matrix lightSpaceMatrix;
     float4 viewPos;
     float4 sunDir;
@@ -11,7 +13,9 @@ struct PerFrameData {
     float4 lightPos;
     float4 lightColor;
     int shadowMapIndex;
-    int padding[3];
+    int ssaoTexIndex;
+    float2 jitter;
+    float2 previousJitter;
 };
 
 struct PerObjectData {
@@ -34,6 +38,8 @@ struct VSOutput {
     float4 position : SV_POSITION;
     float3 viewNormal : NORMAL;
     float3 viewPos : POSITION1;
+    float4 currentClipPos : TEXCOORD0;
+    float4 previousClipPos : TEXCOORD1;
 };
 
 VSOutput VSMain(VSInput input) {
@@ -68,7 +74,13 @@ VSOutput VSMain(VSInput input) {
     float4 worldPos = mul(objectData.model, totalPosition);
     float4 viewPos = mul(pfd.view, worldPos);
     
+    // Apply jitter to current frame projection
     output.position = mul(pfd.projection, viewPos);
+    output.currentClipPos = output.position;
+    
+    // Compute previous clip pos WITHOUT current jitter, but with previous jitter
+    float4 prevViewPos = mul(pfd.previousView, worldPos);
+    output.previousClipPos = mul(pfd.previousProjection, prevViewPos);
     
     matrix modelView = mul(pfd.view, objectData.model);
     float3x3 normalMatrix = (float3x3)modelView;
@@ -81,10 +93,26 @@ VSOutput VSMain(VSInput input) {
 
 struct PSOutput {
     float4 normal : SV_Target0;
+    float2 motionVector : SV_Target1;
 };
 
 PSOutput PSMain(VSOutput input) {
     PSOutput output;
     output.normal = float4(normalize(input.viewNormal), 1.0f);
+    
+    // Compute motion vector
+    float2 currentNdc = input.currentClipPos.xy / input.currentClipPos.w;
+    float2 previousNdc = input.previousClipPos.xy / input.previousClipPos.w;
+    
+    // Convert to UV space [0, 1]
+    float2 currentUv = currentNdc * float2(0.5f, -0.5f) + 0.5f;
+    float2 previousUv = previousNdc * float2(0.5f, -0.5f) + 0.5f;
+    
+    // Remove jitter from motion vector to prevent blurring static objects
+    currentUv -= pfd.jitter;
+    previousUv -= pfd.previousJitter;
+    
+    output.motionVector = currentUv - previousUv;
+    
     return output;
 }

@@ -18,13 +18,13 @@
 
 ## 🚀 Overview
 
-**VECTOR** is a custom hardware-accelerated 3D C++ game engine built from scratch. It utilizes **SDL3** for windowing and input, with **Vulkan** as its primary rendering backend (OpenGL is supported but deprecated). It is compiled as a standalone static library (`libVECTOR.a`/`VECTOR.lib`) and includes a fully functional 3D Pong game that demonstrates the engine's incredible capabilities.
+**VECTOR** is a custom hardware-accelerated 3D C++ game engine built from scratch. It utilizes **SDL3** for windowing and input, with **Vulkan** and **DirectX 12** as its rendering backends. It is compiled as a standalone static library (`libVECTOR.a`/`VECTOR.lib`) and includes a fully functional 3D Pong game that demonstrates the engine's incredible capabilities.
 
 ---
 
 ## ✨ Features
 
-- 📺 **Advanced Rendering (Vulkan)**: Features a modern Vulkan rendering backend with support for Shadow Mapping, Screen Space Ambient Occlusion (SSAO), Cubemaps/Skyboxes, and Post-Processing.
+- 📺 **Advanced Rendering (Vulkan & DX12)**: Features modern rendering backends with support for Temporal Anti-Aliasing (TAA), Screen Space Ambient Occlusion (SSAO), Bloom, Shadow Mapping, Cubemaps/Skyboxes, and Post-Processing. DX12 backend uses advanced Shader Model 6.6 bindless rendering.
 - 🎬 **3D Models & Skeletal Animation**: Integrated with **Assimp** for loading 3D meshes, materials, and skeletal animations.
 - 💥 **3D Physics Engine**: Integrated **Bullet Physics** for 3D rigid body simulation, collision events, and continuous collision detection.
 - 🧵 **Multithreading**: Custom `JobSystem` for parallel task execution and maximizing CPU utilization.
@@ -46,8 +46,9 @@ Ensure you have the following installed before building:
 * 🧰 **C++17 or C++20** compatible compiler
 * 🏗️ **CMake 3.10+**
 * 🎮 **SDL3, SDL3_ttf, SDL3_image, and SDL3_mixer** development libraries
-* 🌋 **Vulkan SDK** & **VulkanMemoryAllocator**
-* 📦 **Bullet Physics**, **GLM**, **Assimp**, **nlohmann_json**, **GLEW**, **OpenGL** (for legacy support)
+* 🌋 **Vulkan SDK** & **VulkanMemoryAllocator** (for Vulkan backend)
+* 🪟 **Windows SDK** (for DirectX 12 backend)
+* 📦 **Bullet Physics**, **GLM**, **Assimp**, **nlohmann_json**
 * *Note: Dear ImGui is automatically fetched by CMake at build time.*
 
 ---
@@ -74,7 +75,7 @@ This engine uses a **universal CMake configuration**. It is highly recommended t
 Using [vcpkg](https://vcpkg.io/):
 
 ```bash
-vcpkg install sdl3 sdl3-ttf sdl3-image sdl3-mixer bullet3 glm assimp nlohmann-json vulkan-memory-allocator glew opengl
+vcpkg install sdl3 sdl3-ttf sdl3-image sdl3-mixer bullet3 glm assimp nlohmann-json vulkan-memory-allocator
 mkdir build && cd build
 cmake -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake ..
 cmake --build .
@@ -84,7 +85,7 @@ cmake --build .
 If using MSYS2 (UCRT64), install the dependencies (example):
 
 ```bash
-pacman -S mingw-w64-ucrt-x86_64-SDL3 mingw-w64-ucrt-x86_64-SDL3_ttf mingw-w64-ucrt-x86_64-SDL3_image mingw-w64-ucrt-x86_64-SDL3_mixer mingw-w64-ucrt-x86_64-bullet mingw-w64-ucrt-x86_64-glm mingw-w64-ucrt-x86_64-assimp mingw-w64-ucrt-x86_64-nlohmann-json mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-vulkan-memory-allocator mingw-w64-ucrt-x86_64-glew
+pacman -S mingw-w64-ucrt-x86_64-SDL3 mingw-w64-ucrt-x86_64-SDL3_ttf mingw-w64-ucrt-x86_64-SDL3_image mingw-w64-ucrt-x86_64-SDL3_mixer mingw-w64-ucrt-x86_64-bullet mingw-w64-ucrt-x86_64-glm mingw-w64-ucrt-x86_64-assimp mingw-w64-ucrt-x86_64-nlohmann-json mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-vulkan-memory-allocator
 ```
 
 Then configure and build via CMake:

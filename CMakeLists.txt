@@ -83,6 +83,7 @@ set(VECTOR_SOURCES
     src/Engine/Graphics/DirectX12/DirectX12Prepass.cpp
     src/Engine/Graphics/DirectX12/DirectX12ShadowPass.cpp
     src/Engine/Graphics/DirectX12/DirectX12SSAO.cpp
+    src/Engine/Graphics/DirectX12/DirectX12TAA.cpp
     src/Engine/Graphics/DirectX12/DirectX12PostProcessor.cpp
     src/Engine/Graphics/DirectX12/DirectX12Mesh.cpp
 )
