@@ -59,6 +59,9 @@ namespace VECTOR {
         VkImageView m_NoiseImageView = VK_NULL_HANDLE;
         VkSampler m_NoiseSampler = VK_NULL_HANDLE;
 
+        VkImageView m_LastNormalView = VK_NULL_HANDLE;
+        VkImageView m_LastDepthView = VK_NULL_HANDLE;
+
         VkSampler m_Sampler = VK_NULL_HANDLE;
 
         VkDescriptorSetLayout m_SSAOSetLayout = VK_NULL_HANDLE;

@@ -166,4 +166,62 @@ namespace VECTOR {
         }
     }
 
+    DirectX12Texture2D::DirectX12Texture2D(uint32_t width, uint32_t height, TextureFormat format) 
+        : m_Width(width), m_Height(height) {
+        auto allocator = DirectX12Context::Get()->GetAllocator();
+        auto device = DirectX12Context::Get()->GetDevice();
+
+        D3D12MA::ALLOCATION_DESC allocDesc = {};
+        allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+
+        D3D12_RESOURCE_DESC resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = width;
+        resourceDesc.Height = height;
+        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.MipLevels = 1;
+        
+        bool isDepth = (format == TextureFormat::Depth32F);
+        if (isDepth) {
+            resourceDesc.Format = DXGI_FORMAT_D32_FLOAT;
+        } else {
+            switch (format) {
+                case TextureFormat::RGBA16F: resourceDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT; break;
+                case TextureFormat::RGBA32F: resourceDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT; break;
+                case TextureFormat::RG16F: resourceDesc.Format = DXGI_FORMAT_R16G16_FLOAT; break;
+                case TextureFormat::RG32F: resourceDesc.Format = DXGI_FORMAT_R32G32_FLOAT; break;
+                default: resourceDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT; break;
+            }
+        }
+        resourceDesc.SampleDesc.Count = 1;
+        resourceDesc.SampleDesc.Quality = 0;
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        resourceDesc.Flags = isDepth ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+        HRESULT hr = allocator->CreateResource(
+            &allocDesc,
+            &resourceDesc,
+            isDepth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET,
+            nullptr,
+            &m_Allocation,
+            IID_PPV_ARGS(&m_Resource)
+        );
+
+        if (FAILED(hr)) {
+            VECTOR_LOG_ERROR("Failed to create transient RenderGraph resource.");
+            return;
+        }
+
+        m_DescriptorIndex = DirectX12DescriptorManager::Get()->AllocateSRVIndex();
+        
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Format = isDepth ? DXGI_FORMAT_R32_FLOAT : resourceDesc.Format; // DXGI_FORMAT_D32_FLOAT can't be SRV
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = 1;
+
+        device->CreateShaderResourceView(m_Resource.Get(), &srvDesc, DirectX12DescriptorManager::Get()->GetSRVCPUHandle(m_DescriptorIndex));
+    }
+
 } // namespace VECTOR

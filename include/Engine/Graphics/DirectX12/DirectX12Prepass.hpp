@@ -2,6 +2,7 @@
 #include <directx/d3d12.h>
 #include <wrl/client.h>
 #include <memory>
+#include "Engine/Graphics/Texture2D.hpp"
 
 namespace VECTOR {
 
@@ -16,7 +17,7 @@ namespace VECTOR {
         void Initialize();
         void Resize(uint32_t width, uint32_t height);
         
-        void BeginPass(ID3D12GraphicsCommandList* commandList);
+        void BeginPass(ID3D12GraphicsCommandList* commandList, std::shared_ptr<Texture2D> outNormal, std::shared_ptr<Texture2D> outPosition, std::shared_ptr<Texture2D> outDepth);
         void EndPass(ID3D12GraphicsCommandList* commandList);
 
         DirectX12Pipeline* GetPipeline() const { return m_Pipeline.get(); }

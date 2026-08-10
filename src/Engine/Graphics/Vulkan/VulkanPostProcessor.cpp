@@ -438,6 +438,7 @@ namespace VECTOR {
     }
     
     void VulkanPostProcessor::CreateResources() {
+        VECTOR_LOG_INFO("VulkanPostProcessor::CreateResources called!");
         VkDevice device = VulkanContext::Get()->GetDevice();
         
         // 1. Create Offscreen Color Image
@@ -807,6 +808,7 @@ namespace VECTOR {
         postWrites[1].descriptorCount = 1;
         postWrites[1].pImageInfo = &bloomInfo;
 
+        VECTOR_LOG_INFO("VulkanPostProcessor::UpdateDescriptorSets called! Set: %p", (void*)m_PostProcessDescriptorSet);
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(postWrites.size()), postWrites.data(), 0, nullptr);
 
         // 5. Allocate and Update Bloom Sets (one for offscreen -> mip0, then mipN -> mipN+1)
@@ -849,6 +851,7 @@ namespace VECTOR {
             bloomWrites.push_back(write);
         }
 
+        VECTOR_LOG_INFO("VulkanPostProcessor::Bloom sets allocated! Base set: %p", (void*)m_BloomDescriptorSets[0]);
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(bloomWrites.size()), bloomWrites.data(), 0, nullptr);
 
         // 6. Allocate and Update TAA Sets
@@ -904,6 +907,7 @@ namespace VECTOR {
             taaWrites[2].descriptorCount = 1;
             taaWrites[2].pImageInfo = &historyInfo;
 
+            VECTOR_LOG_INFO("VulkanPostProcessor::TAA set updated! Set: %p", (void*)m_TAADescriptorSets[i]);
             vkUpdateDescriptorSets(device, static_cast<uint32_t>(taaWrites.size()), taaWrites.data(), 0, nullptr);
         }
     }

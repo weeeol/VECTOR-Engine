@@ -9,6 +9,7 @@ namespace VECTOR {
     public:
         VulkanTexture2D(const std::string& path);
         VulkanTexture2D(uint32_t width, uint32_t height, void* data, uint32_t channels);
+        VulkanTexture2D(uint32_t width, uint32_t height, TextureFormat format);
         virtual ~VulkanTexture2D();
 
         virtual void Bind(unsigned int slot = 0) const override;

@@ -12,7 +12,8 @@ namespace VECTOR {
     class DirectX12Texture2D : public Texture2D {
     public:
         DirectX12Texture2D(const std::string& path);
-        DirectX12Texture2D(uint32_t width, uint32_t height, void* data, uint32_t size);
+        DirectX12Texture2D(uint32_t width, uint32_t height, void* data, uint32_t channels);
+        DirectX12Texture2D(uint32_t width, uint32_t height, TextureFormat format);
         virtual ~DirectX12Texture2D();
 
         virtual void Bind(unsigned int slot = 0) const override;

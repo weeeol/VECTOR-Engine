@@ -111,6 +111,10 @@ namespace VECTOR {
     }
 
     void DirectX12Renderer::Shutdown() {
+        VECTOR_LOG_INFO("DirectX12Renderer::Shutdown called");
+
+        m_RenderGraph.Clear();
+
         if (!m_Window) return; // Already shut down
 
         WaitIdle();
@@ -284,6 +288,8 @@ namespace VECTOR {
     }
 
     void DirectX12Renderer::SetResolution(int width, int height) {
+        if (width == 0 || height == 0) return;
+        m_RenderGraph.Clear();
         WaitIdle();
         SDL_SetWindowSize(m_Window, width, height);
         SDL_SetWindowPosition(m_Window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
@@ -354,6 +360,23 @@ namespace VECTOR {
         ID3D12DescriptorHeap* heaps[] = { DirectX12DescriptorManager::Get()->GetSRVHeap() };
         m_CommandList->SetDescriptorHeaps(1, heaps);
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
+    }
+
+    std::shared_ptr<Texture2D> DirectX12Renderer::AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format) {
+        return Texture2D::CreateRenderTarget(width, height, format);
+    }
+
+    void DirectX12Renderer::TransitionResource(uint32_t handle, int oldState, int newState) {
+        if (!m_FrameStarted) return;
+        
+        // High-level automated barrier injected by Render Graph!
+        // ID3D12GraphicsCommandList* commandList = m_CommandLists[m_CurrentFrame];
+        // D3D12_RESOURCE_BARRIER barrier = {};
+        // barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        // barrier.Transition.pResource = resourceMap[handle];
+        // barrier.Transition.StateBefore = MapState(oldState);
+        // barrier.Transition.StateAfter = MapState(newState);
+        // commandList->ResourceBarrier(1, &barrier);
     }
 
     void DirectX12Renderer::BeginUI() {
@@ -562,7 +585,7 @@ namespace VECTOR {
         m_LightData.dirLightColor = glm::vec4(color, intensity);
     }
 
-    void DirectX12Renderer::BeginMainPass() {
+    void DirectX12Renderer::BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth) {
         if (!m_FrameStarted) return;
         m_LightUBOs[m_FrameIndex]->SetData(&m_LightData, sizeof(LightUBOData));
         
@@ -596,9 +619,9 @@ namespace VECTOR {
         m_CommandList->SetGraphicsRootConstantBufferView(1, lightAddress);
     }
 
-    void DirectX12Renderer::BeginPrepass() {
+    void DirectX12Renderer::BeginPrepass(std::shared_ptr<Texture2D> outNormal, std::shared_ptr<Texture2D> outPosition, std::shared_ptr<Texture2D> outDepth) {
         if (!m_FrameStarted) return;
-        m_Prepass->BeginPass(m_CommandList.Get());
+        m_Prepass->BeginPass(m_CommandList.Get(), outNormal, outPosition, outDepth);
     }
 
     void DirectX12Renderer::FlushPrepass() {

@@ -457,6 +457,11 @@ namespace VECTOR {
     }
 
     void VulkanSSAO::UpdateDescriptorSets(VkImageView normalView, VkImageView depthView) {
+        if (m_LastNormalView == normalView && m_LastDepthView == depthView)
+            return;
+        m_LastNormalView = normalView;
+        m_LastDepthView = depthView;
+
         VkDevice device = m_Context->GetDevice();
 
         VkDescriptorImageInfo normalInfo{};
@@ -553,8 +558,7 @@ namespace VECTOR {
     }
 
     void VulkanSSAO::Generate(VkCommandBuffer commandBuffer, VkImageView normalView, VkImageView depthView, const glm::mat4& projection, const glm::mat4& view) {
-        // Descriptor sets should be updated outside of the render loop (e.g. after initialization or resize)
-        // to avoid updating sets that are currently bound and in-use by a command buffer.
+        UpdateDescriptorSets(normalView, depthView);
 
         VkRenderPassBeginInfo rpInfo{};
         rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;

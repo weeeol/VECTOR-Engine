@@ -30,12 +30,12 @@ namespace Game {
             m_ShootCooldown = 0.5f;
 
             // Find camera
-            VECTOR::Entity cameraEntity = -1;
+            VECTOR::Entity cameraEntity = entt::null;
             registry.View<VECTOR::TransformComponent, VECTOR::CameraComponent>([&](VECTOR::Entity entity) {
                 cameraEntity = entity;
             });
 
-            if (cameraEntity == (VECTOR::Entity)-1) return;
+            if (cameraEntity == entt::null) return;
 
             auto& camT = registry.GetComponent<VECTOR::TransformComponent>(cameraEntity);
             auto& camC = registry.GetComponent<VECTOR::CameraComponent>(cameraEntity);
@@ -88,7 +88,7 @@ namespace Game {
             m_PhysicsSystem->GetWorld()->addRigidBody(body);
             
             // Link Bullet rigid body back to ECS entity
-            body->setUserIndex((int)bullet);
+            body->setUserIndex((int)entt::to_integral(bullet));
             
             registry.AddComponent(bullet, VECTOR::RigidBodyComponent{bodyPtr});
             registry.AddComponent(bullet, Game::ProjectileComponent{});

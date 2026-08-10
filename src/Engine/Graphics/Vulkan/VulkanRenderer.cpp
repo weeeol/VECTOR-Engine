@@ -63,8 +63,6 @@ bool VulkanRenderer::Initialize(const std::string &title, int width,
   m_SSAO =
       std::make_unique<VulkanSSAO>(m_Context.get(), pixelWidth, pixelHeight);
   m_SSAO->Initialize();
-  m_SSAO->UpdateDescriptorSets(m_Prepass->GetNormalImageView(),
-                               m_Prepass->GetDepthImageView());
 
   CreateCommandPool();
   CreateCommandBuffers();
@@ -168,6 +166,8 @@ bool VulkanRenderer::Initialize(const std::string &title, int width,
 
 void VulkanRenderer::Shutdown() {
   VECTOR_LOG_INFO("VulkanRenderer::Shutdown called");
+  
+  m_RenderGraph.Clear();
 
   if (m_Context && m_Context->GetDevice()) {
     vkDeviceWaitIdle(m_Context->GetDevice());
@@ -287,7 +287,7 @@ void VulkanRenderer::Present() {
     BeginFrame();
   }
   if (!m_MainPassActive) {
-    BeginMainPass();
+    BeginMainPass(nullptr, nullptr, nullptr);
   }
 
   VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
@@ -377,6 +377,9 @@ void VulkanRenderer::Present() {
 }
 
 void VulkanRenderer::SetResolution(int width, int height) {
+  if (width == 0 || height == 0)
+    return;
+  m_RenderGraph.Clear();
   if (m_Window) {
     SDL_SetWindowSize(m_Window, width, height);
   }
@@ -404,8 +407,6 @@ void VulkanRenderer::RecreateSwapchain() {
     m_Prepass->Resize(width, height);
   if (m_SSAO) {
     m_SSAO->Resize(width, height);
-    m_SSAO->UpdateDescriptorSets(m_Prepass->GetNormalImageView(),
-                                 m_Prepass->GetDepthImageView());
   }
 }
 
@@ -784,6 +785,14 @@ void VulkanRenderer::BeginImGuiFrame() {
 
 void VulkanRenderer::EndImGuiFrame() { ImGui::Render(); }
 
+std::shared_ptr<Texture2D> VulkanRenderer::AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format) {
+  return Texture2D::CreateRenderTarget(width, height, format);
+}
+
+void VulkanRenderer::TransitionResource(uint32_t handle, int oldState, int newState) {
+  if (!m_FrameStarted) return;
+}
+
 void VulkanRenderer::BeginShadowPass() {
   BeginFrame();
   if (!m_FrameStarted)
@@ -837,13 +846,13 @@ void VulkanRenderer::FlushShadowPass() {
   m_ShadowPass->EndPass(commandBuffer);
 }
 
-void VulkanRenderer::BeginPrepass() {
+void VulkanRenderer::BeginPrepass(std::shared_ptr<Texture2D> outNormal, std::shared_ptr<Texture2D> outPosition, std::shared_ptr<Texture2D> outDepth) {
   BeginFrame();
   if (!m_FrameStarted)
     return;
 
   VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
-  m_Prepass->BeginPass(commandBuffer);
+  m_Prepass->BeginPass(commandBuffer, outNormal, outPosition, outDepth);
 }
 
 void VulkanRenderer::FlushPrepass() {
@@ -897,7 +906,7 @@ void VulkanRenderer::FlushPrepass() {
   }
 }
 
-void VulkanRenderer::BeginMainPass() {
+void VulkanRenderer::BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth) {
   if (m_MainPassActive)
     return;
 

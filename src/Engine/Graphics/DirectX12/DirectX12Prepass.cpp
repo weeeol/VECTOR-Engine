@@ -3,6 +3,7 @@
 #include "Engine/Graphics/DirectX12/DirectX12Pipeline.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12Shader.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12DescriptorManager.hpp"
+#include "Engine/Graphics/DirectX12/DirectX12Texture2D.hpp"
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Core/ResourceManager.hpp"
 #include <directx/d3dx12.h>
@@ -39,86 +40,23 @@ namespace VECTOR {
     }
 
     void DirectX12Prepass::CreateResources(uint32_t width, uint32_t height) {
-        auto device = m_Context->GetDevice();
-
-        // 1. Create Normal Render Target (R16G16B16A16_FLOAT)
-        D3D12_RESOURCE_DESC rtvDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16B16A16_FLOAT, width, height, 1, 1);
-        rtvDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-        D3D12_CLEAR_VALUE rtvClearValue = {};
-        rtvClearValue.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        rtvClearValue.Color[0] = 0.0f;
-        rtvClearValue.Color[1] = 0.0f;
-        rtvClearValue.Color[2] = 0.0f;
-        rtvClearValue.Color[3] = 1.0f;
-
-        auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-        device->CreateCommittedResource(
-            &heapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &rtvDesc,
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-            &rtvClearValue,
-            IID_PPV_ARGS(&m_NormalTexture)
-        );
-
-        // 1.5 Create Motion Vector Render Target (R16G16_FLOAT)
-        D3D12_RESOURCE_DESC mvDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16_FLOAT, width, height, 1, 1);
-        mvDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-        D3D12_CLEAR_VALUE mvClearValue = {};
-        mvClearValue.Format = DXGI_FORMAT_R16G16_FLOAT;
-        mvClearValue.Color[0] = 0.0f;
-        mvClearValue.Color[1] = 0.0f;
-        mvClearValue.Color[2] = 0.0f;
-        mvClearValue.Color[3] = 0.0f;
-
-        device->CreateCommittedResource(
-            &heapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &mvDesc,
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-            &mvClearValue,
-            IID_PPV_ARGS(&m_MotionVectorTexture)
-        );
-
-        // 2. Create Depth Render Target (D32_FLOAT)
-        D3D12_RESOURCE_DESC dsvDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32_TYPELESS, width, height, 1, 1);
-        dsvDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-        D3D12_CLEAR_VALUE dsvClearValue = {};
-        dsvClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-        dsvClearValue.DepthStencil.Depth = 1.0f;
-        dsvClearValue.DepthStencil.Stencil = 0;
-
-        device->CreateCommittedResource(
-            &heapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &dsvDesc,
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-            &dsvClearValue,
-            IID_PPV_ARGS(&m_DepthTexture)
-        );
     }
 
     void DirectX12Prepass::CreateDescriptors() {
         auto device = m_Context->GetDevice();
-        auto descManager = DirectX12DescriptorManager::Get();
 
         // RTV Heap
         D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-        rtvHeapDesc.NumDescriptors = 2; // Normal + MotionVector
+        rtvHeapDesc.NumDescriptors = 2; // Normal + Position/MotionVector
         rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_RTVHeap));
 
         uint32_t rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
         m_NormalRTV = m_RTVHeap->GetCPUDescriptorHandleForHeapStart();
-        device->CreateRenderTargetView(m_NormalTexture.Get(), nullptr, m_NormalRTV);
-
+        
         m_MotionVectorRTV = m_NormalRTV;
         m_MotionVectorRTV.ptr += rtvDescriptorSize;
-        device->CreateRenderTargetView(m_MotionVectorTexture.Get(), nullptr, m_MotionVectorRTV);
 
         // DSV Heap
         D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
@@ -128,38 +66,6 @@ namespace VECTOR {
         device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_DSVHeap));
 
         m_DepthDSV = m_DSVHeap->GetCPUDescriptorHandleForHeapStart();
-        D3D12_DEPTH_STENCIL_VIEW_DESC dsvViewDesc = {};
-        dsvViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
-        dsvViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-        dsvViewDesc.Texture2D.MipSlice = 0;
-        device->CreateDepthStencilView(m_DepthTexture.Get(), &dsvViewDesc, m_DepthDSV);
-
-        // SRVs
-        if (m_NormalSRVIndex == 0) m_NormalSRVIndex = descManager->AllocateSRVIndex();
-        if (m_MotionVectorSRVIndex == 0) m_MotionVectorSRVIndex = descManager->AllocateSRVIndex();
-        if (m_DepthSRVIndex == 0) m_DepthSRVIndex = descManager->AllocateSRVIndex();
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(m_NormalTexture.Get(), &srvDesc, descManager->GetSRVCPUHandle(m_NormalSRVIndex));
-        
-        D3D12_SHADER_RESOURCE_VIEW_DESC mvSrvDesc = {};
-        mvSrvDesc.Format = DXGI_FORMAT_R16G16_FLOAT;
-        mvSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        mvSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        mvSrvDesc.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(m_MotionVectorTexture.Get(), &mvSrvDesc, descManager->GetSRVCPUHandle(m_MotionVectorSRVIndex));
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvViewDesc = {};
-        srvViewDesc.Format = DXGI_FORMAT_R32_FLOAT; // Read depth as float
-        srvViewDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvViewDesc.Texture2D.MipLevels = 1;
-        srvViewDesc.Texture2D.MostDetailedMip = 0;
-        srvViewDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        device->CreateShaderResourceView(m_DepthTexture.Get(), &srvViewDesc, descManager->GetSRVCPUHandle(m_DepthSRVIndex));
     }
 
     void DirectX12Prepass::CreatePipeline() {
@@ -173,8 +79,38 @@ namespace VECTOR {
         m_Pipeline = std::make_unique<DirectX12Pipeline>(dynamic_cast<DirectX12Shader*>(shader.get()), config);
     }
 
-    void DirectX12Prepass::BeginPass(ID3D12GraphicsCommandList* commandList) {
-        // Transition resources to RENDER_TARGET and DEPTH_WRITE
+    void DirectX12Prepass::BeginPass(ID3D12GraphicsCommandList* commandList, std::shared_ptr<Texture2D> outNormal, std::shared_ptr<Texture2D> outPosition, std::shared_ptr<Texture2D> outDepth) {
+        auto dxNormal = std::dynamic_pointer_cast<DirectX12Texture2D>(outNormal);
+        auto dxPosition = std::dynamic_pointer_cast<DirectX12Texture2D>(outPosition);
+        auto dxDepth = std::dynamic_pointer_cast<DirectX12Texture2D>(outDepth);
+        
+        if (!dxNormal || !dxPosition || !dxDepth) {
+            VECTOR_LOG_ERROR("DirectX12Prepass received invalid textures from RenderGraph!");
+            return;
+        }
+
+        m_NormalTexture = dxNormal->GetResource();
+        m_MotionVectorTexture = dxPosition->GetResource(); // Map Position to MotionVector slot for now
+        m_DepthTexture = dxDepth->GetResource();
+        
+        m_NormalSRVIndex = dxNormal->GetDescriptorIndex();
+        m_MotionVectorSRVIndex = dxPosition->GetDescriptorIndex();
+        m_DepthSRVIndex = dxDepth->GetDescriptorIndex();
+
+        // Update RTV/DSV
+        auto device = m_Context->GetDevice();
+        device->CreateRenderTargetView(m_NormalTexture.Get(), nullptr, m_NormalRTV);
+        device->CreateRenderTargetView(m_MotionVectorTexture.Get(), nullptr, m_MotionVectorRTV);
+        
+        D3D12_DEPTH_STENCIL_VIEW_DESC dsvViewDesc = {};
+        dsvViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
+        dsvViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        dsvViewDesc.Texture2D.MipSlice = 0;
+        device->CreateDepthStencilView(m_DepthTexture.Get(), &dsvViewDesc, m_DepthDSV);
+
+        // Transition resources to RENDER_TARGET and DEPTH_WRITE handled by Graph? Wait, Graph transitions to RENDER_TARGET / DEPTH_WRITE?
+        // Right now our graph hasn't been fully updated to issue barriers.
+        // We will issue manual barriers for now.
         D3D12_RESOURCE_BARRIER barriers[3] = {};
         barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_NormalTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
         barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_MotionVectorTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -201,7 +137,7 @@ namespace VECTOR {
     }
 
     void DirectX12Prepass::EndPass(ID3D12GraphicsCommandList* commandList) {
-        // Transition resources back to PIXEL_SHADER_RESOURCE
+        if (!m_NormalTexture) return;
         D3D12_RESOURCE_BARRIER barriers[3] = {};
         barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_NormalTexture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_MotionVectorTexture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);

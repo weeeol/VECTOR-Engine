@@ -3,6 +3,7 @@
 #include "Engine/Graphics/Material.hpp"
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/Shader.hpp"
+#include "Engine/Graphics/RenderGraph.hpp"
 #include "Engine/Graphics/Texture2D.hpp"
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -50,6 +51,9 @@ public:
                           const glm::vec4 &color, int fontSize = 24) = 0;
   virtual void EndUI() = 0;
 
+  virtual std::shared_ptr<Texture2D> AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format = TextureFormat::RGBA16F) { return nullptr; }
+  virtual void TransitionResource(uint32_t handle, int oldState, int newState) {}
+
   virtual void BeginImGuiFrame() = 0;
   virtual void EndImGuiFrame() = 0;
 
@@ -59,10 +63,10 @@ public:
   virtual void BeginShadowPass() = 0;
   virtual void FlushShadowPass() = 0;
 
-  virtual void BeginPrepass() {}
-  virtual void FlushPrepass() {}
+  virtual void BeginPrepass(std::shared_ptr<Texture2D> outNormal, std::shared_ptr<Texture2D> outPosition, std::shared_ptr<Texture2D> outDepth) = 0;
+  virtual void FlushPrepass() = 0;
 
-  virtual void BeginMainPass() = 0;
+  virtual void BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth) = 0;
   virtual void FlushMainPass() = 0;
   virtual void EndPostProcessPass() = 0;
 
@@ -100,6 +104,7 @@ protected:
   };
 
   std::vector<RenderCommand> m_RenderQueue;
+  RenderGraph m_RenderGraph;
 };
 
 } // namespace VECTOR

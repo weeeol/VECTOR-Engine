@@ -45,6 +45,9 @@ namespace VECTOR {
         virtual void DrawUIText(const std::string& text, int x, int y, const glm::vec4& color, int fontSize = 24) override;
         virtual void EndUI() override;
 
+        virtual std::shared_ptr<Texture2D> AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format) override;
+        void TransitionResource(uint32_t handle, int oldState, int newState) override;
+
         virtual void BeginImGuiFrame() override;
         virtual void EndImGuiFrame() override;
 
@@ -53,10 +56,10 @@ namespace VECTOR {
         virtual void BeginShadowPass() override;
         virtual void FlushShadowPass() override;
         
-        virtual void BeginPrepass() override;
+        virtual void BeginPrepass(std::shared_ptr<Texture2D> outNormal, std::shared_ptr<Texture2D> outPosition, std::shared_ptr<Texture2D> outDepth) override;
         virtual void FlushPrepass() override;
         
-        virtual void BeginMainPass() override;
+        virtual void BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth) override;
         virtual void FlushMainPass() override;
         virtual void EndPostProcessPass() override;
 

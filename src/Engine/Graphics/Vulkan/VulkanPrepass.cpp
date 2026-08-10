@@ -1,6 +1,7 @@
 #include "Engine/Graphics/Vulkan/VulkanPrepass.hpp"
 #include "Engine/Graphics/Vulkan/VulkanContext.hpp"
 #include "Engine/Graphics/Vulkan/VulkanPipeline.hpp"
+#include "Engine/Graphics/Vulkan/VulkanTexture2D.hpp"
 #include "Engine/Core/Logger.hpp"
 #include <array>
 
@@ -36,41 +37,9 @@ namespace VECTOR {
         VkDevice device = m_Context->GetDevice();
         VmaAllocator allocator = m_Context->GetAllocator();
 
-        if (m_Sampler != VK_NULL_HANDLE) {
-            vkDestroySampler(device, m_Sampler, nullptr);
-            m_Sampler = VK_NULL_HANDLE;
-        }
-        
         if (m_Framebuffer != VK_NULL_HANDLE) {
             vkDestroyFramebuffer(device, m_Framebuffer, nullptr);
             m_Framebuffer = VK_NULL_HANDLE;
-        }
-        
-        if (m_NormalImageView != VK_NULL_HANDLE) {
-            vkDestroyImageView(device, m_NormalImageView, nullptr);
-            m_NormalImageView = VK_NULL_HANDLE;
-        }
-        if (m_NormalImage != VK_NULL_HANDLE) {
-            vmaDestroyImage(allocator, m_NormalImage, m_NormalAllocation);
-            m_NormalImage = VK_NULL_HANDLE;
-        }
-        
-        if (m_PositionImageView != VK_NULL_HANDLE) {
-            vkDestroyImageView(device, m_PositionImageView, nullptr);
-            m_PositionImageView = VK_NULL_HANDLE;
-        }
-        if (m_PositionImage != VK_NULL_HANDLE) {
-            vmaDestroyImage(allocator, m_PositionImage, m_PositionAllocation);
-            m_PositionImage = VK_NULL_HANDLE;
-        }
-        
-        if (m_DepthImageView != VK_NULL_HANDLE) {
-            vkDestroyImageView(device, m_DepthImageView, nullptr);
-            m_DepthImageView = VK_NULL_HANDLE;
-        }
-        if (m_DepthImage != VK_NULL_HANDLE) {
-            vmaDestroyImage(allocator, m_DepthImage, m_DepthAllocation);
-            m_DepthImage = VK_NULL_HANDLE;
         }
     }
 
@@ -104,8 +73,8 @@ namespace VECTOR {
             attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             
-            // 1: Position (RGBA16F)
-            attachments[1].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+            // 1: Position (RGBA32F)
+            attachments[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
             attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
             attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
             attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -172,94 +141,6 @@ namespace VECTOR {
             }
         }
 
-        // --- Create Images ---
-        VkImageCreateInfo imageInfo{};
-        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageInfo.extent.width = width;
-        imageInfo.extent.height = height;
-        imageInfo.extent.depth = 1;
-        imageInfo.mipLevels = 1;
-        imageInfo.arrayLayers = 1;
-        imageInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-        VmaAllocationCreateInfo allocInfo{};
-        allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-        // Normal Image
-        vmaCreateImage(allocator, &imageInfo, &allocInfo, &m_NormalImage, &m_NormalAllocation, nullptr);
-        // Position Image
-        vmaCreateImage(allocator, &imageInfo, &allocInfo, &m_PositionImage, &m_PositionAllocation, nullptr);
-        
-        // Depth Image
-        imageInfo.format = VK_FORMAT_D32_SFLOAT;
-        imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        vmaCreateImage(allocator, &imageInfo, &allocInfo, &m_DepthImage, &m_DepthAllocation, nullptr);
-
-        // --- Create Image Views ---
-        VkImageViewCreateInfo viewInfo{};
-        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.subresourceRange.levelCount = 1;
-        viewInfo.subresourceRange.baseMipLevel = 0;
-        viewInfo.subresourceRange.layerCount = 1;
-        viewInfo.subresourceRange.baseArrayLayer = 0;
-
-        viewInfo.image = m_NormalImage;
-        viewInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        vkCreateImageView(device, &viewInfo, nullptr, &m_NormalImageView);
-
-        viewInfo.image = m_PositionImage;
-        vkCreateImageView(device, &viewInfo, nullptr, &m_PositionImageView);
-
-        viewInfo.image = m_DepthImage;
-        viewInfo.format = VK_FORMAT_D32_SFLOAT;
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        vkCreateImageView(device, &viewInfo, nullptr, &m_DepthImageView);
-
-        // --- Create Sampler ---
-        VkSamplerCreateInfo samplerInfo{};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_NEAREST; // No filtering for GBuffer
-        samplerInfo.minFilter = VK_FILTER_NEAREST;
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 1.0f;
-        samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-
-        vkCreateSampler(device, &samplerInfo, nullptr, &m_Sampler);
-
-        // --- Create Framebuffer ---
-        std::array<VkImageView, 3> fbAttachments = {
-            m_NormalImageView,
-            m_PositionImageView,
-            m_DepthImageView
-        };
-
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = m_RenderPass;
-        framebufferInfo.attachmentCount = static_cast<uint32_t>(fbAttachments.size());
-        framebufferInfo.pAttachments = fbAttachments.data();
-        framebufferInfo.width = width;
-        framebufferInfo.height = height;
-        framebufferInfo.layers = 1;
-
-        if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &m_Framebuffer) != VK_SUCCESS) {
-            VECTOR_LOG_ERROR("Failed to create prepass framebuffer!");
-        }
     }
 
     void VulkanPrepass::CreatePipeline(VkPipelineLayout pipelineLayout) {
@@ -278,7 +159,48 @@ namespace VECTOR {
         m_Pipeline = std::make_unique<VulkanPipeline>("assets/engine/shaders/vulkan/prepass.vert.spv", "assets/engine/shaders/vulkan/prepass.frag.spv", config);
     }
 
-    void VulkanPrepass::BeginPass(VkCommandBuffer commandBuffer) {
+    void VulkanPrepass::BeginPass(VkCommandBuffer commandBuffer, std::shared_ptr<Texture2D> outNormal, std::shared_ptr<Texture2D> outPosition, std::shared_ptr<Texture2D> outDepth) {
+        
+        auto vkNormal = std::dynamic_pointer_cast<VulkanTexture2D>(outNormal);
+        auto vkPosition = std::dynamic_pointer_cast<VulkanTexture2D>(outPosition);
+        auto vkDepth = std::dynamic_pointer_cast<VulkanTexture2D>(outDepth);
+
+        if (!vkNormal || !vkPosition || !vkDepth) {
+            VECTOR_LOG_ERROR("VulkanPrepass received invalid textures from RenderGraph!");
+            return;
+        }
+
+        m_NormalImageView = vkNormal->GetImageView();
+        m_PositionImageView = vkPosition->GetImageView();
+        m_DepthImageView = vkDepth->GetImageView();
+        
+        // Use Texture's sampler if m_Sampler is null
+        if (m_Sampler == VK_NULL_HANDLE) {
+            m_Sampler = vkNormal->GetSampler();
+        }
+
+        if (m_Framebuffer == VK_NULL_HANDLE) {
+            std::array<VkImageView, 3> fbAttachments = {
+                vkNormal->GetImageView(),
+                vkPosition->GetImageView(),
+                vkDepth->GetImageView()
+            };
+
+            VkFramebufferCreateInfo framebufferInfo{};
+            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            framebufferInfo.renderPass = m_RenderPass;
+            framebufferInfo.attachmentCount = static_cast<uint32_t>(fbAttachments.size());
+            framebufferInfo.pAttachments = fbAttachments.data();
+            framebufferInfo.width = m_Width;
+            framebufferInfo.height = m_Height;
+            framebufferInfo.layers = 1;
+
+            if (vkCreateFramebuffer(m_Context->GetDevice(), &framebufferInfo, nullptr, &m_Framebuffer) != VK_SUCCESS) {
+                VECTOR_LOG_ERROR("Failed to create dynamic prepass framebuffer!");
+                return;
+            }
+        }
+
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = m_RenderPass;

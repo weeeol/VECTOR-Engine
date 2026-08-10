@@ -4,6 +4,9 @@
 #include <vk_mem_alloc.h>
 #include <memory>
 
+#include <memory>
+#include "Engine/Graphics/Texture2D.hpp"
+
 namespace VECTOR {
 
     class VulkanContext;
@@ -21,7 +24,7 @@ namespace VECTOR {
         void Shutdown();
         void Resize(uint32_t width, uint32_t height);
 
-        void BeginPass(VkCommandBuffer commandBuffer);
+        void BeginPass(VkCommandBuffer commandBuffer, std::shared_ptr<Texture2D> outNormal, std::shared_ptr<Texture2D> outPosition, std::shared_ptr<Texture2D> outDepth);
         void EndPass(VkCommandBuffer commandBuffer);
 
         VkImageView GetNormalImageView() const { return m_NormalImageView; }

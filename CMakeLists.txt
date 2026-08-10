@@ -28,6 +28,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(directx-headers CONFIG REQUIRED)
 find_package(directx-dxc CONFIG REQUIRED)
 find_package(D3D12MemoryAllocator CONFIG REQUIRED)
+find_package(entt CONFIG REQUIRED)
 set(VECTOR_SOURCES
     src/Engine/Core/Application.cpp
     src/Engine/Core/Logger.cpp
@@ -36,6 +37,7 @@ set(VECTOR_SOURCES
     src/Engine/Core/JobSystem.cpp
     src/Engine/Graphics/RendererAPI.cpp
     src/Engine/Graphics/Renderer.cpp
+    src/Engine/Graphics/RenderGraph.cpp
     src/Engine/Graphics/Shader.cpp
     src/Engine/Graphics/Mesh.cpp
     src/Engine/Graphics/Model.cpp
@@ -91,7 +93,7 @@ set(VECTOR_SOURCES
 add_library(VECTOR STATIC ${VECTOR_SOURCES})
 target_include_directories(VECTOR PUBLIC include src ${VECTOR_SDL_INCLUDES} ${BULLET_ROOT_DIR}/${BULLET_INCLUDE_DIRS})
 target_link_directories(VECTOR PUBLIC ${BULLET_ROOT_DIR}/${BULLET_LIBRARY_DIRS})
-target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} glm::glm ${BULLET_LIBRARIES} imgui::imgui Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator assimp::assimp nlohmann_json::nlohmann_json Microsoft::DirectX-Headers Microsoft::DirectXShaderCompiler GPUOpen::D3D12MemoryAllocator d3d12.lib dxgi.lib dxguid.lib)
+target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} glm::glm ${BULLET_LIBRARIES} imgui::imgui Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator assimp::assimp nlohmann_json::nlohmann_json Microsoft::DirectX-Headers Microsoft::DirectXShaderCompiler GPUOpen::D3D12MemoryAllocator d3d12.lib dxgi.lib dxguid.lib EnTT::EnTT)
 
 # ==============================================================================
 # PONG GAME EXECUTABLE
