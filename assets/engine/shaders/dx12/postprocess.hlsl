@@ -30,6 +30,16 @@ ConstantBuffer<PostProcessData> ppData : register(b0);
 
 SamplerState linearSampler : register(s0);
 
+// ACES Filmic Tone Mapping
+float3 ACESFilm(float3 x) {
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+}
+
 float4 PSMain(VSOutput input) : SV_TARGET {
     Texture2D hdrTexture = ResourceDescriptorHeap[ppData.hdrTexIndex];
     float3 hdrColor = hdrTexture.Sample(linearSampler, input.TexCoords).rgb;
@@ -40,8 +50,11 @@ float4 PSMain(VSOutput input) : SV_TARGET {
         hdrColor += bloomColor * ppData.bloomIntensity; // Additive blending with intensity
     }
     
-    // Exposure tone mapping
-    float3 mapped = float3(1.0f, 1.0f, 1.0f) - exp(-hdrColor * ppData.exposure);
+    // Apply exposure
+    hdrColor *= ppData.exposure;
+    
+    // Tone mapping (ACES filmic)
+    float3 mapped = ACESFilm(hdrColor);
     
     // Gamma correction 
     mapped = pow(mapped, float3(1.0f / 2.2f, 1.0f / 2.2f, 1.0f / 2.2f));

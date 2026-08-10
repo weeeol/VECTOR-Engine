@@ -3,6 +3,7 @@
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/Material.hpp"
 #include "Engine/Core/ResourceManager.hpp"
+#include "Game/Components/ProjectileComponent.hpp"
 #include <iostream>
 
 namespace Game {
@@ -85,7 +86,12 @@ namespace Game {
             std::shared_ptr<btRigidBody> bodyPtr(body, deleter);
 
             m_PhysicsSystem->GetWorld()->addRigidBody(body);
+            
+            // Link Bullet rigid body back to ECS entity
+            body->setUserIndex((int)bullet);
+            
             registry.AddComponent(bullet, VECTOR::RigidBodyComponent{bodyPtr});
+            registry.AddComponent(bullet, Game::ProjectileComponent{});
         }
     }
 

@@ -4,6 +4,8 @@
 struct PerFrameData {
     matrix view;
     matrix projection;
+    matrix previousView;
+    matrix previousProjection;
     matrix lightSpaceMatrix;
     float4 viewPos;
     float4 sunDir;
@@ -11,7 +13,9 @@ struct PerFrameData {
     float4 lightPos;
     float4 lightColor;
     int shadowMapIndex;
-    int padding[3];
+    int ssaoTexIndex;
+    float2 jitter;
+    float2 previousJitter;
 };
 
 struct PerObjectData {

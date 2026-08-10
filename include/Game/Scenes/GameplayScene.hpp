@@ -31,6 +31,7 @@ namespace Game {
     private:
         void GenerateArena();
         void CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy = false);
+        void SpawnParticles(const glm::vec3& position);
         void CreateUI();
         void ClearUI();
 

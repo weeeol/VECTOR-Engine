@@ -66,7 +66,14 @@ namespace VECTOR {
         virtual void SetUnlitMode(bool unlit) override {}
         
         virtual void SetWireframeMode(bool enabled) override;
-        virtual std::string GetRendererInfo() const override { return "DirectX 12 Renderer"; }
+        virtual std::string GetRendererInfo() const override {
+            if (!DirectX12Context::Get() || !DirectX12Context::Get()->GetAdapter()) return "DirectX 12";
+            DXGI_ADAPTER_DESC desc;
+            DirectX12Context::Get()->GetAdapter()->GetDesc(&desc);
+            char adapterName[128];
+            WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, adapterName, sizeof(adapterName), NULL, NULL);
+            return std::string("DirectX 12 - ") + adapterName;
+        }
 
         virtual uint32_t GetDrawCallCount() const override { return 0; }
 

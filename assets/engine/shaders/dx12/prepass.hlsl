@@ -108,9 +108,12 @@ PSOutput PSMain(VSOutput input) {
     float2 currentUv = currentNdc * float2(0.5f, -0.5f) + 0.5f;
     float2 previousUv = previousNdc * float2(0.5f, -0.5f) + 0.5f;
     
-    // Remove jitter from motion vector to prevent blurring static objects
-    currentUv -= pfd.jitter;
-    previousUv -= pfd.previousJitter;
+    // Remove jitter from motion vector to prevent blurring static objects.
+    // DX12 NDC Y is up, UV Y is down, so the jitter applied to NDC Y is inverted in UV Y.
+    currentUv.x -= pfd.jitter.x;
+    currentUv.y += pfd.jitter.y;
+    previousUv.x -= pfd.previousJitter.x;
+    previousUv.y += pfd.previousJitter.y;
     
     output.motionVector = currentUv - previousUv;
     

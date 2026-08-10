@@ -58,6 +58,8 @@ namespace VECTOR {
         Microsoft::WRL::ComPtr<ID3D12Resource> m_DepthBuffer;
         Microsoft::WRL::ComPtr<D3D12MA::Allocation> m_DepthAllocation;
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_DSVHeap;
+
+        bool m_TearingSupported = false;
     };
 
 } // namespace VECTOR

@@ -42,16 +42,14 @@ float4 PSMain(VSOutput input) : SV_Target {
     downsample += (j + k + l + m) * 0.125f;
 
     if (bloomData.threshold > 0.0f) {
-        float brightness = dot(downsample, float3(0.2126f, 0.7152f, 0.0722f));
-        if (brightness < bloomData.threshold) {
-            downsample = float3(0.0f, 0.0f, 0.0f);
-        } else {
-            float knee = bloomData.threshold * 0.5f;
-            float soft = brightness - bloomData.threshold + knee;
-            soft = clamp(soft / (2.0f * knee + 0.00001f), 0.0f, 1.0f);
-            soft = soft * soft;
-            downsample *= soft;
-        }
+        float brightness = max(downsample.r, max(downsample.g, downsample.b));
+        float knee = bloomData.threshold * 0.5f;
+        float soft = brightness - bloomData.threshold + knee;
+        soft = clamp(soft, 0.0f, 2.0f * knee);
+        soft = soft * soft / (4.0f * knee + 0.00001f);
+        
+        float contribution = max(soft, brightness - bloomData.threshold);
+        downsample *= (contribution / max(brightness, 0.00001f));
     }
 
     return float4(downsample, 1.0f);

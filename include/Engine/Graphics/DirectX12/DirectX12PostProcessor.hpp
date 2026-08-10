@@ -55,7 +55,7 @@ namespace VECTOR {
             int hdrTexIndex = -1;
             int bloomTexIndex = -1;
             int useBloom = 0;
-            float bloomIntensity = 1.5f; // Add intensity, defaulting to 1.5
+            float bloomIntensity = 0.04f; // Add intensity, defaulting to 0.04
             int padding[3] = {0, 0, 0};
         };
 
@@ -75,9 +75,9 @@ namespace VECTOR {
 
         float m_Exposure = 1.0f;
         uint32_t m_MipLevels = 6;
-        float m_BloomThreshold = 0.5f;
+        float m_BloomThreshold = 1.0f;
         float m_BloomFilterRadius = 0.005f;
-        float m_BloomIntensity = 2.0f; // Added intensity parameter
+        float m_BloomIntensity = 0.04f; // Added intensity parameter
 
         std::vector<BloomMip> m_BloomMips;
         std::unique_ptr<DirectX12Pipeline> m_BloomDownsamplePipeline;

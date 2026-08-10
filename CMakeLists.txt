@@ -104,6 +104,7 @@ set(GAME_SOURCES
     src/Game/Systems/GameSystems.cpp
     src/Game/Systems/CameraSystem.cpp
     src/Game/Systems/ShootingSystem.cpp
+    src/Game/Systems/ParticleSystem.cpp
 )
 
 add_executable(Pong src/main.cpp ${GAME_SOURCES})
@@ -117,4 +118,5 @@ add_custom_target(CopyAssets ALL
         "${CMAKE_SOURCE_DIR}/assets"
         "${CMAKE_CURRENT_BINARY_DIR}/assets"
 )
+add_dependencies(Pong CopyAssets)
 add_dependencies(Pong CopyAssets)

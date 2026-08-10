@@ -41,7 +41,10 @@ namespace VECTOR {
             return false;
         }
 
-        m_Swapchain = std::make_unique<DirectX12Swapchain>(m_Context.get(), m_Window, width, height);
+        int pixelWidth, pixelHeight;
+        SDL_GetWindowSizeInPixels(m_Window, &pixelWidth, &pixelHeight);
+
+        m_Swapchain = std::make_unique<DirectX12Swapchain>(m_Context.get(), m_Window, pixelWidth, pixelHeight);
 
         CreateCommandObjects();
         CreateSyncObjects();
@@ -90,17 +93,17 @@ namespace VECTOR {
         m_ShadowPass = std::make_unique<DirectX12ShadowPass>(m_Context.get());
         m_ShadowPass->Initialize();
 
-        m_Prepass = std::make_unique<DirectX12Prepass>(m_Context.get(), width, height);
+        m_Prepass = std::make_unique<DirectX12Prepass>(m_Context.get(), pixelWidth, pixelHeight);
         m_Prepass->Initialize();
         
-        m_SSAO = std::make_unique<DirectX12SSAO>(m_Context.get(), width, height);
+        m_SSAO = std::make_unique<DirectX12SSAO>(m_Context.get(), pixelWidth, pixelHeight);
         m_SSAO->Initialize();
 
-        m_TAA = std::make_unique<DirectX12TAA>(m_Context.get(), width, height);
+        m_TAA = std::make_unique<DirectX12TAA>(m_Context.get(), pixelWidth, pixelHeight);
         m_TAA->Initialize();
 
         VECTOR_LOG_INFO("Initializing DirectX 12 PostProcessor...");
-        m_PostProcessor = std::make_unique<DirectX12PostProcessor>(m_Context.get(), width, height);
+        m_PostProcessor = std::make_unique<DirectX12PostProcessor>(m_Context.get(), pixelWidth, pixelHeight);
         m_PostProcessor->Initialize();
 
         VECTOR_LOG_INFO("DirectX 12 Renderer Initialized.");
@@ -284,11 +287,15 @@ namespace VECTOR {
         WaitIdle();
         SDL_SetWindowSize(m_Window, width, height);
         SDL_SetWindowPosition(m_Window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-        m_Swapchain->Recreate(width, height);
         
-        if (m_PostProcessor) m_PostProcessor->Recreate(width, height);
-        if (m_Prepass) m_Prepass->Resize(width, height);
-        if (m_SSAO) m_SSAO->Resize(width, height);
+        int pixelWidth, pixelHeight;
+        SDL_GetWindowSizeInPixels(m_Window, &pixelWidth, &pixelHeight);
+
+        m_Swapchain->Recreate(pixelWidth, pixelHeight);
+        
+        if (m_PostProcessor) m_PostProcessor->Recreate(pixelWidth, pixelHeight);
+        if (m_Prepass) m_Prepass->Resize(pixelWidth, pixelHeight);
+        if (m_SSAO) m_SSAO->Resize(pixelWidth, pixelHeight);
     }
 
     void DirectX12Renderer::SetFullscreen(bool fullscreen, bool borderless) {

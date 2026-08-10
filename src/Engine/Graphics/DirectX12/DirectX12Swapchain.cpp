@@ -29,7 +29,9 @@ namespace VECTOR {
 
     void DirectX12Swapchain::Present(bool vSync) {
         UINT syncInterval = vSync ? 1 : 0;
-        HRESULT hr = m_Swapchain->Present(syncInterval, 0);
+        UINT flags = (syncInterval == 0 && m_TearingSupported) ? DXGI_PRESENT_ALLOW_TEARING : 0;
+        
+        HRESULT hr = m_Swapchain->Present(syncInterval, flags);
         if (FAILED(hr)) {
             VECTOR_LOG_ERROR("Failed to present DirectX 12 Swapchain. HRESULT: " + std::to_string(hr));
         }
@@ -71,6 +73,16 @@ namespace VECTOR {
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.SampleDesc.Count = 1;
+        
+        // Check for tearing support
+        BOOL allowTearing = FALSE;
+        Microsoft::WRL::ComPtr<IDXGIFactory5> factory5;
+        if (SUCCEEDED(factory.As(&factory5))) {
+            factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing));
+        }
+        m_TearingSupported = allowTearing == TRUE;
+        
+        swapChainDesc.Flags = m_TearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
         HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(m_Window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
         if (!hwnd) {

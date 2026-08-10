@@ -13,6 +13,8 @@
 #include "Engine/Physics/CharacterControllerComponent.hpp"
 #include "Engine/ECS/UIComponents.hpp"
 #include <glm/gtc/matrix_transform.hpp>
+#include <windows.h>
+#include <psapi.h>
 // #include <GL/glew.h> Removed
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/Model.hpp"
@@ -23,6 +25,9 @@
 #include "Engine/Graphics/Cubemap.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include "Game/Systems/ShootingSystem.hpp"
+#include "Game/Systems/ParticleSystem.hpp"
+#include "Game/Components/ParticleComponent.hpp"
+#include "Game/Components/ProjectileComponent.hpp"
 #include "Engine/Graphics/Frustum.hpp"
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Scene/SceneSerializer.hpp"
@@ -49,6 +54,8 @@ namespace Game {
         m_Registry.RegisterComponent<VECTOR::PointLightComponent>();
         m_Registry.RegisterComponent<VECTOR::DirectionalLightComponent>();
         m_Registry.RegisterComponent<AIComponent>(); // Reusing AIComponent for enemies
+        m_Registry.RegisterComponent<Game::ProjectileComponent>();
+        m_Registry.RegisterComponent<Game::ParticleComponent>();
 
         auto physSys = std::make_unique<VECTOR::BulletPhysicsSystem>();
         m_PhysicsSystem = physSys.get();
@@ -59,6 +66,7 @@ namespace Game {
         m_Systems.push_back(std::move(camSys));
 
         m_Systems.push_back(std::make_unique<ShootingSystem>(m_InputManager, m_PhysicsSystem));
+        m_Systems.push_back(std::make_unique<ParticleSystem>());
 
         m_CubeMesh = VECTOR::Mesh::CreateCube();
 
@@ -365,6 +373,7 @@ namespace Game {
         };
         std::shared_ptr<btRigidBody> bodyPtr(body, deleter);
         m_PhysicsSystem->GetWorld()->addRigidBody(body);
+        body->setUserIndex((int)entity);
         m_Registry.AddComponent(entity, VECTOR::RigidBodyComponent{bodyPtr});
 
         if (isEnemy) {
@@ -372,9 +381,39 @@ namespace Game {
         }
     }
 
+    void GameplayScene::SpawnParticles(const glm::vec3& position) {
+        for (int i = 0; i < 15; i++) {
+            VECTOR::Entity p = m_Registry.CreateEntity();
+            
+            VECTOR::TransformComponent t;
+            t.position = position;
+            t.scale = glm::vec3(0.2f);
+            m_Registry.AddComponent(p, t);
+            
+            VECTOR::MeshComponent m;
+            m.mesh = m_CubeMesh;
+            m_Registry.AddComponent(p, m);
+            
+            m_Registry.AddComponent(p, VECTOR::RenderComponent(m_UnlitMaterial));
+            
+            Game::ParticleComponent pc;
+            float vx = ((rand() % 100) / 50.0f) - 1.0f;
+            float vy = ((rand() % 100) / 50.0f) - 1.0f;
+            float vz = ((rand() % 100) / 50.0f) - 1.0f;
+            pc.velocity = glm::normalize(glm::vec3(vx, vy, vz)) * (5.0f + (rand() % 50) / 10.0f);
+            pc.maxLifetime = 0.3f + (rand() % 30) / 100.0f;
+            pc.lifetime = pc.maxLifetime;
+            
+            m_Registry.AddComponent(p, pc);
+        }
+    }
+
     // Mesh generated via Mesh::CreateCube
 
     void GameplayScene::OnEnter() {
+        VECTOR::EventBus::Get().Subscribe<CollisionEvent>([this](const CollisionEvent& e) {
+            SpawnParticles(e.position);
+        });
     }
 
     void GameplayScene::Update(float deltaTime) {
@@ -435,6 +474,51 @@ namespace Game {
         } else {
             for (auto& system : m_Systems) {
                 system->Update(m_Registry, deltaTime);
+            }
+
+            // Detect Collisions
+            int numManifolds = m_PhysicsSystem->GetWorld()->getDispatcher()->getNumManifolds();
+            for (int i = 0; i < numManifolds; i++) {
+                btPersistentManifold* contactManifold = m_PhysicsSystem->GetWorld()->getDispatcher()->getManifoldByIndexInternal(i);
+                if (contactManifold->getNumContacts() > 0) {
+                    const btCollisionObject* obA = contactManifold->getBody0();
+                    const btCollisionObject* obB = contactManifold->getBody1();
+                    
+                    int indexA = obA->getUserIndex();
+                    int indexB = obB->getUserIndex();
+                    
+                    // Check if A is a projectile
+                    if (indexA != -1 && m_Registry.HasComponent<Game::ProjectileComponent>((VECTOR::Entity)indexA)) {
+                        auto& proj = m_Registry.GetComponent<Game::ProjectileComponent>((VECTOR::Entity)indexA);
+                        if (!proj.toDestroy) {
+                            proj.toDestroy = true;
+                            btVector3 pos = contactManifold->getContactPoint(0).getPositionWorldOnA();
+                            VECTOR::EventBus::Get().Publish<CollisionEvent>(glm::vec3(pos.x(), pos.y(), pos.z()));
+                        }
+                    }
+                    // Check if B is a projectile
+                    if (indexB != -1 && m_Registry.HasComponent<Game::ProjectileComponent>((VECTOR::Entity)indexB)) {
+                        auto& proj = m_Registry.GetComponent<Game::ProjectileComponent>((VECTOR::Entity)indexB);
+                        if (!proj.toDestroy) {
+                            proj.toDestroy = true;
+                            btVector3 pos = contactManifold->getContactPoint(0).getPositionWorldOnB();
+                            VECTOR::EventBus::Get().Publish<CollisionEvent>(glm::vec3(pos.x(), pos.y(), pos.z()));
+                        }
+                    }
+                }
+            }
+
+            // Cleanup destroyed projectiles
+            std::vector<VECTOR::Entity> toDestroy;
+            m_Registry.View<Game::ProjectileComponent>([&](VECTOR::Entity entity) {
+                auto& p = m_Registry.GetComponent<Game::ProjectileComponent>(entity);
+                if (p.toDestroy) {
+                    toDestroy.push_back(entity);
+                }
+            });
+            
+            for (auto e : toDestroy) {
+                m_Registry.DestroyEntity(e);
             }
 
             // Update skeletal animations
@@ -603,7 +687,19 @@ namespace Game {
                 ImGui::Text("Draw Calls: %u", renderer->GetDrawCallCount());
                 ImGui::Text("GPU: %s", renderer->GetRendererInfo().c_str());
                 ImGui::Text("CPU Cores: %d", SDL_GetNumLogicalCPUCores());
-                ImGui::Text("System RAM: %d MB", SDL_GetSystemRAM());
+                
+                MEMORYSTATUSEX memInfo;
+                memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+                GlobalMemoryStatusEx(&memInfo);
+                DWORDLONG totalSystemRAM = memInfo.ullTotalPhys / (1024 * 1024);
+                DWORDLONG usedSystemRAM = (memInfo.ullTotalPhys - memInfo.ullAvailPhys) / (1024 * 1024);
+                
+                PROCESS_MEMORY_COUNTERS_EX pmc;
+                GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+                SIZE_T usedAppRAM = pmc.WorkingSetSize / (1024 * 1024);
+
+                ImGui::Text("System RAM: %llu MB / %llu MB", usedSystemRAM, totalSystemRAM);
+                ImGui::Text("App RAM: %llu MB", usedAppRAM);
             }
 
             if (m_DebugMode) {

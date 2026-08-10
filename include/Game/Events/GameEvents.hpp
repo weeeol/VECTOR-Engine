@@ -5,8 +5,8 @@
 namespace Game {
 
     struct CollisionEvent : public VECTOR::Event {
-        // Can hold info about collision, e.g. velocity, position, etc.
-        CollisionEvent() = default;
+        glm::vec3 position;
+        CollisionEvent(glm::vec3 pos) : position(pos) {}
     };
 
     struct ScoreEvent : public VECTOR::Event {
