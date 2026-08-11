@@ -2,6 +2,7 @@
 
 #include "Engine/Graphics/Vulkan/VulkanContext.hpp"
 #include "Engine/Graphics/Vulkan/VulkanPipeline.hpp"
+#include "Engine/Graphics/Texture2D.hpp"
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <vector>
@@ -22,18 +23,19 @@ namespace VECTOR {
         VulkanPostProcessor(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass);
         ~VulkanPostProcessor();
 
-        void Process(VkCommandBuffer commandBuffer);
+        void Process(VkCommandBuffer commandBuffer, std::shared_ptr<Texture2D> inColor);
         void ProcessSSAO(VkCommandBuffer commandBuffer, VkImageView normalView, VkImageView depthView, const glm::mat4& projection, const glm::mat4& view);
         void Recreate(uint32_t width, uint32_t height, VkRenderPass swapchainRenderPass);
         
         // Call this during rendering
-        void ProcessTAA(VkCommandBuffer commandBuffer, bool taaEnabled);
+        void ProcessTAA(VkCommandBuffer commandBuffer, bool taaEnabled, std::shared_ptr<Texture2D> inColor);
         void RenderBloom(VkCommandBuffer commandBuffer);
         void RenderFinal(VkCommandBuffer commandBuffer, VkDescriptorSet globalSet, uint32_t currentFrame);
 
         VkRenderPass GetOffscreenRenderPass() const { return m_OffscreenRenderPass; }
         VkFramebuffer GetOffscreenFramebuffer() const { return m_OffscreenFramebuffer; }
         VkImageView GetOffscreenColorView() const { return m_OffscreenColorView; }
+        VkImageView GetOffscreenVelocityView() const { return m_OffscreenVelocityView; }
         
         float exposure = 1.0f;
         float bloomStrength = 0.04f;
@@ -101,7 +103,8 @@ namespace VECTOR {
         VkImage m_TAAHistoryImage[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
         VmaAllocation m_TAAHistoryAlloc[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
         VkImageView m_TAAHistoryView[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
-        uint32_t m_TAAHistoryIndex = 0;
+        int m_TAAHistoryIndex = 0;
+        VkImageView m_LastInColorView = VK_NULL_HANDLE;
         bool m_FirstTAAFrame = true;
 
         // TAA Pass

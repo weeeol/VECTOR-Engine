@@ -19,6 +19,7 @@ namespace VECTOR {
         virtual int GetHeight() const override { return m_Height; }
         virtual unsigned int GetID() const override { return 0; } // OpenGL ID, not used in Vulkan directly
 
+        VkImage GetImage() const { return m_Image; }
         VkImageView GetImageView() const { return m_ImageView; }
         VkSampler GetSampler() const { return m_Sampler; }
 

@@ -59,9 +59,9 @@ namespace VECTOR {
         virtual void BeginPrepass(std::shared_ptr<Texture2D> outNormal, std::shared_ptr<Texture2D> outPosition, std::shared_ptr<Texture2D> outDepth) override;
         virtual void FlushPrepass() override;
         
-        virtual void BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth) override;
+        virtual void BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth, std::shared_ptr<Texture2D> outColor) override;
         virtual void FlushMainPass() override;
-        virtual void EndPostProcessPass() override;
+        virtual void EndPostProcessPass(std::shared_ptr<Texture2D> inColor) override;
 
         virtual const glm::mat4& GetLightSpaceMatrix() const override { return m_LightSpaceMatrix; }
         virtual Shader* GetDepthShader() const override { return nullptr; }
@@ -143,6 +143,7 @@ namespace VECTOR {
         std::unique_ptr<class DirectX12SSAO> m_SSAO;
         std::unique_ptr<class DirectX12TAA> m_TAA;
         std::unique_ptr<class DirectX12PostProcessor> m_PostProcessor;
+        Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_MainRTVHeap;
         class DirectX12Cubemap* m_CurrentSkybox = nullptr;
         glm::mat4 m_LightSpaceMatrix = glm::mat4(1.0f);
         

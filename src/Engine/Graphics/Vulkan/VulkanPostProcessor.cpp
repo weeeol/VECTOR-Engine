@@ -1,5 +1,6 @@
 #include "Engine/Graphics/Vulkan/VulkanPostProcessor.hpp"
 #include "Engine/Core/Logger.hpp"
+#include "Engine/Graphics/Vulkan/VulkanTexture2D.hpp"
 #include <array>
 
 namespace VECTOR {
@@ -15,12 +16,6 @@ namespace VECTOR {
 
     VulkanPostProcessor::~VulkanPostProcessor() {
         DestroyResources();
-        
-        VkDevice device = VulkanContext::Get()->GetDevice();
-        vkDestroyRenderPass(device, m_OffscreenRenderPass, nullptr);
-        if (m_BloomRenderPass) {
-            vkDestroyRenderPass(device, m_BloomRenderPass, nullptr);
-        }
         
         // Destructors of VulkanPipeline handle pipeline destruction
     }
@@ -198,6 +193,14 @@ namespace VECTOR {
         if (m_TAARenderPass) {
             vkDestroyRenderPass(device, m_TAARenderPass, nullptr);
             m_TAARenderPass = VK_NULL_HANDLE;
+        }
+        if (m_OffscreenRenderPass) {
+            vkDestroyRenderPass(device, m_OffscreenRenderPass, nullptr);
+            m_OffscreenRenderPass = VK_NULL_HANDLE;
+        }
+        if (m_BloomRenderPass) {
+            vkDestroyRenderPass(device, m_BloomRenderPass, nullptr);
+            m_BloomRenderPass = VK_NULL_HANDLE;
         }
         for (int i = 0; i < 2; i++) {
             if (m_TAAFramebuffer[i]) {
@@ -441,11 +444,7 @@ namespace VECTOR {
         VECTOR_LOG_INFO("VulkanPostProcessor::CreateResources called!");
         VkDevice device = VulkanContext::Get()->GetDevice();
         
-        // 1. Create Offscreen Color Image
-        CreateImage(m_Width, m_Height, VK_FORMAT_R16G16B16A16_SFLOAT,
-                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                    m_OffscreenColorImage, m_OffscreenColorAlloc);
-        m_OffscreenColorView = CreateImageView(m_OffscreenColorImage, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
+        // Removed duplicate device declaration
         
         // 1.5 Create Offscreen Velocity Image
         CreateImage(m_Width, m_Height, VK_FORMAT_R16G16_SFLOAT,
@@ -467,20 +466,7 @@ namespace VECTOR {
             m_TAAHistoryView[i] = CreateImageView(m_TAAHistoryImage[i], VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
         }
 
-        // 3. Create Offscreen Framebuffer
-        std::array<VkImageView, 3> attachments = { m_OffscreenColorView, m_OffscreenVelocityView, m_OffscreenDepthView };
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = m_OffscreenRenderPass;
-        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = m_Width;
-        framebufferInfo.height = m_Height;
-        framebufferInfo.layers = 1;
-
-        if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &m_OffscreenFramebuffer) != VK_SUCCESS) {
-            VECTOR_LOG_ERROR("Failed to create offscreen framebuffer!");
-        }
+        // No longer allocating offscreen framebuffer here. Managed by VulkanRenderer dynamically.
 
         // 3.5 Create TAA Framebuffers
         for (int i = 0; i < 2; i++) {
@@ -781,10 +767,10 @@ namespace VECTOR {
             VECTOR_LOG_ERROR("Failed to allocate post process descriptor set!");
         }
 
-        VkDescriptorImageInfo screenInfo{};
-        screenInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        screenInfo.imageView = m_OffscreenColorView;
-        screenInfo.sampler = m_ColorSampler;
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = m_OffscreenVelocityView; // Overwritten in Process()
+        imageInfo.sampler = m_ColorSampler;
 
         VkDescriptorImageInfo bloomInfo{};
         bloomInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -798,7 +784,7 @@ namespace VECTOR {
         postWrites[0].dstArrayElement = 0;
         postWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         postWrites[0].descriptorCount = 1;
-        postWrites[0].pImageInfo = &screenInfo;
+        postWrites[0].pImageInfo = &imageInfo;
 
         postWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         postWrites[1].dstSet = m_PostProcessDescriptorSet;
@@ -808,7 +794,7 @@ namespace VECTOR {
         postWrites[1].descriptorCount = 1;
         postWrites[1].pImageInfo = &bloomInfo;
 
-        VECTOR_LOG_INFO("VulkanPostProcessor::UpdateDescriptorSets called! Set: %p", (void*)m_PostProcessDescriptorSet);
+        VECTOR_LOG_INFO("VulkanPostProcessor::Post process sets updated");
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(postWrites.size()), postWrites.data(), 0, nullptr);
 
         // 5. Allocate and Update Bloom Sets (one for offscreen -> mip0, then mipN -> mipN+1)
@@ -833,7 +819,7 @@ namespace VECTOR {
             
             if (i == 0) {
                 bloomImageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                bloomImageInfos[i].imageView = m_OffscreenColorView; // Offscreen to Mip 0
+                bloomImageInfos[i].imageView = m_OffscreenVelocityView; // Overwritten in Process()
             } else {
                 bloomImageInfos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
                 bloomImageInfos[i].imageView = m_BloomMips[i - 1].view; // Mip i-1 to Mip i
@@ -851,7 +837,7 @@ namespace VECTOR {
             bloomWrites.push_back(write);
         }
 
-        VECTOR_LOG_INFO("VulkanPostProcessor::Bloom sets allocated! Base set: %p", (void*)m_BloomDescriptorSets[0]);
+        VECTOR_LOG_INFO("VulkanPostProcessor::Bloom sets allocated");
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(bloomWrites.size()), bloomWrites.data(), 0, nullptr);
 
         // 6. Allocate and Update TAA Sets
@@ -867,10 +853,10 @@ namespace VECTOR {
         }
 
         for (int i = 0; i < 2; i++) {
-            VkDescriptorImageInfo currentInfo{};
-            currentInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            currentInfo.imageView = m_OffscreenColorView;
-            currentInfo.sampler = m_ColorSampler;
+            VkDescriptorImageInfo imageInfo{};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = m_OffscreenVelocityView; // Just a dummy initialization for index 0, overwritten in Process()
+            imageInfo.sampler = m_ColorSampler;
 
             VkDescriptorImageInfo velocityInfo{};
             velocityInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -889,7 +875,7 @@ namespace VECTOR {
             taaWrites[0].dstArrayElement = 0;
             taaWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             taaWrites[0].descriptorCount = 1;
-            taaWrites[0].pImageInfo = &currentInfo;
+            taaWrites[0].pImageInfo = &imageInfo;
 
             taaWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             taaWrites[1].dstSet = m_TAADescriptorSets[i];
@@ -907,12 +893,132 @@ namespace VECTOR {
             taaWrites[2].descriptorCount = 1;
             taaWrites[2].pImageInfo = &historyInfo;
 
-            VECTOR_LOG_INFO("VulkanPostProcessor::TAA set updated! Set: %p", (void*)m_TAADescriptorSets[i]);
+            VECTOR_LOG_INFO("VulkanPostProcessor::TAA set updated");
             vkUpdateDescriptorSets(device, static_cast<uint32_t>(taaWrites.size()), taaWrites.data(), 0, nullptr);
+        }
+
+        // --- Transition Images to initial layouts ---
+        {
+            VkCommandPool tempPool;
+            VkCommandPoolCreateInfo poolInfo{};
+            poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+            poolInfo.queueFamilyIndex = VulkanContext::Get()->GetGraphicsQueueFamilyIndex();
+            vkCreateCommandPool(device, &poolInfo, nullptr, &tempPool);
+
+            VkCommandBufferAllocateInfo cmdAllocInfo{};
+            cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            cmdAllocInfo.commandPool = tempPool;
+            cmdAllocInfo.commandBufferCount = 1;
+
+            VkCommandBuffer cmd;
+            vkAllocateCommandBuffers(device, &cmdAllocInfo, &cmd);
+
+            VkCommandBufferBeginInfo beginInfo{};
+            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            vkBeginCommandBuffer(cmd, &beginInfo);
+
+            VkImageMemoryBarrier barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+            for(int i=0; i<2; i++) {
+                barrier.image = m_TAAHistoryImage[i];
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+            }
+
+            barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+            for(int i=0; i<m_MipLevels; i++) {
+                barrier.image = m_BloomMips[i].image;
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+            }
+
+            vkEndCommandBuffer(cmd);
+
+            VkSubmitInfo submitInfo{};
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submitInfo.commandBufferCount = 1;
+            submitInfo.pCommandBuffers = &cmd;
+
+            VkQueue graphicsQueue = VulkanContext::Get()->GetGraphicsQueue();
+            {
+                std::lock_guard<std::mutex> lock(VulkanContext::Get()->GetGraphicsQueueMutex());
+                vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+                vkQueueWaitIdle(graphicsQueue);
+            }
+
+            vkFreeCommandBuffers(device, tempPool, 1, &cmd);
+            vkDestroyCommandPool(device, tempPool, nullptr);
         }
     }
     
-    void VulkanPostProcessor::ProcessTAA(VkCommandBuffer commandBuffer, bool taaEnabled) {
+    void VulkanPostProcessor::Process(VkCommandBuffer commandBuffer, std::shared_ptr<Texture2D> inColor) {
+        VkDevice device = VulkanContext::Get()->GetDevice();
+        auto vkColor = std::dynamic_pointer_cast<VulkanTexture2D>(inColor);
+        if (!vkColor) return;
+        
+        VkImageView inColorView = vkColor->GetImageView();
+        VkImage inColorImage = vkColor->GetImage();
+        
+        // Update Descriptor Sets dynamically with the injected inColorView ONLY if it changed
+        if (m_LastInColorView != inColorView) {
+            m_LastInColorView = inColorView;
+            
+            // 1. Post Process Set
+            VkDescriptorImageInfo ppInfo{};
+        ppInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        ppInfo.imageView = inColorView;
+        ppInfo.sampler = m_ColorSampler;
+        
+        VkWriteDescriptorSet ppWrite{};
+        ppWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        ppWrite.dstSet = m_PostProcessDescriptorSet;
+        ppWrite.dstBinding = 0;
+        ppWrite.dstArrayElement = 0;
+        ppWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        ppWrite.descriptorCount = 1;
+        ppWrite.pImageInfo = &ppInfo;
+        vkUpdateDescriptorSets(device, 1, &ppWrite, 0, nullptr);
+        
+        // 2. Bloom Downsample Set 0
+        VkWriteDescriptorSet bloomWrite{};
+        bloomWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        bloomWrite.dstSet = m_BloomDescriptorSets[0];
+        bloomWrite.dstBinding = 0;
+        bloomWrite.dstArrayElement = 0;
+        bloomWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bloomWrite.descriptorCount = 1;
+        bloomWrite.pImageInfo = &ppInfo;
+        vkUpdateDescriptorSets(device, 1, &bloomWrite, 0, nullptr);
+        
+        // 3. TAA Sets
+        for(int i=0; i<2; i++) {
+            VkWriteDescriptorSet taaWrite{};
+            taaWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            taaWrite.dstSet = m_TAADescriptorSets[i];
+            taaWrite.dstBinding = 0;
+            taaWrite.dstArrayElement = 0;
+            taaWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            taaWrite.descriptorCount = 1;
+            taaWrite.pImageInfo = &ppInfo;
+            vkUpdateDescriptorSets(device, 1, &taaWrite, 0, nullptr);
+        }
+        } // End if (m_LastInColorView != inColorView)
+    }
+    
+    void VulkanPostProcessor::ProcessTAA(VkCommandBuffer commandBuffer, bool taaEnabled, std::shared_ptr<Texture2D> inColor) {
         if (!taaEnabled) return;
         
         if (m_FirstTAAFrame) {
@@ -975,84 +1081,87 @@ namespace VECTOR {
         // We will need to copy the TAA resolved image back into m_OffscreenColorImage 
         // so that Bloom/PostProcess can read from it! Or we could use the history view for Bloom.
         
-        // Let's do a simple blit from m_TAAHistoryImage[m_TAAHistoryIndex] -> m_OffscreenColorImage
-        
-        VkImageMemoryBarrier barrier1[2] = {};
-        barrier1[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier1[0].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier1[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier1[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier1[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier1[0].image = m_TAAHistoryImage[m_TAAHistoryIndex];
-        barrier1[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier1[0].subresourceRange.baseMipLevel = 0;
-        barrier1[0].subresourceRange.levelCount = 1;
-        barrier1[0].subresourceRange.baseArrayLayer = 0;
-        barrier1[0].subresourceRange.layerCount = 1;
-        barrier1[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Just finished writing in render pass
-        barrier1[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        auto vkColor = std::dynamic_pointer_cast<VulkanTexture2D>(inColor);
+        if (vkColor) {
+            VkImage inColorImage = vkColor->GetImage();
+            
+            VkImageMemoryBarrier barrier1[2] = {};
+            barrier1[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier1[0].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier1[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier1[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier1[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier1[0].image = m_TAAHistoryImage[m_TAAHistoryIndex];
+            barrier1[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier1[0].subresourceRange.baseMipLevel = 0;
+            barrier1[0].subresourceRange.levelCount = 1;
+            barrier1[0].subresourceRange.baseArrayLayer = 0;
+            barrier1[0].subresourceRange.layerCount = 1;
+            barrier1[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier1[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-        barrier1[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier1[1].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier1[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier1[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier1[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier1[1].image = m_OffscreenColorImage;
-        barrier1[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier1[1].subresourceRange.baseMipLevel = 0;
-        barrier1[1].subresourceRange.levelCount = 1;
-        barrier1[1].subresourceRange.baseArrayLayer = 0;
-        barrier1[1].subresourceRange.layerCount = 1;
-        barrier1[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barrier1[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier1[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier1[1].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier1[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier1[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier1[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier1[1].image = inColorImage;
+            barrier1[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier1[1].subresourceRange.baseMipLevel = 0;
+            barrier1[1].subresourceRange.levelCount = 1;
+            barrier1[1].subresourceRange.baseArrayLayer = 0;
+            barrier1[1].subresourceRange.layerCount = 1;
+            barrier1[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier1[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
-        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 2, barrier1);
+            vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 2, barrier1);
 
-        VkImageCopy copyRegion{};
-        copyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        copyRegion.srcSubresource.mipLevel = 0;
-        copyRegion.srcSubresource.baseArrayLayer = 0;
-        copyRegion.srcSubresource.layerCount = 1;
-        copyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        copyRegion.dstSubresource.mipLevel = 0;
-        copyRegion.dstSubresource.baseArrayLayer = 0;
-        copyRegion.dstSubresource.layerCount = 1;
-        copyRegion.extent.width = m_Width;
-        copyRegion.extent.height = m_Height;
-        copyRegion.extent.depth = 1;
+            VkImageCopy copyRegion{};
+            copyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copyRegion.srcSubresource.mipLevel = 0;
+            copyRegion.srcSubresource.baseArrayLayer = 0;
+            copyRegion.srcSubresource.layerCount = 1;
+            copyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copyRegion.dstSubresource.mipLevel = 0;
+            copyRegion.dstSubresource.baseArrayLayer = 0;
+            copyRegion.dstSubresource.layerCount = 1;
+            copyRegion.extent.width = m_Width;
+            copyRegion.extent.height = m_Height;
+            copyRegion.extent.depth = 1;
 
-        vkCmdCopyImage(commandBuffer, m_TAAHistoryImage[m_TAAHistoryIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_OffscreenColorImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+            vkCmdCopyImage(commandBuffer, m_TAAHistoryImage[m_TAAHistoryIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, inColorImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
-        VkImageMemoryBarrier barrier2[2] = {};
-        barrier2[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier2[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier2[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier2[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier2[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier2[0].image = m_TAAHistoryImage[m_TAAHistoryIndex];
-        barrier2[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier2[0].subresourceRange.baseMipLevel = 0;
-        barrier2[0].subresourceRange.levelCount = 1;
-        barrier2[0].subresourceRange.baseArrayLayer = 0;
-        barrier2[0].subresourceRange.layerCount = 1;
-        barrier2[0].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        barrier2[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            VkImageMemoryBarrier barrier2[2] = {};
+            barrier2[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier2[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier2[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier2[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier2[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier2[0].image = m_TAAHistoryImage[m_TAAHistoryIndex];
+            barrier2[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier2[0].subresourceRange.baseMipLevel = 0;
+            barrier2[0].subresourceRange.levelCount = 1;
+            barrier2[0].subresourceRange.baseArrayLayer = 0;
+            barrier2[0].subresourceRange.layerCount = 1;
+            barrier2[0].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier2[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        barrier2[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier2[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier2[1].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier2[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier2[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier2[1].image = m_OffscreenColorImage;
-        barrier2[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier2[1].subresourceRange.baseMipLevel = 0;
-        barrier2[1].subresourceRange.levelCount = 1;
-        barrier2[1].subresourceRange.baseArrayLayer = 0;
-        barrier2[1].subresourceRange.layerCount = 1;
-        barrier2[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier2[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier2[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier2[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier2[1].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier2[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier2[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier2[1].image = inColorImage;
+            barrier2[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier2[1].subresourceRange.baseMipLevel = 0;
+            barrier2[1].subresourceRange.levelCount = 1;
+            barrier2[1].subresourceRange.baseArrayLayer = 0;
+            barrier2[1].subresourceRange.layerCount = 1;
+            barrier2[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier2[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 2, barrier2);
+            vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 2, barrier2);
+        }
 
         // Ping-pong for next frame
         m_TAAHistoryIndex = 1 - m_TAAHistoryIndex;

@@ -28,7 +28,7 @@ struct PostProcessData {
 
 ConstantBuffer<PostProcessData> ppData : register(b0);
 
-SamplerState linearSampler : register(s0);
+SamplerState linearSampler : register(s4);
 
 // ACES Filmic Tone Mapping
 float3 ACESFilm(float3 x) {

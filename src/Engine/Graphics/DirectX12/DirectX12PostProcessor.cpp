@@ -12,16 +12,12 @@ namespace VECTOR {
     }
 
     DirectX12PostProcessor::~DirectX12PostProcessor() {
-        if (m_HDRTextureSRVIndex != (uint32_t)-1) {
-            DirectX12DescriptorManager::Get()->FreeSRVIndex(m_HDRTextureSRVIndex);
-        }
         for (auto& mip : m_BloomMips) {
             if (mip.srvIndex != (uint32_t)-1) {
                 DirectX12DescriptorManager::Get()->FreeSRVIndex(mip.srvIndex);
             }
             mip.texture.Reset();
         }
-        m_HDRTexture.Reset();
         m_RTVHeap.Reset();
     }
 
@@ -36,9 +32,6 @@ namespace VECTOR {
         m_Width = width;
         m_Height = height;
 
-        if (m_HDRTextureSRVIndex != (uint32_t)-1) {
-            DirectX12DescriptorManager::Get()->FreeSRVIndex(m_HDRTextureSRVIndex);
-        }
         for (auto& mip : m_BloomMips) {
             if (mip.srvIndex != (uint32_t)-1) {
                 DirectX12DescriptorManager::Get()->FreeSRVIndex(mip.srvIndex);
@@ -47,7 +40,6 @@ namespace VECTOR {
         }
         m_BloomMips.clear();
 
-        m_HDRTexture.Reset();
         m_RTVHeap.Reset();
         
         CreateResources(width, height);
@@ -57,28 +49,10 @@ namespace VECTOR {
     void DirectX12PostProcessor::CreateResources(uint32_t width, uint32_t height) {
         auto device = m_Context->GetDevice();
 
-        D3D12_RESOURCE_DESC rtvDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R16G16B16A16_FLOAT, width, height, 1, 1);
-        rtvDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-        D3D12_CLEAR_VALUE rtvClearValue = {};
-        rtvClearValue.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        rtvClearValue.Color[0] = 0.0f;
-        rtvClearValue.Color[1] = 0.0f;
-        rtvClearValue.Color[2] = 0.0f;
-        rtvClearValue.Color[3] = 1.0f;
+        // Removed HDR Texture creation and RTV/SRV allocation
 
         auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-        HRESULT hr = device->CreateCommittedResource(
-            &heapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &rtvDesc,
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-            &rtvClearValue,
-            IID_PPV_ARGS(&m_HDRTexture)
-        );
-        if (FAILED(hr)) {
-            VECTOR_LOG_ERROR("Failed to create HDR texture");
-        }
+        HRESULT hr = S_OK;
 
         // Bloom Mips
         m_BloomMips.resize(m_MipLevels);
@@ -97,7 +71,7 @@ namespace VECTOR {
                 D3D12_HEAP_FLAG_NONE,
                 &mipDesc,
                 D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-                &rtvClearValue,
+                nullptr, // no optimized clear value needed for now
                 IID_PPV_ARGS(&m_BloomMips[i].texture)
             );
 
@@ -116,21 +90,13 @@ namespace VECTOR {
         auto device = m_Context->GetDevice();
 
         D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-        rtvHeapDesc.NumDescriptors = 1 + m_MipLevels; // HDR + Bloom Mips
+        rtvHeapDesc.NumDescriptors = m_MipLevels; // Bloom Mips only
         rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_RTVHeap));
 
         uint32_t rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_RTVHeap->GetCPUDescriptorHandleForHeapStart();
-        
-        // HDR RTV
-        device->CreateRenderTargetView(m_HDRTexture.Get(), nullptr, rtvHandle);
-        m_HDRTextureSRVIndex = DirectX12DescriptorManager::Get()->AllocateSRVIndex();
-        D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = DirectX12DescriptorManager::Get()->GetSRVCPUHandle(m_HDRTextureSRVIndex);
-        device->CreateShaderResourceView(m_HDRTexture.Get(), nullptr, srvHandle);
-
-        rtvHandle.ptr += rtvDescriptorSize;
 
         // Bloom Mip RTVs and SRVs
         for (uint32_t i = 0; i < m_MipLevels; i++) {
@@ -189,27 +155,11 @@ namespace VECTOR {
         }
     }
 
-    void DirectX12PostProcessor::TransitionToRenderTarget(ID3D12GraphicsCommandList* commandList) {
-        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-            m_HDRTexture.Get(),
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-            D3D12_RESOURCE_STATE_RENDER_TARGET
-        );
-        commandList->ResourceBarrier(1, &barrier);
-    }
-
-    void DirectX12PostProcessor::BeginMainPass(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle) {
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_RTVHeap->GetCPUDescriptorHandleForHeapStart();
+    void DirectX12PostProcessor::BeginMainPass(ID3D12GraphicsCommandList* commandList, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle, D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle) {
         commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-    }
-
-    void DirectX12PostProcessor::TransitionHDRToSRV(ID3D12GraphicsCommandList* commandList) {
-        auto hdrToSRV = CD3DX12_RESOURCE_BARRIER::Transition(
-            m_HDRTexture.Get(),
-            D3D12_RESOURCE_STATE_RENDER_TARGET,
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-        );
-        commandList->ResourceBarrier(1, &hdrToSRV);
+        
+        float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+        commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     }
 
     void DirectX12PostProcessor::RenderBloom(ID3D12GraphicsCommandList* commandList, uint32_t inputSRVIndex) {

@@ -37,7 +37,8 @@ namespace VECTOR {
         DXGI_ADAPTER_DESC1 desc;
         m_Adapter->GetDesc1(&desc);
         std::wstring ws(desc.Description);
-        std::string adapterName(ws.begin(), ws.end());
+        std::string adapterName;
+        for (wchar_t c : ws) adapterName += static_cast<char>(c);
         VECTOR_LOG_INFO("DirectX 12 Context Initialized. Adapter: " + adapterName);
 
         if (!CreateDevice()) return false;
@@ -91,7 +92,9 @@ namespace VECTOR {
             // Enable GPU-based validation if possible
             Microsoft::WRL::ComPtr<ID3D12Debug1> debugController1;
             if (SUCCEEDED(debugController.As(&debugController1))) {
-                debugController1->SetEnableGPUBasedValidation(TRUE);
+                // GPU-based validation has a massive performance overhead. 
+                // Enable only when specifically debugging shader/resource issues.
+                debugController1->SetEnableGPUBasedValidation(FALSE);
             }
             return true;
         }

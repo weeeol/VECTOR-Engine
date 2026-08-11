@@ -4,7 +4,7 @@ struct BloomDataBlock {
 };
 
 ConstantBuffer<BloomDataBlock> bloomData : register(b0);
-SamplerState sampLinearClamp : register(s0);
+SamplerState sampLinearClamp : register(s4);
 
 struct VSOutput {
     float4 position : SV_POSITION;

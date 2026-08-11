@@ -80,7 +80,8 @@ void Renderer::ExecuteRenderPipeline() {
         hdrTarget = builder.CreateTexture("HDRTarget", {1920, 1080, TextureFormat::RGBA16F});
       }, 
       std::make_unique<LambdaRenderPass>([&graph = m_RenderGraph, this](Renderer* r) {
-        r->BeginMainPass(graph.GetTexture("GBufferNormal"), graph.GetTexture("GBufferPosition"), graph.GetTexture("GBufferDepth"));
+        r->BeginMainPass(graph.GetTexture("GBufferNormal"), graph.GetTexture("GBufferPosition"), graph.GetTexture("GBufferDepth"),
+                         graph.GetTexture("HDRTarget"));
         r->FlushMainPass();
       })
     );
@@ -89,8 +90,8 @@ void Renderer::ExecuteRenderPipeline() {
       [&](RenderGraphBuilder& builder) {
         builder.ReadTexture(hdrTarget);
       }, 
-      std::make_unique<LambdaRenderPass>([this](Renderer* r) {
-        r->EndPostProcessPass();
+      std::make_unique<LambdaRenderPass>([&graph = m_RenderGraph, this](Renderer* r) {
+        r->EndPostProcessPass(graph.GetTexture("HDRTarget"));
       })
     );
 

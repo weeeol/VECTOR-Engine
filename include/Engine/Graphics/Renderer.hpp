@@ -66,9 +66,9 @@ public:
   virtual void BeginPrepass(std::shared_ptr<Texture2D> outNormal, std::shared_ptr<Texture2D> outPosition, std::shared_ptr<Texture2D> outDepth) = 0;
   virtual void FlushPrepass() = 0;
 
-  virtual void BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth) = 0;
+  virtual void BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth, std::shared_ptr<Texture2D> outColor) = 0;
   virtual void FlushMainPass() = 0;
-  virtual void EndPostProcessPass() = 0;
+  virtual void EndPostProcessPass(std::shared_ptr<Texture2D> inColor) = 0;
 
   virtual const glm::mat4 &GetLightSpaceMatrix() const = 0;
   virtual Shader *GetDepthShader() const = 0;

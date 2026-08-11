@@ -9,8 +9,8 @@ struct TAADataBlock {
 
 ConstantBuffer<TAADataBlock> taaData : register(b1);
 
-SamplerState LinearSampler : register(s0);
-SamplerState PointSampler : register(s1);
+SamplerState LinearSampler : register(s4);
+SamplerState PointSampler : register(s2);
 
 struct VSOutput {
     float4 position : SV_POSITION;

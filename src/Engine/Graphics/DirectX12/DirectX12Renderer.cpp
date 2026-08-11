@@ -8,6 +8,7 @@
 #include "Engine/Graphics/DirectX12/DirectX12PostProcessor.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12Texture2D.hpp"
 #include "Engine/Graphics/DirectX12/DirectX12Cubemap.hpp"
+#include <directx/d3dx12.h>
 #include "Engine/Core/ResourceManager.hpp"
 #include "Engine/Core/Logger.hpp"
 #include <SDL3/SDL.h>
@@ -219,7 +220,6 @@ namespace VECTOR {
             m_CommandAllocators[m_FrameIndex]->Reset();
             m_CommandList->Reset(m_CommandAllocators[m_FrameIndex].Get(), nullptr);
             TransitionResource(m_CommandList, backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-            m_PostProcessor->TransitionToRenderTarget(m_CommandList.Get());
 
             m_ObjectDataIndex = 0;
             m_MaterialDataIndex = 0;
@@ -241,8 +241,8 @@ namespace VECTOR {
         }
 
         float clearColor[] = { r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f };
-        D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV = m_PostProcessor->GetRTV();
-        m_CommandList->ClearRenderTargetView(hdrRTV, clearColor, 0, nullptr);
+        // No longer clearing HDR texture here as it's passed into the RenderPass which can clear it if needed.
+        // m_CommandList->ClearRenderTargetView(hdrRTV, clearColor, 0, nullptr);
         
         // Also clear the backbuffer, because if a scene doesn't call EndPostProcessPass, the backbuffer will have garbage
         D3D12_CPU_DESCRIPTOR_HANDLE backbufferRTV = m_Swapchain->GetBackBufferRTV(m_Swapchain->AcquireNextImage());
@@ -585,12 +585,30 @@ namespace VECTOR {
         m_LightData.dirLightColor = glm::vec4(color, intensity);
     }
 
-    void DirectX12Renderer::BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth) {
+    void DirectX12Renderer::BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth, std::shared_ptr<Texture2D> outColor) {
         if (!m_FrameStarted) return;
         m_LightUBOs[m_FrameIndex]->SetData(&m_LightData, sizeof(LightUBOData));
         
+        auto dx12Color = std::dynamic_pointer_cast<DirectX12Texture2D>(outColor);
+        if (!dx12Color) return;
+
+        if (!m_MainRTVHeap) {
+            D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
+            rtvHeapDesc.NumDescriptors = 1;
+            rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+            rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+            m_Context->GetDevice()->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_MainRTVHeap));
+            m_Context->GetDevice()->CreateRenderTargetView(dx12Color->GetResource(), nullptr, m_MainRTVHeap->GetCPUDescriptorHandleForHeapStart());
+        }
+
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_Swapchain->GetDepthBufferDSV();
-        m_PostProcessor->BeginMainPass(m_CommandList.Get(), dsvHandle);
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_MainRTVHeap->GetCPUDescriptorHandleForHeapStart();
+
+        // Transition outColor to RenderTarget
+        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(dx12Color->GetResource(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        m_CommandList->ResourceBarrier(1, &barrier);
+
+        m_PostProcessor->BeginMainPass(m_CommandList.Get(), rtvHandle, dsvHandle);
 
         m_CommandList->SetGraphicsRootSignature(m_Pipeline->GetRootSignature());
         m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -752,7 +770,7 @@ namespace VECTOR {
         m_CurrentSkybox = dynamic_cast<DirectX12Cubemap*>(cubemap);
     }
 
-    void DirectX12Renderer::EndPostProcessPass() {
+    void DirectX12Renderer::EndPostProcessPass(std::shared_ptr<Texture2D> inColor) {
         if (!m_FrameStarted) return;
         
         Microsoft::WRL::ComPtr<IDXGISwapChain3> swapchain3;
@@ -761,9 +779,14 @@ namespace VECTOR {
             backBufferIndex = swapchain3->GetCurrentBackBufferIndex();
         }
         
-        uint32_t postProcessInputSRV = m_PostProcessor->GetHDRTextureSRVIndex();
+        auto dx12Color = std::dynamic_pointer_cast<DirectX12Texture2D>(inColor);
+        if (!dx12Color) return;
         
-        m_PostProcessor->TransitionHDRToSRV(m_CommandList.Get());
+        uint32_t postProcessInputSRV = dx12Color->GetDescriptorIndex();
+        
+        // Transition inColor back to SRV
+        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(dx12Color->GetResource(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        m_CommandList->ResourceBarrier(1, &barrier);
 
         if (m_TAAEnabled) {
             // TAA Resolve passes:
@@ -772,7 +795,7 @@ namespace VECTOR {
             // 3. Depth buffer (from Prepass)
             m_TAA->Resolve(
                 m_CommandList.Get(), 
-                m_PostProcessor->GetHDRTextureSRVIndex(), 
+                postProcessInputSRV, 
                 m_Prepass->GetMotionVectorSRVIndex(), 
                 m_Prepass->GetDepthSRVIndex()
             );

@@ -174,6 +174,11 @@ void VulkanRenderer::Shutdown() {
 
     ImGui_ImplVulkan_Shutdown();
 
+    if (m_MainFramebuffer != VK_NULL_HANDLE) {
+        vkDestroyFramebuffer(m_Context->GetDevice(), m_MainFramebuffer, nullptr);
+        m_MainFramebuffer = VK_NULL_HANDLE;
+    }
+
     VkDevice device = m_Context->GetDevice();
     for (size_t i = 0; i < m_FramesInFlight; i++) {
       vkDestroySemaphore(device, m_RenderFinishedSemaphores[i], nullptr);
@@ -203,14 +208,14 @@ void VulkanRenderer::Shutdown() {
 
     vkDestroyDescriptorPool(device, m_DescriptorPool, nullptr);
     vkDestroyCommandPool(device, m_CommandPool, nullptr);
+  m_LastMainColor.reset();
+  m_DummyTexture.reset();
+  m_Swapchain.reset();
+  m_Context.reset(); // Shutdown happens in destructor
   }
 
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyContext();
-
-  m_DummyTexture.reset();
-  m_Swapchain.reset();
-  m_Context.reset(); // Shutdown happens in destructor
 
   if (m_Window) {
     SDL_DestroyWindow(m_Window);
@@ -284,23 +289,11 @@ void VulkanRenderer::Clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 
 void VulkanRenderer::Present() {
   if (!m_FrameStarted) {
-    BeginFrame();
-  }
-  if (!m_MainPassActive) {
-    BeginMainPass(nullptr, nullptr, nullptr);
+    return;
   }
 
   VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
 
-  // 1. End the offscreen main pass
-  vkCmdEndRenderPass(commandBuffer);
-  m_MainPassActive = false;
-
-  // 1.5 Process TAA
-  m_PostProcessor->ProcessTAA(commandBuffer, m_TAAEnabled);
-
-  // 2. Render Bloom (does its own RenderPasses)
-  m_PostProcessor->RenderBloom(commandBuffer);
 
   // 3. Begin Swapchain Render Pass for Post Processing & ImGui
   VkRenderPassBeginInfo renderPassInfo{};
@@ -400,6 +393,10 @@ void VulkanRenderer::RecreateSwapchain() {
   }
 
   m_Swapchain->Recreate(width, height);
+  if (m_MainFramebuffer != VK_NULL_HANDLE) {
+      vkDestroyFramebuffer(m_Context->GetDevice(), m_MainFramebuffer, nullptr);
+      m_MainFramebuffer = VK_NULL_HANDLE;
+  }
   if (m_PostProcessor) {
     m_PostProcessor->Recreate(width, height, m_Swapchain->GetRenderPass());
   }
@@ -906,7 +903,7 @@ void VulkanRenderer::FlushPrepass() {
   }
 }
 
-void VulkanRenderer::BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth) {
+void VulkanRenderer::BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth, std::shared_ptr<Texture2D> outColor) {
   if (m_MainPassActive)
     return;
 
@@ -914,12 +911,42 @@ void VulkanRenderer::BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::sha
   if (!m_FrameStarted)
     return;
 
+  auto vkColor = std::dynamic_pointer_cast<VulkanTexture2D>(outColor);
+  auto vkDepth = std::dynamic_pointer_cast<VulkanTexture2D>(inDepth);
+
+  if (!vkColor || !vkDepth) {
+      VECTOR_LOG_ERROR("VulkanRenderer received invalid textures for Main Pass!");
+      return;
+  }
+
+  if (m_MainFramebuffer == VK_NULL_HANDLE) {
+      std::array<VkImageView, 3> fbAttachments = {
+          vkColor->GetImageView(),
+          m_PostProcessor->GetOffscreenVelocityView(), // Assuming Velocity is still managed by PostProcessor for now, or we can use a dummy/skip it?
+          vkDepth->GetImageView()
+      };
+
+      VkFramebufferCreateInfo framebufferInfo{};
+      framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+      framebufferInfo.renderPass = m_PostProcessor->GetOffscreenRenderPass();
+      framebufferInfo.attachmentCount = static_cast<uint32_t>(fbAttachments.size());
+      framebufferInfo.pAttachments = fbAttachments.data();
+      framebufferInfo.width = m_Swapchain->GetExtent().width;
+      framebufferInfo.height = m_Swapchain->GetExtent().height;
+      framebufferInfo.layers = 1;
+
+      if (vkCreateFramebuffer(m_Context->GetDevice(), &framebufferInfo, nullptr, &m_MainFramebuffer) != VK_SUCCESS) {
+          VECTOR_LOG_ERROR("Failed to create dynamic main framebuffer!");
+          return;
+      }
+  }
+
   VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
 
   VkRenderPassBeginInfo renderPassInfo{};
   renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
   renderPassInfo.renderPass = m_PostProcessor->GetOffscreenRenderPass();
-  renderPassInfo.framebuffer = m_PostProcessor->GetOffscreenFramebuffer();
+  renderPassInfo.framebuffer = m_MainFramebuffer;
   renderPassInfo.renderArea.offset = {0, 0};
   renderPassInfo.renderArea.extent = m_Swapchain->GetExtent();
 
@@ -1086,7 +1113,20 @@ void VulkanRenderer::FlushMainPass() {
   m_CurrentSkybox = nullptr;
 }
 
-void VulkanRenderer::EndPostProcessPass() {}
+// Removed duplicate EndPostProcessPass
+
+void VulkanRenderer::EndPostProcessPass(std::shared_ptr<Texture2D> inColor) {
+  if (!m_FrameStarted) return;
+  VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
+
+  if (m_MainPassActive) {
+    vkCmdEndRenderPass(commandBuffer);
+    m_MainPassActive = false;
+  }
+
+  m_LastMainColor = inColor;
+  m_PostProcessor->Process(commandBuffer, inColor);
+}
 
 void VulkanRenderer::SetFullscreen(bool fullscreen, bool borderless) {
   if (m_Window) {

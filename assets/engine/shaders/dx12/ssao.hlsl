@@ -13,8 +13,8 @@ struct SSAODataBlock {
 
 ConstantBuffer<SSAODataBlock> ssaoData : register(b0);
 
-SamplerState sampPointClamp : register(s0);
-SamplerState sampPointWrap  : register(s1);
+SamplerState sampPointClamp : register(s2);
+SamplerState sampPointWrap  : register(s3);
 
 struct VSOutput {
     float4 position : SV_POSITION;

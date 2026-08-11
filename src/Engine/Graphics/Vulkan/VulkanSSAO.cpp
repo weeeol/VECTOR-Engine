@@ -237,6 +237,67 @@ namespace VECTOR {
         samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         vkCreateSampler(device, &samplerInfo, nullptr, &m_Sampler);
+
+        // --- Transition Images to initial layouts ---
+        {
+            VkCommandPool tempPool;
+            VkCommandPoolCreateInfo poolInfo{};
+            poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+            poolInfo.queueFamilyIndex = m_Context->GetGraphicsQueueFamilyIndex();
+            vkCreateCommandPool(device, &poolInfo, nullptr, &tempPool);
+
+            VkCommandBufferAllocateInfo cmdAllocInfo{};
+            cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            cmdAllocInfo.commandPool = tempPool;
+            cmdAllocInfo.commandBufferCount = 1;
+
+            VkCommandBuffer cmd;
+            vkAllocateCommandBuffers(device, &cmdAllocInfo, &cmd);
+
+            VkCommandBufferBeginInfo beginInfo{};
+            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            vkBeginCommandBuffer(cmd, &beginInfo);
+
+            VkImageMemoryBarrier barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+            barrier.image = m_SSAOImage;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            barrier.image = m_BlurImage;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            vkEndCommandBuffer(cmd);
+
+            VkSubmitInfo submitInfo{};
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submitInfo.commandBufferCount = 1;
+            submitInfo.pCommandBuffers = &cmd;
+
+            VkQueue graphicsQueue = m_Context->GetGraphicsQueue();
+            {
+                std::lock_guard<std::mutex> lock(m_Context->GetGraphicsQueueMutex());
+                vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+                vkQueueWaitIdle(graphicsQueue);
+            }
+
+            vkFreeCommandBuffers(device, tempPool, 1, &cmd);
+            vkDestroyCommandPool(device, tempPool, nullptr);
+        }
     }
 
     void VulkanSSAO::CreateNoiseTexture() {
