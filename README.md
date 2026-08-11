@@ -1,6 +1,6 @@
 <div align="center">
   
-  <h1 align="center">VECTOR Engine & FPS </h1>
+  <h1 align="center">VECTOR Engine & FPS</h1>
   <p align="center">
     <strong>Velocity Engine for C++ Texturing and Object Rendering</strong>
   </p>
@@ -13,79 +13,78 @@
     <img src="https://img.shields.io/badge/C++-17%2F20-blueviolet?style=for-the-badge&logo=c%2B%2B" alt="C++17/20">
   </p>
 </div>
-
 <br/>
 
-## 🚀 Overview
+## Overview
 
 **VECTOR** is a custom hardware-accelerated 3D C++ game engine built from scratch. It utilizes **SDL3** for windowing and input, with **Vulkan** and **DirectX 12** as its rendering backends. It is compiled as a standalone static library (`libVECTOR.a`/`VECTOR.lib`) and includes a fully functional 3D Pong game that demonstrates the engine's incredible capabilities.
 
 ---
 
-## ✨ Features
+## Features
 
-- 📺 **Advanced Rendering (Vulkan & DX12)**: Features modern rendering backends with support for Temporal Anti-Aliasing (TAA), Screen Space Ambient Occlusion (SSAO), Bloom, Shadow Mapping, Cubemaps/Skyboxes, and Post-Processing. DX12 backend uses advanced Shader Model 6.6 bindless rendering.
-- 🎬 **3D Models & Skeletal Animation**: Integrated with **Assimp** for loading 3D meshes, materials, and skeletal animations.
-- 💥 **3D Physics Engine**: Integrated **Bullet Physics** for 3D rigid body simulation, collision events, and continuous collision detection.
-- 🧵 **Multithreading**: Custom `JobSystem` for parallel task execution and maximizing CPU utilization.
-- 💾 **Save System & Settings**: Lightweight persistent data storage (`save.dat`) using JSON to track settings and high scores.
-- 🛠️ **Developer Debug Tools**: Full integration of **Dear ImGui**, allowing developers to create custom floating debug panels (press `F3` to toggle the Engine Status & FPS window).
-- 🕹️ **Game Modes**: Play in standard or endless modes.
-- 🤖 **Dynamic AI Opponent**: Play against a computer-controlled AI.
-- 🧬 **Data-Oriented ECS**: A custom Entity-Component System core framework, maximizing cache locality and decoupling logic from data.
-- 🎵 **Audio & BGM Support**: Robust audio manager supporting `SDL_mixer` sound effects and endless `.mp3`/`.wav`/`.ogg` background music.
-- 💎 **High Definition & Polish**: Includes neon UIs, dynamic window resizing, and smooth state transitions.
-- 🚥 **Game States**: Includes Splash, Main Menu, Playing, Loading, and Paused menus with interactive mouse-driven UI.
+- **Advanced Rendering (Vulkan & DX12)**: Features modern rendering backends powered by a custom **RenderGraph** architecture for automated resource state tracking and batched barrier execution. Supports Temporal Anti-Aliasing (TAA), Screen Space Ambient Occlusion (SSAO), Bloom, Shadow Mapping, Cubemaps/Skyboxes, and Post-Processing. DX12 backend uses advanced Shader Model 6.6 bindless rendering.
+- **3D Models & Skeletal Animation**: Integrated with **Assimp** for loading 3D meshes, materials, and skeletal animations.
+- **3D Physics Engine**: Integrated **Bullet Physics** for 3D rigid body simulation, collision events, and continuous collision detection.
+- **Multithreading**: Custom `JobSystem` for parallel task execution and maximizing CPU utilization.
+- **Save System & Settings**: Lightweight persistent data storage (`save.dat`) using JSON to track settings and high scores.
+- **Developer Debug Tools**: Full integration of **Dear ImGui**, allowing developers to create custom floating debug panels (press `F3` to toggle the Engine Status & FPS window).
+- **Game Modes**: Play in standard or endless modes.
+- **Dynamic AI Opponent**: Play against a computer-controlled AI.
+- **Data-Oriented ECS**: A custom Entity-Component System core framework, maximizing cache locality and decoupling logic from data.
+- **Audio & BGM Support**: Robust audio manager supporting `SDL_mixer` sound effects and endless `.mp3`/`.wav`/`.ogg` background music.
+- **High Definition & Polish**: Includes neon UIs, dynamic window resizing, and smooth state transitions.
+- **Game States**: Includes Splash, Main Menu, Playing, Loading, and Paused menus with interactive mouse-driven UI.
 
 ---
 
-## 🛠️ Requirements
+## Requirements
 
 Ensure you have the following installed before building:
 
-* 🧰 **C++17 or C++20** compatible compiler
-* 🏗️ **CMake 3.10+**
-* 🎮 **SDL3, SDL3_ttf, SDL3_image, and SDL3_mixer** development libraries
-* 🌋 **Vulkan SDK** & **VulkanMemoryAllocator** (for Vulkan backend)
-* 🪟 **Windows SDK** (for DirectX 12 backend)
-* 📦 **Bullet Physics**, **GLM**, **Assimp**, **nlohmann_json**
+* **C++17 or C++20** compatible compiler
+* **CMake 3.10+**
+* **SDL3, SDL3_ttf, SDL3_image, and SDL3_mixer** development libraries
+* **Vulkan SDK** & **VulkanMemoryAllocator** (for Vulkan backend)
+* **Windows SDK** (for DirectX 12 backend)
+* **Bullet Physics**, **GLM**, **Assimp**, **nlohmann_json**, **EnTT**
 * *Note: Dear ImGui is automatically fetched by CMake at build time.*
 
 ---
 
-## 🎮 Controls
+## Controls
 
 | Action | Key |
 | :--- | :--- |
 | **Movement** | `W` `A` `S` `D` |
-| **Look Around** | `Mouse` 🖱️ |
+| **Look Around** | `Mouse` |
 | **Jump** | `Space` |
-| **Shoot** | `Left Click` 🖱️ |
+| **Shoot** | `Left Click` |
 | **Adjust FOV** | `Up` / `Down` Arrows |
 | **Pause** | `P` or `ESC` |
 | **Toggle Debug UI** | `F3` |
 
 ---
 
-## 🏗️ Building
+## Building
 
 This engine uses a **universal CMake configuration**. It is highly recommended to use a package manager like `vcpkg` to resolve all the 3D and media dependencies.
 
-### 🌐 Option 1: Vcpkg (Universal / MSVC / Cross-Platform)
+### Option 1: Vcpkg (Universal / MSVC / Cross-Platform)
 Using [vcpkg](https://vcpkg.io/):
 
 ```bash
-vcpkg install sdl3 sdl3-ttf sdl3-image sdl3-mixer bullet3 glm assimp nlohmann-json vulkan-memory-allocator directx-headers directx-dxc d3d12-memory-allocator
+vcpkg install sdl3 sdl3-ttf sdl3-image sdl3-mixer bullet3 glm assimp nlohmann-json entt vulkan-memory-allocator directx-headers directx-dxc d3d12-memory-allocator
 mkdir build && cd build
 cmake -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake ..
 cmake --build .
 ```
 
-### 🪟 Option 2: MSYS2 / MinGW (Windows)
+### Option 2: MSYS2 / MinGW (Windows)
 If using MSYS2 (UCRT64), install the dependencies (example):
 
 ```bash
-pacman -S mingw-w64-ucrt-x86_64-SDL3 mingw-w64-ucrt-x86_64-SDL3_ttf mingw-w64-ucrt-x86_64-SDL3_image mingw-w64-ucrt-x86_64-SDL3_mixer mingw-w64-ucrt-x86_64-bullet mingw-w64-ucrt-x86_64-glm mingw-w64-ucrt-x86_64-assimp mingw-w64-ucrt-x86_64-nlohmann-json mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-vulkan-memory-allocator mingw-w64-ucrt-x86_64-directx-headers mingw-w64-ucrt-x86_64-directx-dxc mingw-w64-ucrt-x86_64-d3d12-memory-allocator
+pacman -S mingw-w64-ucrt-x86_64-SDL3 mingw-w64-ucrt-x86_64-SDL3_ttf mingw-w64-ucrt-x86_64-SDL3_image mingw-w64-ucrt-x86_64-SDL3_mixer mingw-w64-ucrt-x86_64-bullet mingw-w64-ucrt-x86_64-glm mingw-w64-ucrt-x86_64-assimp mingw-w64-ucrt-x86_64-nlohmann-json mingw-w64-ucrt-x86_64-entt mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-vulkan-memory-allocator mingw-w64-ucrt-x86_64-directx-headers mingw-w64-ucrt-x86_64-directx-dxc mingw-w64-ucrt-x86_64-d3d12-memory-allocator
 ```
 
 Then configure and build via CMake:
@@ -98,5 +97,5 @@ cmake --build .
 
 <div align="center">
   <br/>
-  Made with ❤️ by the VECTOR Team.
+  Made with love by the VECTOR Team.
 </div>
