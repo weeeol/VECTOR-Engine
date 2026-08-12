@@ -7,7 +7,7 @@
   
   <p align="center">
     <a href="https://github.com/libsdl-org/SDL"><img src="https://img.shields.io/badge/SDL3-Awesome-blue?style=for-the-badge&logo=c%2B%2B" alt="SDL3"></a>
-    <a href="https://www.vulkan.org/"><img src="https://img.shields.io/badge/Vulkan-Primary-red?style=for-the-badge&logo=vulkan" alt="Vulkan"></a>
+    <a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-12-graphics"><img src="https://img.shields.io/badge/DirectX%2012-Primary-blue?style=for-the-badge&logo=windows" alt="DirectX 12"></a>
     <a href="https://github.com/bulletphysics/bullet3"><img src="https://img.shields.io/badge/Bullet3D-Physics-green?style=for-the-badge&logo=c%2B%2B" alt="Bullet3D"></a>
     <a href="https://cmake.org/"><img src="https://img.shields.io/badge/CMake-3.10+-red?style=for-the-badge&logo=cmake" alt="CMake"></a>
     <img src="https://img.shields.io/badge/C++-17%2F20-blueviolet?style=for-the-badge&logo=c%2B%2B" alt="C++17/20">
@@ -17,7 +17,7 @@
 
 ## Overview
 
-**VECTOR** is a custom hardware-accelerated 3D C++ game engine built from scratch. It utilizes **SDL3** for windowing and input, with **Vulkan** and **DirectX 12** as its rendering backends. It is compiled as a standalone static library (`libVECTOR.a`/`VECTOR.lib`) and includes a fully functional 3D Pong game that demonstrates the engine's incredible capabilities.
+**VECTOR** is a custom hardware-accelerated 3D C++ game engine built from scratch. It utilizes **SDL3** for windowing and input, with **DirectX 12** as its primary and default rendering backend (with Vulkan as a secondary option). It is compiled as a standalone static library (`libVECTOR.a`/`VECTOR.lib`) and includes a fully functional 3D Pong game that demonstrates the engine's incredible capabilities.
 
 ---
 

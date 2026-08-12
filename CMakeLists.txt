@@ -52,6 +52,9 @@ set(VECTOR_SOURCES
     src/Engine/Graphics/UniformBufferObject.cpp
 
     src/Engine/Graphics/Vulkan/VulkanRenderer.cpp
+    src/Engine/Graphics/Vulkan/VulkanRenderer_Passes.cpp
+    src/Engine/Graphics/Vulkan/VulkanRenderer_Descriptors.cpp
+    src/Engine/Graphics/Vulkan/VulkanRenderer_UI.cpp
     src/Engine/Graphics/Vulkan/VulkanDescriptorManager.cpp
     src/Engine/Graphics/Vulkan/VulkanShadowPass.cpp
     src/Engine/Graphics/Vulkan/VulkanContext.cpp
