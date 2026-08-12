@@ -68,8 +68,8 @@ public:
                           const glm::vec4 &color) override;
   virtual void DrawUIText(const std::string &text, int x, int y,
                           const glm::vec4 &color, int fontSize = 24) override;
-  virtual std::shared_ptr<Texture2D> AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format) override;
-  virtual void TransitionResource(uint32_t handle, int oldState, int newState) override;
+  virtual std::shared_ptr<Texture2D> AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format, Texture2D* aliasTexture = nullptr) override;
+  virtual void TransitionResources(const std::vector<RGResourceTransition>& transitions) override;
   virtual void EndUI() override;
 
   virtual void BeginImGuiFrame() override;
@@ -86,6 +86,8 @@ public:
   virtual void BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth, std::shared_ptr<Texture2D> outColor) override;
   virtual void FlushMainPass() override;
   virtual void EndPostProcessPass(std::shared_ptr<Texture2D> inColor) override;
+
+  virtual void GenerateSSAO() override;
 
   virtual const glm::mat4 &GetLightSpaceMatrix() const override {
     return m_DummyMatrix;

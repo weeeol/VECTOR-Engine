@@ -362,21 +362,60 @@ namespace VECTOR {
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_CommandList.Get());
     }
 
-    std::shared_ptr<Texture2D> DirectX12Renderer::AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format) {
+    std::shared_ptr<Texture2D> DirectX12Renderer::AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format, Texture2D* aliasTexture) {
+        if (aliasTexture) {
+            // Memory Aliasing: Create a texture that aliases the same allocation as aliasTexture
+            auto dx12Tex = dynamic_cast<DirectX12Texture2D*>(aliasTexture);
+            if (dx12Tex && dx12Tex->GetAllocation()) {
+                return Texture2D::CreateRenderTargetAliased(width, height, format, dx12Tex);
+            }
+        }
         return Texture2D::CreateRenderTarget(width, height, format);
     }
 
-    void DirectX12Renderer::TransitionResource(uint32_t handle, int oldState, int newState) {
-        if (!m_FrameStarted) return;
-        
-        // High-level automated barrier injected by Render Graph!
-        // ID3D12GraphicsCommandList* commandList = m_CommandLists[m_CurrentFrame];
-        // D3D12_RESOURCE_BARRIER barrier = {};
-        // barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        // barrier.Transition.pResource = resourceMap[handle];
-        // barrier.Transition.StateBefore = MapState(oldState);
-        // barrier.Transition.StateAfter = MapState(newState);
-        // commandList->ResourceBarrier(1, &barrier);
+    D3D12_RESOURCE_STATES MapRGStateToD3D12(int state) {
+        switch (static_cast<RGResourceState>(state)) {
+            case RGResourceState::RENDER_TARGET: return D3D12_RESOURCE_STATE_RENDER_TARGET;
+            case RGResourceState::DEPTH_WRITE: return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+            case RGResourceState::DEPTH_READ: return D3D12_RESOURCE_STATE_DEPTH_READ;
+            case RGResourceState::SHADER_RESOURCE: return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            case RGResourceState::UNORDERED_ACCESS: return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            case RGResourceState::PRESENT: return D3D12_RESOURCE_STATE_PRESENT;
+            default: return D3D12_RESOURCE_STATE_COMMON;
+        }
+    }
+
+    void DirectX12Renderer::TransitionResources(const std::vector<RGResourceTransition>& transitions) {
+        if (!m_FrameStarted || transitions.empty()) return;
+
+        std::vector<D3D12_RESOURCE_BARRIER> barriers;
+        barriers.reserve(transitions.size());
+
+        for (const auto& trans : transitions) {
+            auto tex = m_RenderGraph.GetTexture(trans.handle);
+            if (!tex) continue;
+
+            auto dx12Tex = dynamic_cast<DirectX12Texture2D*>(tex.get());
+            if (!dx12Tex || !dx12Tex->GetResource()) continue;
+
+            D3D12_RESOURCE_STATES stateBefore = MapRGStateToD3D12(trans.oldState);
+            D3D12_RESOURCE_STATES stateAfter = MapRGStateToD3D12(trans.newState);
+            
+            if (stateBefore == stateAfter) continue;
+
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = dx12Tex->GetResource();
+            barrier.Transition.StateBefore = stateBefore;
+            barrier.Transition.StateAfter = stateAfter;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            
+            barriers.push_back(barrier);
+        }
+
+        if (!barriers.empty()) {
+            m_CommandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+        }
     }
 
     void DirectX12Renderer::BeginUI() {
@@ -604,10 +643,6 @@ namespace VECTOR {
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_Swapchain->GetDepthBufferDSV();
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_MainRTVHeap->GetCPUDescriptorHandleForHeapStart();
 
-        // Transition outColor to RenderTarget
-        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(dx12Color->GetResource(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        m_CommandList->ResourceBarrier(1, &barrier);
-
         m_PostProcessor->BeginMainPass(m_CommandList.Get(), rtvHandle, dsvHandle);
 
         m_CommandList->SetGraphicsRootSignature(m_Pipeline->GetRootSignature());
@@ -661,13 +696,17 @@ namespace VECTOR {
         }
         
         m_Prepass->EndPass(m_CommandList.Get());
+    }
 
-        // Generate SSAO
-        m_SSAO->Generate(m_CommandList.Get(), 
-                         m_Prepass->GetNormalSRVIndex(), 
-                         m_Prepass->GetDepthSRVIndex(), 
-                         m_UnjitteredProjection,
-                         m_CurrentView);
+    void DirectX12Renderer::GenerateSSAO() {
+        if (!m_FrameStarted) return;
+        if (m_SSAOEnabled) {
+            m_SSAO->Generate(m_CommandList.Get(), 
+                             m_Prepass->GetNormalSRVIndex(), 
+                             m_Prepass->GetDepthSRVIndex(), 
+                             m_UnjitteredProjection,
+                             m_CurrentView);
+        }
     }
 
     void DirectX12Renderer::BeginShadowPass() {
@@ -783,10 +822,6 @@ namespace VECTOR {
         if (!dx12Color) return;
         
         uint32_t postProcessInputSRV = dx12Color->GetDescriptorIndex();
-        
-        // Transition inColor back to SRV
-        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(dx12Color->GetResource(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        m_CommandList->ResourceBarrier(1, &barrier);
 
         if (m_TAAEnabled) {
             // TAA Resolve passes:

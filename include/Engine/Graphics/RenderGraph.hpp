@@ -12,6 +12,12 @@ namespace VECTOR {
 
 class Renderer;
 
+struct RGResourceTransition {
+    uint32_t handle;
+    int oldState;
+    int newState;
+};
+
 using RGResourceHandle = uint32_t;
 constexpr RGResourceHandle RG_INVALID_HANDLE = static_cast<RGResourceHandle>(-1);
 
@@ -93,6 +99,13 @@ public:
         return GetTexture(it->second);
     }
 
+    void SetResourceState(const std::string& name, RGResourceState state) {
+        auto it = m_ResourceNameToHandle.find(name);
+        if (it != m_ResourceNameToHandle.end()) {
+            m_Resources[it->second].currentState = state;
+        }
+    }
+
 private:
     class BuilderImpl;
     friend class BuilderImpl;
@@ -106,6 +119,10 @@ private:
         RGPassNode* creator = nullptr;
         RGResourceState currentState = RGResourceState::UNDEFINED;
         std::shared_ptr<Texture2D> texture = nullptr;
+        
+        int firstPass = -1;
+        int lastPass = -1;
+        RGResourceHandle aliasHandle = RG_INVALID_HANDLE;
     };
     std::vector<ResourceInfo> m_Resources;
     std::unordered_map<std::string, RGResourceHandle> m_ResourceNameToHandle;

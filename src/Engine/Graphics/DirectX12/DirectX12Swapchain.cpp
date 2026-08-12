@@ -84,6 +84,16 @@ namespace VECTOR {
         
         swapChainDesc.Flags = m_TearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
+        if (m_Swapchain) {
+            HRESULT hr = m_Swapchain->ResizeBuffers(
+                s_FrameCount, m_Width, m_Height, m_ImageFormat, swapChainDesc.Flags
+            );
+            if (FAILED(hr)) {
+                VECTOR_LOG_ERROR("Failed to resize DXGI Swapchain. HRESULT: " + std::to_string(hr));
+            }
+            return;
+        }
+
         HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(m_Window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
         if (!hwnd) {
             VECTOR_LOG_ERROR("Failed to get HWND from SDL3 window");

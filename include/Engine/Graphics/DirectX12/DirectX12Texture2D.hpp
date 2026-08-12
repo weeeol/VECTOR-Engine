@@ -14,6 +14,7 @@ namespace VECTOR {
         DirectX12Texture2D(const std::string& path);
         DirectX12Texture2D(uint32_t width, uint32_t height, void* data, uint32_t channels);
         DirectX12Texture2D(uint32_t width, uint32_t height, TextureFormat format);
+        DirectX12Texture2D(uint32_t width, uint32_t height, TextureFormat format, Texture2D* alias);
         virtual ~DirectX12Texture2D();
 
         virtual void Bind(unsigned int slot = 0) const override;
@@ -25,6 +26,7 @@ namespace VECTOR {
 
         ID3D12Resource* GetResource() const { return m_Resource.Get(); }
         uint32_t GetDescriptorIndex() const { return m_DescriptorIndex; }
+        D3D12MA::Allocation* GetAllocation() const { return m_Allocation.Get(); }
 
     private:
         void LoadFromFile(const std::string& path);

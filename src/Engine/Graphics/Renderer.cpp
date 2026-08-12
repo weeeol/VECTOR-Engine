@@ -68,8 +68,15 @@ void Renderer::ExecuteRenderPipeline() {
     );
 
     if (IsSSAOEnabled()) {
-      // Generate SSAO based on G-Buffer
-      // Handled implicitly by backends for now
+      m_RenderGraph.AddPass("SSAO",
+        [&](RenderGraphBuilder& builder) {
+          builder.ReadTexture(gBufferNormal);
+          builder.ReadTexture(gBufferDepth);
+        },
+        std::make_unique<LambdaRenderPass>([this](Renderer* r) {
+          r->GenerateSSAO();
+        })
+      );
     }
 
     m_RenderGraph.AddPass("MainPass", 

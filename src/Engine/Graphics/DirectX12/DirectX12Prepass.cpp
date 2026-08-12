@@ -111,11 +111,7 @@ namespace VECTOR {
         // Transition resources to RENDER_TARGET and DEPTH_WRITE handled by Graph? Wait, Graph transitions to RENDER_TARGET / DEPTH_WRITE?
         // Right now our graph hasn't been fully updated to issue barriers.
         // We will issue manual barriers for now.
-        D3D12_RESOURCE_BARRIER barriers[3] = {};
-        barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_NormalTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_MotionVectorTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        barriers[2] = CD3DX12_RESOURCE_BARRIER::Transition(m_DepthTexture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-        commandList->ResourceBarrier(3, barriers);
+        // REMOVED: RenderGraph now handles these transitions!
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2] = { m_NormalRTV, m_MotionVectorRTV };
         commandList->OMSetRenderTargets(2, rtvHandles, FALSE, &m_DepthDSV);
@@ -138,10 +134,6 @@ namespace VECTOR {
 
     void DirectX12Prepass::EndPass(ID3D12GraphicsCommandList* commandList) {
         if (!m_NormalTexture) return;
-        D3D12_RESOURCE_BARRIER barriers[3] = {};
-        barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_NormalTexture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_MotionVectorTexture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        barriers[2] = CD3DX12_RESOURCE_BARRIER::Transition(m_DepthTexture.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        commandList->ResourceBarrier(3, barriers);
+        // REMOVED: RenderGraph now handles transition back to SRV!
     }
 } // namespace VECTOR

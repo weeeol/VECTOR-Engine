@@ -38,4 +38,18 @@ std::shared_ptr<Texture2D> Texture2D::CreateRenderTarget(uint32_t width, uint32_
   return nullptr;
 }
 
+std::shared_ptr<Texture2D> Texture2D::CreateRenderTargetAliased(uint32_t width, uint32_t height, TextureFormat format, Texture2D* alias) {
+  switch (RendererAPI::GetAPI()) {
+  case RendererAPI::API::None:
+    VECTOR_LOG_ERROR("RendererAPI::None is currently not supported!");
+    return nullptr;
+  case RendererAPI::API::Vulkan:
+    return std::make_shared<VulkanTexture2D>(width, height, format, alias);
+  case RendererAPI::API::DirectX12:
+    return std::make_shared<DirectX12Texture2D>(width, height, format, alias);
+  }
+  VECTOR_LOG_ERROR("Unknown RendererAPI!");
+  return nullptr;
+}
+
 } // namespace VECTOR

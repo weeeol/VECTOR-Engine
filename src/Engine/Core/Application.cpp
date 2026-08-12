@@ -76,6 +76,23 @@ namespace VECTOR {
         Uint64 fpsTimer = SDL_GetTicks();
 
         while (m_IsRunning) {
+            if (m_NeedsResize) {
+                m_Width = m_PendingWidth;
+                m_Height = m_PendingHeight;
+                if (m_Renderer) {
+                    m_Renderer->SetResolution(m_Width, m_Height);
+                }
+                SceneManager::Get().OnResize(m_Width, m_Height);
+                m_NeedsResize = false;
+            }
+
+            if (m_NeedsFullscreenChange) {
+                if (m_Renderer) {
+                    m_Renderer->SetFullscreen(m_PendingFullscreen, m_PendingBorderless);
+                }
+                m_NeedsFullscreenChange = false;
+            }
+
             Uint64 currentTime = SDL_GetPerformanceCounter();
             // Convert to milliseconds
             float deltaTime = (float)((currentTime - previousTime) * 1000.0 / SDL_GetPerformanceFrequency());
@@ -111,18 +128,15 @@ namespace VECTOR {
     }
 
     void Application::SetResolution(int width, int height) {
-        m_Width = width;
-        m_Height = height;
-        if (m_Renderer) {
-            m_Renderer->SetResolution(width, height);
-        }
-        SceneManager::Get().OnResize(width, height);
+        m_PendingWidth = width;
+        m_PendingHeight = height;
+        m_NeedsResize = true;
     }
 
     void Application::SetFullscreen(bool fullscreen, bool borderless) {
-        if (m_Renderer) {
-            m_Renderer->SetFullscreen(fullscreen, borderless);
-        }
+        m_PendingFullscreen = fullscreen;
+        m_PendingBorderless = borderless;
+        m_NeedsFullscreenChange = true;
     }
 
     void Application::Shutdown() {
@@ -153,12 +167,9 @@ namespace VECTOR {
                 int width = event.window.data1;
                 int height = event.window.data2;
                 if (width != m_Width || height != m_Height) {
-                    m_Width = width;
-                    m_Height = height;
-                    if (m_Renderer) {
-                        m_Renderer->SetResolution(width, height);
-                    }
-                    SceneManager::Get().OnResize(width, height);
+                    m_PendingWidth = width;
+                    m_PendingHeight = height;
+                    m_NeedsResize = true;
                 }
             }
         }

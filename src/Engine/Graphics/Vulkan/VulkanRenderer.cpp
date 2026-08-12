@@ -782,12 +782,141 @@ void VulkanRenderer::BeginImGuiFrame() {
 
 void VulkanRenderer::EndImGuiFrame() { ImGui::Render(); }
 
-std::shared_ptr<Texture2D> VulkanRenderer::AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format) {
+std::shared_ptr<Texture2D> VulkanRenderer::AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format, Texture2D* aliasTexture) {
+  if (aliasTexture) {
+    auto vkTex = dynamic_cast<VulkanTexture2D*>(aliasTexture);
+    if (vkTex && vkTex->GetAllocation() != VK_NULL_HANDLE) {
+      return Texture2D::CreateRenderTargetAliased(width, height, format, vkTex);
+    }
+  }
   return Texture2D::CreateRenderTarget(width, height, format);
 }
 
-void VulkanRenderer::TransitionResource(uint32_t handle, int oldState, int newState) {
-  if (!m_FrameStarted) return;
+VkImageLayout MapRGStateToVkLayout(int state) {
+  switch (static_cast<RGResourceState>(state)) {
+    case RGResourceState::RENDER_TARGET: return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    case RGResourceState::DEPTH_WRITE: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    case RGResourceState::DEPTH_READ: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    case RGResourceState::SHADER_RESOURCE: return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    case RGResourceState::UNORDERED_ACCESS: return VK_IMAGE_LAYOUT_GENERAL;
+    case RGResourceState::PRESENT: return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    default: return VK_IMAGE_LAYOUT_UNDEFINED;
+  }
+}
+
+void VulkanRenderer::TransitionResources(const std::vector<RGResourceTransition>& transitions) {
+  if (!m_FrameStarted || transitions.empty()) return;
+
+  VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
+
+  std::vector<VkImageMemoryBarrier> barriers;
+  barriers.reserve(transitions.size());
+
+  VkPipelineStageFlags sourceStage = 0;
+  VkPipelineStageFlags destinationStage = 0;
+
+  for (const auto& trans : transitions) {
+    auto tex = m_RenderGraph.GetTexture(trans.handle);
+    if (!tex) continue;
+
+    auto vkTex = dynamic_cast<VulkanTexture2D*>(tex.get());
+    if (!vkTex || vkTex->GetImage() == VK_NULL_HANDLE) continue;
+
+    VkImageLayout oldLayout = MapRGStateToVkLayout(trans.oldState);
+    VkImageLayout newLayout = MapRGStateToVkLayout(trans.newState);
+
+    if (oldLayout == newLayout) continue;
+
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = vkTex->GetImage();
+    bool isDepth = (oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) || 
+                   (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) ||
+                   (oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL) ||
+                   (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL) ||
+                   (oldLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ||
+                   (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ||
+                   (oldLayout == VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL) ||
+                   (newLayout == VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL);
+    barrier.subresourceRange.aspectMask = isDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags srcStageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    VkPipelineStageFlags dstStageFlags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
+    switch (oldLayout) {
+      case VK_IMAGE_LAYOUT_UNDEFINED:
+        barrier.srcAccessMask = 0;
+        srcStageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        break;
+      case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        srcStageFlags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        break;
+      case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+        barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        srcStageFlags = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        break;
+      case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+        barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        srcStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        break;
+      default:
+        barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+        srcStageFlags = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        break;
+    }
+
+    switch (newLayout) {
+      case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+        dstStageFlags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        break;
+      case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+        dstStageFlags = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        break;
+      case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+        dstStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        break;
+      case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        dstStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        break;
+      case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+        barrier.dstAccessMask = 0;
+        dstStageFlags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        break;
+      default:
+        barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+        dstStageFlags = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        break;
+    }
+
+    sourceStage |= srcStageFlags;
+    destinationStage |= dstStageFlags;
+
+    barriers.push_back(barrier);
+  }
+
+  if (!barriers.empty()) {
+    vkCmdPipelineBarrier(
+      commandBuffer,
+      sourceStage, destinationStage,
+      0,
+      0, nullptr,
+      0, nullptr,
+      static_cast<uint32_t>(barriers.size()), barriers.data()
+    );
+  }
 }
 
 void VulkanRenderer::BeginShadowPass() {
@@ -894,9 +1023,11 @@ void VulkanRenderer::FlushPrepass() {
   }
 
   m_Prepass->EndPass(commandBuffer);
+}
 
-  // Generate SSAO using the prepass results
-  if (m_SSAOEnabled) {
+void VulkanRenderer::GenerateSSAO() {
+  if (m_SSAOEnabled && m_FrameStarted) {
+    VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
     m_SSAO->Generate(commandBuffer, m_Prepass->GetNormalImageView(),
                      m_Prepass->GetDepthImageView(), m_CachedProjection,
                      m_CachedView);
@@ -1111,6 +1242,11 @@ void VulkanRenderer::FlushMainPass() {
 
   m_RenderQueue.clear();
   m_CurrentSkybox = nullptr;
+
+  if (m_MainPassActive) {
+    vkCmdEndRenderPass(commandBuffer);
+    m_MainPassActive = false;
+  }
 }
 
 // Removed duplicate EndPostProcessPass
@@ -1118,11 +1254,6 @@ void VulkanRenderer::FlushMainPass() {
 void VulkanRenderer::EndPostProcessPass(std::shared_ptr<Texture2D> inColor) {
   if (!m_FrameStarted) return;
   VkCommandBuffer commandBuffer = m_CommandBuffers[m_CurrentFrame];
-
-  if (m_MainPassActive) {
-    vkCmdEndRenderPass(commandBuffer);
-    m_MainPassActive = false;
-  }
 
   m_LastMainColor = inColor;
   m_PostProcessor->Process(commandBuffer, inColor);

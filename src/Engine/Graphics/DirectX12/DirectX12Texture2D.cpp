@@ -224,4 +224,65 @@ namespace VECTOR {
         device->CreateShaderResourceView(m_Resource.Get(), &srvDesc, DirectX12DescriptorManager::Get()->GetSRVCPUHandle(m_DescriptorIndex));
     }
 
+    DirectX12Texture2D::DirectX12Texture2D(uint32_t width, uint32_t height, TextureFormat format, Texture2D* alias) 
+        : m_Width(width), m_Height(height) {
+        auto allocator = DirectX12Context::Get()->GetAllocator();
+        auto device = DirectX12Context::Get()->GetDevice();
+
+        D3D12_RESOURCE_DESC resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = width;
+        resourceDesc.Height = height;
+        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.MipLevels = 1;
+        
+        bool isDepth = (format == TextureFormat::Depth32F);
+        if (isDepth) {
+            resourceDesc.Format = DXGI_FORMAT_D32_FLOAT;
+        } else {
+            switch (format) {
+                case TextureFormat::RGBA16F: resourceDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT; break;
+                case TextureFormat::RGBA32F: resourceDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT; break;
+                case TextureFormat::RG16F: resourceDesc.Format = DXGI_FORMAT_R16G16_FLOAT; break;
+                case TextureFormat::RG32F: resourceDesc.Format = DXGI_FORMAT_R32G32_FLOAT; break;
+                default: resourceDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT; break;
+            }
+        }
+        resourceDesc.SampleDesc.Count = 1;
+        resourceDesc.SampleDesc.Quality = 0;
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        resourceDesc.Flags = isDepth ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+        DirectX12Texture2D* dx12Alias = dynamic_cast<DirectX12Texture2D*>(alias);
+        if (!dx12Alias || !dx12Alias->GetAllocation()) {
+            VECTOR_LOG_ERROR("Failed to alias DirectX12Texture2D: Alias is invalid.");
+            return;
+        }
+
+        HRESULT hr = allocator->CreateAliasingResource(
+            dx12Alias->GetAllocation(),
+            0,
+            &resourceDesc,
+            isDepth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET,
+            nullptr,
+            IID_PPV_ARGS(&m_Resource)
+        );
+
+        if (FAILED(hr)) {
+            VECTOR_LOG_ERROR("Failed to create transient aliasing RenderGraph resource.");
+            return;
+        }
+
+        m_DescriptorIndex = DirectX12DescriptorManager::Get()->AllocateSRVIndex();
+        
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Format = isDepth ? DXGI_FORMAT_R32_FLOAT : resourceDesc.Format;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = 1;
+
+        device->CreateShaderResourceView(m_Resource.Get(), &srvDesc, DirectX12DescriptorManager::Get()->GetSRVCPUHandle(m_DescriptorIndex));
+    }
+
 } // namespace VECTOR

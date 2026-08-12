@@ -70,8 +70,8 @@ namespace VECTOR {
             attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
             attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             
             // 1: Position (RGBA32F)
             attachments[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -80,8 +80,8 @@ namespace VECTOR {
             attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
             attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            attachments[1].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            attachments[1].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            attachments[1].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             
             // 2: Depth
             attachments[2].format = VK_FORMAT_D32_SFLOAT; // We could get this from swapchain depth format
@@ -90,8 +90,8 @@ namespace VECTOR {
             attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
             attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            attachments[2].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+            attachments[2].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            attachments[2].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
             std::array<VkAttachmentReference, 2> colorRefs{};
             colorRefs[0].attachment = 0;

@@ -28,6 +28,7 @@ public:
 
   static std::shared_ptr<Texture2D> Create(const std::string &path);
   static std::shared_ptr<Texture2D> CreateRenderTarget(uint32_t width, uint32_t height, TextureFormat format = TextureFormat::RGBA16F);
+  static std::shared_ptr<Texture2D> CreateRenderTargetAliased(uint32_t width, uint32_t height, TextureFormat format, Texture2D* alias);
 };
 
 } // namespace VECTOR

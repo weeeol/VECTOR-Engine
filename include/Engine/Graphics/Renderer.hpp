@@ -51,8 +51,8 @@ public:
                           const glm::vec4 &color, int fontSize = 24) = 0;
   virtual void EndUI() = 0;
 
-  virtual std::shared_ptr<Texture2D> AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format = TextureFormat::RGBA16F) { return nullptr; }
-  virtual void TransitionResource(uint32_t handle, int oldState, int newState) {}
+  virtual std::shared_ptr<Texture2D> AllocateTransientTexture(uint32_t handle, uint32_t width, uint32_t height, TextureFormat format = TextureFormat::RGBA16F, Texture2D* aliasTexture = nullptr) { return nullptr; }
+  virtual void TransitionResources(const std::vector<RGResourceTransition>& transitions) {}
 
   virtual void BeginImGuiFrame() = 0;
   virtual void EndImGuiFrame() = 0;
@@ -69,6 +69,8 @@ public:
   virtual void BeginMainPass(std::shared_ptr<Texture2D> inNormal, std::shared_ptr<Texture2D> inPosition, std::shared_ptr<Texture2D> inDepth, std::shared_ptr<Texture2D> outColor) = 0;
   virtual void FlushMainPass() = 0;
   virtual void EndPostProcessPass(std::shared_ptr<Texture2D> inColor) = 0;
+  
+  virtual void GenerateSSAO() {}
 
   virtual const glm::mat4 &GetLightSpaceMatrix() const = 0;
   virtual Shader *GetDepthShader() const = 0;

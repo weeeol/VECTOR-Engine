@@ -55,6 +55,14 @@ namespace VECTOR {
 
         std::unique_ptr<Renderer> m_Renderer;
         std::unique_ptr<InputManager> m_InputManager;
+
+        // Deferred state changes to prevent iterator invalidation during UI loops
+        bool m_NeedsResize = false;
+        int m_PendingWidth = 0;
+        int m_PendingHeight = 0;
+        bool m_NeedsFullscreenChange = false;
+        bool m_PendingFullscreen = false;
+        bool m_PendingBorderless = false;
     };
 
     // To be defined by the client application
