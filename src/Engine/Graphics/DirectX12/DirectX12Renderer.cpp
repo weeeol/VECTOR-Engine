@@ -458,23 +458,6 @@ namespace VECTOR {
     void DirectX12Renderer::SetViewProjection(const glm::vec3& viewPos, const glm::mat4& view, const glm::mat4& projection) {
         if (!m_FrameStarted) return; 
 
-        struct PerFrameData {
-            glm::mat4 view;
-            glm::mat4 projection;
-            glm::mat4 previousView;
-            glm::mat4 previousProjection;
-            glm::mat4 lightSpaceMatrix;
-            glm::vec4 viewPos;
-            glm::vec4 sunDir;
-            glm::vec4 sunColor;
-            glm::vec4 lightPos;
-            glm::vec4 lightColor;
-            int shadowMapIndex;
-            int ssaoTexIndex;
-            glm::vec2 jitter;
-            glm::vec2 previousJitter;
-        } pfd;
-
         glm::vec3 sunDir = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.3f));
         glm::vec3 lightPos = sunDir * 80.0f;
         glm::mat4 lightProjection = glm::ortho(-60.0f, 60.0f, -60.0f, 60.0f, 1.0f, 150.0f);
@@ -511,26 +494,25 @@ namespace VECTOR {
         m_CurrentView = view;
         m_CurrentProjection = dx12Projection;
 
-        pfd.view = view;
-        pfd.projection = dx12Projection;
-        pfd.previousView = m_PreviousView;
-        pfd.previousProjection = m_PreviousProjection;
-        pfd.jitter = m_Jitter;
-        pfd.previousJitter = m_PreviousJitter;
+        m_PerFrameData.view = view;
+        m_PerFrameData.projection = dx12Projection;
+        m_PerFrameData.previousView = m_PreviousView;
+        m_PerFrameData.previousProjection = m_PreviousProjection;
+        m_PerFrameData.jitter = m_Jitter;
+        m_PerFrameData.previousJitter = m_PreviousJitter;
         
         m_PreviousView = view;
         m_PreviousProjection = dx12Projection;
 
-        pfd.lightSpaceMatrix = m_LightSpaceMatrix;
-        pfd.viewPos = glm::vec4(viewPos, 1.0f);
-        pfd.sunDir = glm::vec4(sunDir, 0.0f);
-        pfd.sunColor = glm::vec4(1.0f);
-        pfd.lightPos = glm::vec4(0.0f);
-        pfd.lightColor = glm::vec4(1.0f);
-        pfd.shadowMapIndex = m_ShadowPass ? m_ShadowPass->GetSRVIndex() : -1;
-        pfd.ssaoTexIndex = (m_SSAO && m_SSAOEnabled) ? m_SSAO->GetSSAOSRVIndex() : -1;
-
-        m_PerFrameUBOs[m_FrameIndex]->SetData(&pfd, sizeof(PerFrameData), 0);
+        m_PerFrameData.lightSpaceMatrix = m_LightSpaceMatrix;
+        m_PerFrameData.viewPos = glm::vec4(viewPos, 1.0f);
+        m_PerFrameData.sunDir = glm::vec4(sunDir, 0.0f);
+        m_PerFrameData.sunColor = glm::vec4(1.0f);
+        m_PerFrameData.lightPos = glm::vec4(0.0f);
+        m_PerFrameData.lightColor = glm::vec4(1.0f);
+        m_PerFrameData.shadowMapIndex = m_ShadowPass ? m_ShadowPass->GetSRVIndex() : -1;
+        m_PerFrameData.ssaoTexIndex = (m_SSAO && m_SSAOEnabled) ? m_SSAO->GetSSAOSRVIndex() : -1;
+        m_PerFrameData.skyboxIndex = -1; // Updated in ExecuteRenderPipeline
     }
 
     void DirectX12Renderer::BindObjectAndMaterial(const RenderCommand& cmd, bool bindMaterial) {
@@ -711,6 +693,11 @@ namespace VECTOR {
 
     void DirectX12Renderer::BeginShadowPass() {
         if (!m_FrameStarted) return;
+        
+        m_PerFrameData.skyboxIndex = m_CurrentSkybox ? m_CurrentSkybox->GetDescriptorIndex() : -1;
+        m_PerFrameData.debugMode = m_WireframeMode ? 1 : 0;
+        m_PerFrameUBOs[m_FrameIndex]->SetData(&m_PerFrameData, sizeof(PerFrameData), 0);
+        
         m_ShadowPass->BeginPass(m_CommandList.Get());
     }
 

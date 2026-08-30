@@ -113,6 +113,26 @@ namespace VECTOR {
         Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_CommandAllocators[s_FrameCount];
         Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList7> m_CommandList;
 
+        struct PerFrameData {
+            glm::mat4 view;
+            glm::mat4 projection;
+            glm::mat4 previousView;
+            glm::mat4 previousProjection;
+            glm::mat4 lightSpaceMatrix;
+            glm::vec4 viewPos;
+            glm::vec4 sunDir;
+            glm::vec4 sunColor;
+            glm::vec4 lightPos;
+            glm::vec4 lightColor;
+            int shadowMapIndex;
+            int ssaoTexIndex;
+            glm::vec2 jitter;
+            glm::vec2 previousJitter;
+            int skyboxIndex;
+            int debugMode;
+            int padding[2];
+        } m_PerFrameData;
+
         struct ObjectData {
             std::unique_ptr<UniformBuffer> ubo;
         };

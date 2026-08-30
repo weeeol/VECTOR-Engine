@@ -88,6 +88,15 @@ namespace Game {
 
         GenerateArena();
 
+        m_Skybox = VECTOR::Cubemap::Create({
+            "assets/sky_right.hdr",
+            "assets/sky_left.hdr",
+            "assets/sky_top.hdr",
+            "assets/sky_bottom.hdr",
+            "assets/sky_front.hdr",
+            "assets/sky_back.hdr"
+        });
+
         m_InputManager->SetRelativeMouseMode(true);
     }
 
@@ -314,12 +323,16 @@ namespace Game {
         m_Registry.AddComponent(animatedEntity, VECTOR::TransformComponent{glm::vec3(0.0f, 0.0f, -5.0f), glm::quat(glm::vec3(0, 0, 0)), glm::vec3(1.0f)});
         
         auto daeModel = VECTOR::ResourceManager::Get().LoadModel("PlayerModel", "assets/models/Walking.dae");
-        auto daeMaterial = std::make_shared<VECTOR::Material>();
-        daeMaterial->shader = VECTOR::ResourceManager::Get().GetShader("Main3D");
-        daeMaterial->albedoColor = glm::vec4(1.0f, 0.8f, 0.2f, 1.0f); // Gold color
-        daeMaterial->metallic = 1.0f;  // Fully metallic
-        daeMaterial->roughness = 0.2f; // Smooth
-        m_Registry.AddComponent(animatedEntity, VECTOR::RenderComponent{daeMaterial});
+        auto daeMaterials = daeModel->GetMaterials();
+        if (daeMaterials.empty()) {
+            auto daeMaterial = std::make_shared<VECTOR::Material>();
+            daeMaterial->shader = VECTOR::ResourceManager::Get().GetShader("Main3D");
+            daeMaterial->albedoColor = glm::vec4(1.0f, 0.8f, 0.2f, 1.0f); // Gold color
+            daeMaterial->metallic = 1.0f;  // Fully metallic
+            daeMaterial->roughness = 0.2f; // Smooth
+            daeMaterials.push_back(daeMaterial);
+        }
+        m_Registry.AddComponent(animatedEntity, VECTOR::RenderComponent{daeMaterials});
         m_Registry.AddComponent(animatedEntity, VECTOR::ModelComponent{daeModel});
         
         auto daeAnim = VECTOR::ResourceManager::Get().LoadAnimation("PlayerWalkAnim", "assets/models/Walking.dae", daeModel);
@@ -548,9 +561,9 @@ namespace Game {
             renderer->SubmitSkybox(m_Skybox.get());
         }
 
-        // Submit Directional Light
+        // Direction vector to the sun in the skybox
         glm::vec3 sunDir = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.3f));
-        // Pass -sunDir because the shader expects the direction the light is travelling
+        // Pass -sunDir to renderer because it expects travel direction
         renderer->SetDirectionalLight(-sunDir, glm::vec3(1.0f, 0.95f, 0.9f), 1.5f);
 
         // Submit Point Lights
@@ -590,7 +603,7 @@ namespace Game {
             }
 
             m_RenderedEntities++;
-            renderer->SubmitMesh(m.mesh.get(), r.material.get(), model);
+            renderer->SubmitMesh(m.mesh.get(), r.materials.empty() ? nullptr : r.materials[0].get(), model);
         });
 
         // Submit all renderable model entities
@@ -626,8 +639,11 @@ namespace Game {
                 }
             }
 
+            int i = 0;
             for (const auto& mesh : m.model->GetMeshes()) {
-                renderer->SubmitMesh(mesh.get(), r.material.get(), modelMatrix, boneTransforms);
+                auto mat = (i < r.materials.size()) ? r.materials[i].get() : (r.materials.empty() ? nullptr : r.materials[0].get());
+                renderer->SubmitMesh(mesh.get(), mat, modelMatrix, boneTransforms);
+                i++;
             }
         });
 

@@ -22,4 +22,7 @@ These rules dictate how AI agents should interact with and write code for the VE
 - When writing code or refactoring, prioritize changes that isolate dependencies. The goal is to allow future agents to understand a component by reading only its header and immediate implementation, without needing engine-wide context.
 
 ## 6. Graphics API Priority
-- **DirectX 12 is the Primary Focus**: Going forward, DirectX 12 development is the primary and default focus. When building new rendering features, prioritize the DX12 backend. Vulkan is a secondary priority, and OpenGL is considered deprecated. Do not spend effort maintaining OpenGL unless explicitly requested.
+- **DirectX 12 is the Primary Focus**: Going forward, DirectX 12 development is the primary and default focus. When building new rendering features, prioritize the DX12 backend. 
+- **Vulkan is Frozen**: Do NOT modify or attempt to maintain the Vulkan backend unless explicitly requested by the user. 
+- **Document Vulkan Porting Tasks**: When you add new rendering features or make significant changes to the DirectX 12 backend, you must document what was changed and what needs to be ported to Vulkan later in `VULKAN_PORTING_TASKS.md`.
+- **OpenGL is Deprecated**: Do not spend effort maintaining OpenGL unless explicitly requested.

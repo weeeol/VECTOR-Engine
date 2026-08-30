@@ -1,5 +1,8 @@
 #include "Engine/Graphics/Model.hpp"
 #include "Engine/Core/Logger.hpp"
+#include "Engine/Graphics/Material.hpp"
+#include "Engine/Core/ResourceManager.hpp"
+#include <filesystem>
 
 namespace VECTOR {
 
@@ -22,6 +25,7 @@ namespace VECTOR {
             return;
         }
 
+        ProcessMaterials(scene, path);
         ProcessNode(scene->mRootNode, scene);
     }
 
@@ -33,6 +37,70 @@ namespace VECTOR {
 
         for (unsigned int i = 0; i < node->mNumChildren; i++) {
             ProcessNode(node->mChildren[i], scene);
+        }
+    }
+
+    void Model::ProcessMaterials(const aiScene* scene, const std::string& modelPath) {
+        std::string directory = std::filesystem::path(modelPath).parent_path().string();
+        if (!directory.empty() && directory.back() != '/' && directory.back() != '\\') {
+            directory += "/";
+        }
+
+        m_Materials.reserve(scene->mNumMaterials);
+        for (unsigned int i = 0; i < scene->mNumMaterials; i++) {
+            aiMaterial* aiMat = scene->mMaterials[i];
+            auto mat = std::make_shared<Material>();
+            
+            // Assign default shader
+            mat->shader = ResourceManager::Get().GetShader("Main3D");
+
+            // Diffuse / Albedo
+            aiString str;
+            if (aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &str) == aiReturn_SUCCESS) {
+                std::string p = directory + str.C_Str();
+                mat->albedoTexture = ResourceManager::Get().LoadTexture2D(p, p);
+            }
+            // Base Color
+            if (aiMat->GetTexture(aiTextureType_BASE_COLOR, 0, &str) == aiReturn_SUCCESS) {
+                std::string p = directory + str.C_Str();
+                mat->albedoTexture = ResourceManager::Get().LoadTexture2D(p, p);
+            }
+
+            // Normal
+            if (aiMat->GetTexture(aiTextureType_NORMALS, 0, &str) == aiReturn_SUCCESS) {
+                std::string p = directory + str.C_Str();
+                mat->normalTexture = ResourceManager::Get().LoadTexture2D(p, p);
+            }
+
+            // Metallic/Roughness (usually in unknown for GLTF, but let's check standard types too)
+            if (aiMat->GetTexture(aiTextureType_UNKNOWN, 0, &str) == aiReturn_SUCCESS) { // GLTF MR map
+                std::string p = directory + str.C_Str();
+                mat->metallicRoughnessTexture = ResourceManager::Get().LoadTexture2D(p, p);
+            }
+
+            // Ambient Occlusion
+            if (aiMat->GetTexture(aiTextureType_AMBIENT, 0, &str) == aiReturn_SUCCESS) {
+                std::string p = directory + str.C_Str();
+                mat->aoTexture = ResourceManager::Get().LoadTexture2D(p, p);
+            }
+
+            // Properties
+            aiColor4D color;
+            if (aiGetMaterialColor(aiMat, AI_MATKEY_COLOR_DIFFUSE, &color) == aiReturn_SUCCESS) {
+                mat->albedoColor = glm::vec4(color.r, color.g, color.b, color.a);
+            }
+
+            float roughness;
+            if (aiGetMaterialFloat(aiMat, AI_MATKEY_ROUGHNESS_FACTOR, &roughness) == aiReturn_SUCCESS) {
+                mat->roughness = roughness;
+            }
+
+            float metallic;
+            if (aiGetMaterialFloat(aiMat, AI_MATKEY_METALLIC_FACTOR, &metallic) == aiReturn_SUCCESS) {
+                mat->metallic = metallic;
+            }
+
+            m_Materials.push_back(mat);
         }
     }
 

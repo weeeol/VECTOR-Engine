@@ -1,4 +1,4 @@
-#include "Game/Core/PongGame.hpp"
+#include "Game/Core/FPSGame.hpp"
 #include "Engine/Audio/AudioManager.hpp"
 #include "Engine/Core/Logger.hpp"
 #include "Engine/Core/SceneManager.hpp"
@@ -10,13 +10,13 @@
 
 namespace Game {
 
-PongGame::PongGame(const std::string &title, int width, int height)
+FPSGame::FPSGame(const std::string &title, int width, int height)
     : VECTOR::Application(title, width, height) {}
 
-PongGame::~PongGame() {}
+FPSGame::~FPSGame() {}
 
-void PongGame::OnInit() {
-  VECTOR_LOG_INFO("PongGame::OnInit() started");
+void FPSGame::OnInit() {
+  VECTOR_LOG_INFO("FPSGame::OnInit() started");
 
   // Push initial scene
   auto firstScene =
@@ -30,10 +30,10 @@ void PongGame::OnInit() {
   VECTOR_LOG_INFO("BGM playback started");
 
   SetupEventSubscriptions();
-  VECTOR_LOG_INFO("PongGame::OnInit() finished");
+  VECTOR_LOG_INFO("FPSGame::OnInit() finished");
 }
 
-void PongGame::SetupEventSubscriptions() {
+void FPSGame::SetupEventSubscriptions() {
   VECTOR::EventBus::Get().Subscribe<CollisionEvent>(
       [](const CollisionEvent &event) {
         VECTOR::AudioManager::Get().PlaySound("assets/hit.wav");
@@ -44,11 +44,11 @@ void PongGame::SetupEventSubscriptions() {
   });
 }
 
-void PongGame::Update(float deltaTime) {
+void FPSGame::Update(float deltaTime) {
   VECTOR::SceneManager::Get().Update(deltaTime);
 }
 
-void PongGame::Render() {
+void FPSGame::Render() {
   m_Renderer->Clear(0, 0, 0, 255);
 
   m_Renderer->BeginImGuiFrame();
@@ -65,5 +65,5 @@ void PongGame::Render() {
 } // namespace Game
 
 VECTOR::Application *VECTOR::CreateApplication() {
-  return new Game::PongGame("VECTOR Engine 3D", 1920, 1080);
+  return new Game::FPSGame("VECTOR Engine 3D", 1920, 1080);
 }

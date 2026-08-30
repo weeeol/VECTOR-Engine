@@ -33,10 +33,11 @@ namespace VECTOR {
     };
 
     struct RenderComponent {
-        std::shared_ptr<Material> material;
+        std::vector<std::shared_ptr<Material>> materials;
 
         RenderComponent() = default;
-        RenderComponent(std::shared_ptr<Material> mat) : material(std::move(mat)) {}
+        RenderComponent(std::shared_ptr<Material> mat) { materials.push_back(std::move(mat)); }
+        RenderComponent(std::vector<std::shared_ptr<Material>> mats) : materials(std::move(mats)) {}
     };
 
     struct MeshComponent {

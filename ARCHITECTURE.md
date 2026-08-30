@@ -1,7 +1,7 @@
 # VECTOR Engine Architecture
 
 ## Overview
-VECTOR (Velocity Engine for C++ Texturing and Object Rendering) is a custom 3D game engine built on top of the SDL3 hardware abstraction layer, Vulkan, DirectX 12, and Bullet3 Physics. Originally a 2D engine, it has been pivoted into a robust framework for building 3D games. It features variable-timestep physics integration, dynamic dual-backend 3D rendering (Vulkan & DirectX 12), scene management, event messaging, and a data-oriented component-driven entity system. The repository currently includes a 3D Pong game prototyping rigid body physics, AI, and advanced 3D rendering features.
+VECTOR (Velocity Engine for C++ Texturing and Object Rendering) is a custom 3D game engine built on top of the SDL3 hardware abstraction layer, Vulkan, DirectX 12, and Bullet3 Physics. Originally a 2D engine, it has been pivoted into a robust framework for building 3D games. It features variable-timestep physics integration, dynamic dual-backend 3D rendering (Vulkan & DirectX 12), scene management, event messaging, and a data-oriented component-driven entity system. The repository currently includes a 3D FPS game prototyping rigid body physics, AI, and advanced 3D rendering features.
 
 ## Folder Structure
 ```text
@@ -17,8 +17,8 @@ VECTOR-Engine/
 ```
 
 ## Core Data Flow & Game Loop
-1. **Entry**: The application starts in `src/main.cpp`, which instantiates `Game::PongGame` (derived from `VECTOR::Application`) and calls `Run()`.
-2. **Initialization**: `PongGame::OnInit()` subscribes to engine events, starts the BGM, and pushes the initial `MainMenuScene` onto the `SceneManager` stack.
+1. **Entry**: The application starts in `src/main.cpp`, which instantiates `Game::FPSGame` (derived from `VECTOR::Application`) and calls `Run()`.
+2. **Initialization**: `FPSGame::OnInit()` subscribes to engine events, starts the BGM, and pushes the initial `MainMenuScene` onto the `SceneManager` stack.
 3. **The Loop**: `Application::Run()` manages the core game loop:
    - **Input**: Polls SDL events and updates the `InputManager` (keyboard state, mouse position, clicks, and relative mouse delta).
    - **Physics/Logic (Variable Step)**: Calculates `deltaTime` and calls `Update(deltaTime)`. The `SceneManager` routes this to the active `Scene`. The `GameplayScene` owns a list of decoupled `VECTOR::System` objects (`CameraSystem`, `ShootingSystem`, `BulletPhysicsSystem`, etc.) and invokes them. 

@@ -60,6 +60,7 @@ void VulkanRenderer::SetViewProjection(const glm::vec3 &viewPos,
   PerFrameData data{};
   data.view = view;
   data.projection = jitteredProjection;
+  data.skyboxIndex = -1; // Unused in Vulkan currently
   // The Y axis is flipped in Vulkan clip space compared to OpenGL
   data.projection[1][1] *= -1.0f;
 

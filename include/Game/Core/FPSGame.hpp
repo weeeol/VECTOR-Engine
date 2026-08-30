@@ -5,10 +5,10 @@
 
 namespace Game {
 
-    class PongGame : public VECTOR::Application {
+    class FPSGame : public VECTOR::Application {
     public:
-        PongGame(const std::string& title, int width, int height);
-        ~PongGame();
+        FPSGame(const std::string& title, int width, int height);
+        ~FPSGame();
 
     protected:
         void OnInit() override;

@@ -17,6 +17,9 @@ struct PerFrameData {
     int ssaoTexIndex;
     float2 jitter;
     float2 previousJitter;
+    int skyboxIndex;
+    int debugMode;
+    int2 padding;
 };
 
 struct PointLightData {
@@ -133,7 +136,7 @@ float ShadowCalculation(float4 fragPosLightSpace, float3 normal, float3 lightDir
     Texture2D shadowMap = ResourceDescriptorHeap[pfd.shadowMapIndex];
     
     float currentDepth = projCoords.z;
-    float bias = max(0.05f * (1.0f - dot(normal, lightDir)), 0.005f);
+    float bias = max(0.005f * (1.0f - dot(normal, lightDir)), 0.001f);
     
     float shadow = 0.0f;
     float2 texelSize = 1.0f / 2048.0f; 
@@ -215,7 +218,7 @@ float4 PSMain(VSOutput input) : SV_TARGET {
     float3 albedo = pow(albedoTex.rgb * material.albedoColor.rgb, float3(2.2f, 2.2f, 2.2f));
     float alpha = albedoTex.a * material.albedoColor.a;
 
-    if (material.isUnlit != 0) {
+    if (material.isUnlit != 0 || pfd.debugMode != 0) {
         return float4(albedo, alpha);
     }
 
@@ -303,6 +306,28 @@ float4 PSMain(VSOutput input) : SV_TARGET {
     }
 
     float3 ambient = float3(0.03f, 0.03f, 0.03f) * albedo * ao * ssao;
+    
+    if (pfd.skyboxIndex >= 0) {
+        TextureCube skybox = ResourceDescriptorHeap[pfd.skyboxIndex];
+        float3 R = reflect(-V, N);
+        // Simple approximation
+        float mip = roughness * 8.0f; // Assuming 9 mip levels
+        float3 prefilteredColor = skybox.SampleLevel(defaultSampler, R, mip).rgb;
+        float3 irradiance = skybox.SampleLevel(defaultSampler, N, 8.0f).rgb;
+        
+        float3 F_ibl = fresnelSchlick(max(dot(N, V), 0.0f), F0);
+        float3 kS_ibl = F_ibl;
+        float3 kD_ibl = 1.0f - kS_ibl;
+        kD_ibl *= 1.0f - metallic;
+        
+        float3 diffuseIBL = irradiance * albedo;
+        
+        // Approximate BRDF integration (split sum approximation without LUT)
+        float2 envBRDF = float2(1.0f, 0.0f); 
+        float3 specularIBL = prefilteredColor * (F_ibl * envBRDF.x + envBRDF.y);
+        
+        ambient = (kD_ibl * diffuseIBL + specularIBL) * ao * ssao;
+    }
     
     float3 color = ambient + Lo;
 

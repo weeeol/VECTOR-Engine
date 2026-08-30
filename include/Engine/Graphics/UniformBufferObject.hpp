@@ -27,6 +27,8 @@ namespace VECTOR {
         glm::vec2 jitter;            // offset 280, size 8
         glm::mat4 prevView;          // offset 288, size 64
         glm::mat4 prevProjection;    // offset 352, size 64
+        int skyboxIndex;
+        int padding2[3];
     };
     // Total: 416 bytes
 

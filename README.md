@@ -17,7 +17,7 @@
 
 ## Overview
 
-**VECTOR** is a custom hardware-accelerated 3D C++ game engine built from scratch. It utilizes **SDL3** for windowing and input, with **DirectX 12** as its primary and default rendering backend (with Vulkan as a secondary option). It is compiled as a standalone static library (`libVECTOR.a`/`VECTOR.lib`) and includes a fully functional 3D Pong game that demonstrates the engine's incredible capabilities.
+**VECTOR** is a custom hardware-accelerated 3D C++ game engine built from scratch. It utilizes **SDL3** for windowing and input, with **DirectX 12** as its primary and default rendering backend (with Vulkan as a secondary option). It is compiled as a standalone static library (`libVECTOR.a`/`VECTOR.lib`) and includes a fully functional 3D FPS game that demonstrates the engine's incredible capabilities.
 
 ---
 

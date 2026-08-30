@@ -24,16 +24,19 @@ namespace VECTOR {
         int& GetBoneCount() { return m_BoneCount; }
 
         const std::vector<std::shared_ptr<Mesh>>& GetMeshes() const { return m_Meshes; }
+        const std::vector<std::shared_ptr<class Material>>& GetMaterials() const { return m_Materials; }
 
     private:
         void LoadModel(const std::string& path);
         void ProcessNode(aiNode* node, const aiScene* scene);
         std::shared_ptr<Mesh> ProcessMesh(aiMesh* mesh, const aiScene* scene);
+        void ProcessMaterials(const aiScene* scene, const std::string& modelPath);
         void SetVertexBoneDataToDefault(Vertex& vertex);
         void SetVertexBoneData(Vertex& vertex, int boneID, float weight);
         void ExtractBoneWeightForVertices(std::vector<Vertex>& vertices, aiMesh* mesh, const aiScene* scene);
 
         std::vector<std::shared_ptr<Mesh>> m_Meshes;
+        std::vector<std::shared_ptr<class Material>> m_Materials;
         
         std::map<std::string, BoneInfo> m_BoneInfoMap;
         int m_BoneCount = 0;

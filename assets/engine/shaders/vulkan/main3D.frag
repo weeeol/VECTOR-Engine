@@ -25,6 +25,8 @@ layout(set = 0, binding = 0) uniform PerFrameData {
     vec2 jitter;
     mat4 prevView;
     mat4 prevProjection;
+    int skyboxIndex;
+    int padding2[3];
 } pfd;
 
 #define MAX_POINT_LIGHTS 64

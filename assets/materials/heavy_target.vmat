@@ -1,5 +1,5 @@
-shader = Default3D
-albedoColor = 2.0 0.0 0.0 1.0
-specularStrength = 1.0
-shininess = 64.0
+shader = Main3D
+albedoColor = 1.0 0.0 0.0 1.0
+metallic = 0.8
+roughness = 0.1
 isUnlit = false

@@ -186,7 +186,7 @@ namespace Game {
         renderer->BeginUI();
         
         if (m_State == MainMenuState::Main) {
-            renderer->DrawUIText("PONG", m_Width / 2 - 60, m_Height / 2 - 150, glm::vec4(1.0f), 48);
+            renderer->DrawUIText("FPS GAME", m_Width / 2 - 80, m_Height / 2 - 150, glm::vec4(1.0f), 48);
             renderer->DrawUIText("Volume", m_Width / 2 - 40, m_Height / 2 + 155, glm::vec4(200/255.0f, 200/255.0f, 200/255.0f, 1.0f), 18);
         } else if (m_State == MainMenuState::Settings) {
             renderer->DrawUIText("Settings", m_Width / 2 - 80, m_Height / 2 - 150, glm::vec4(1.0f), 48);

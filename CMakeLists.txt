@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(PongGame CXX)
+project(FPSGame CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -102,7 +102,7 @@ target_link_libraries(VECTOR PUBLIC ${VECTOR_SDL_LIBS} glm::glm ${BULLET_LIBRARI
 # PONG GAME EXECUTABLE
 # ==============================================================================
 set(GAME_SOURCES
-    src/Game/Core/PongGame.cpp
+    src/Game/Core/FPSGame.cpp
     src/Game/Scenes/MainMenuScene.cpp
     src/Game/Scenes/GameplayScene.cpp
     src/Game/Scenes/LoadingScene.cpp
@@ -112,10 +112,10 @@ set(GAME_SOURCES
     src/Game/Systems/ParticleSystem.cpp
 )
 
-add_executable(Pong src/main.cpp ${GAME_SOURCES})
+add_executable(fps src/main.cpp ${GAME_SOURCES})
 
 # Link the Pong game to the VECTOR engine
-target_link_libraries(Pong PRIVATE VECTOR)
+target_link_libraries(fps PRIVATE VECTOR)
 
 # Copy assets folder to the build directory unconditionally so it syncs new files (like bgm.wav)
 add_custom_target(CopyAssets ALL
@@ -123,5 +123,5 @@ add_custom_target(CopyAssets ALL
         "${CMAKE_SOURCE_DIR}/assets"
         "${CMAKE_CURRENT_BINARY_DIR}/assets"
 )
-add_dependencies(Pong CopyAssets)
-add_dependencies(Pong CopyAssets)
+add_dependencies(fps CopyAssets)
+add_dependencies(fps CopyAssets)

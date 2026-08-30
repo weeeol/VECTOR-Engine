@@ -146,13 +146,31 @@ namespace VECTOR {
                 mat->roughness = std::sqrt(2.0f / (shin + 2.0f));
             } else if (key == "isUnlit") {
                 mat->isUnlit = (value == "true" || value == "1");
-            } else if (key == "diffuseTexture") {
+            } else if (key == "diffuseTexture" || key == "albedoMap") {
                 // If it's a new texture, load it, else get it
                 auto tex = GetTexture2D(value);
                 if (!tex) {
                     tex = LoadTexture2D(value, value); // use path as name
                 }
                 mat->albedoTexture = tex;
+            } else if (key == "normalMap") {
+                auto tex = GetTexture2D(value);
+                if (!tex) {
+                    tex = LoadTexture2D(value, value);
+                }
+                mat->normalTexture = tex;
+            } else if (key == "metallicRoughnessMap") {
+                auto tex = GetTexture2D(value);
+                if (!tex) {
+                    tex = LoadTexture2D(value, value);
+                }
+                mat->metallicRoughnessTexture = tex;
+            } else if (key == "aoMap") {
+                auto tex = GetTexture2D(value);
+                if (!tex) {
+                    tex = LoadTexture2D(value, value);
+                }
+                mat->aoTexture = tex;
             }
         }
 
