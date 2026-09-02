@@ -193,7 +193,7 @@ namespace VECTOR {
         }
 
         psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-        psoDesc.RasterizerState.CullMode = isDepthOnly ? D3D12_CULL_MODE_FRONT : D3D12_CULL_MODE_BACK;
+        psoDesc.RasterizerState.CullMode = isDepthOnly ? D3D12_CULL_MODE_NONE : D3D12_CULL_MODE_BACK;
         if (wireframe) {
             psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
             psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;

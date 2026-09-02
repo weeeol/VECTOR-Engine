@@ -123,7 +123,7 @@ namespace Game {
             m_UIRegistry.AddComponent(resumeBtn, VECTOR::UIRectComponent(startX, startY - 50, btnWidth, btnHeight, glm::vec4(50/255.0f, 100/255.0f, 50/255.0f, 1.0f)));
             m_UIRegistry.AddComponent(resumeBtn, VECTOR::UITextComponent("Resume", 24, glm::vec4(1.0f)));
             auto& textR = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(resumeBtn);
-            textR.offsetX = (btnWidth / 2) - (std::string("Resume").length() * 6);
+            textR.offsetX = (btnWidth / 2) - (static_cast<int>(std::string("Resume").length()) * 6);
             textR.offsetY = (btnHeight / 2) - 12;
             m_UIRegistry.AddComponent(resumeBtn, VECTOR::UIButtonComponent(
                 glm::vec4(50/255.0f, 100/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 200/255.0f, 100/255.0f, 1.0f),
@@ -137,7 +137,7 @@ namespace Game {
             m_UIRegistry.AddComponent(settingsBtn, VECTOR::UIRectComponent(startX, startY + 10, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 100/255.0f, 1.0f)));
             m_UIRegistry.AddComponent(settingsBtn, VECTOR::UITextComponent("Settings", 24, glm::vec4(1.0f)));
             auto& sText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(settingsBtn);
-            sText.offsetX = (btnWidth / 2) - (std::string("Settings").length() * 6);
+            sText.offsetX = (btnWidth / 2) - (static_cast<int>(std::string("Settings").length()) * 6);
             sText.offsetY = (btnHeight / 2) - 12;
             m_UIRegistry.AddComponent(settingsBtn, VECTOR::UIButtonComponent(
                 glm::vec4(50/255.0f, 50/255.0f, 100/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 200/255.0f, 1.0f),
@@ -151,7 +151,7 @@ namespace Game {
             m_UIRegistry.AddComponent(mainMenuBtn, VECTOR::UIRectComponent(startX, startY + 70, btnWidth, btnHeight, glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
             m_UIRegistry.AddComponent(mainMenuBtn, VECTOR::UITextComponent("Main Menu", 24, glm::vec4(1.0f)));
             auto& textC = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(mainMenuBtn);
-            textC.offsetX = (btnWidth / 2) - (std::string("Main Menu").length() * 6);
+            textC.offsetX = (btnWidth / 2) - (static_cast<int>(std::string("Main Menu").length()) * 6);
             textC.offsetY = (btnHeight / 2) - 12;
             m_UIRegistry.AddComponent(mainMenuBtn, VECTOR::UIButtonComponent(
                 glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(200/255.0f, 100/255.0f, 100/255.0f, 1.0f),
@@ -172,7 +172,7 @@ namespace Game {
             m_UIRegistry.AddComponent(res1, VECTOR::UIRectComponent(startX, startY, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
             m_UIRegistry.AddComponent(res1, VECTOR::UITextComponent("1280x720", 24, glm::vec4(1.0f)));
             auto& r1Text = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(res1);
-            r1Text.offsetX = (btnWidth / 2) - (std::string("1280x720").length() * 6);
+            r1Text.offsetX = (btnWidth / 2) - (static_cast<int>(std::string("1280x720").length()) * 6);
             r1Text.offsetY = (btnHeight / 2) - 12;
             m_UIRegistry.AddComponent(res1, VECTOR::UIButtonComponent(
                 glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
@@ -183,7 +183,7 @@ namespace Game {
             m_UIRegistry.AddComponent(res2, VECTOR::UIRectComponent(startX, startY + 60, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
             m_UIRegistry.AddComponent(res2, VECTOR::UITextComponent("1920x1080", 24, glm::vec4(1.0f)));
             auto& r2Text = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(res2);
-            r2Text.offsetX = (btnWidth / 2) - (std::string("1920x1080").length() * 6);
+            r2Text.offsetX = (btnWidth / 2) - (static_cast<int>(std::string("1920x1080").length()) * 6);
             r2Text.offsetY = (btnHeight / 2) - 12;
             m_UIRegistry.AddComponent(res2, VECTOR::UIButtonComponent(
                 glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
@@ -194,7 +194,7 @@ namespace Game {
             m_UIRegistry.AddComponent(fsWin, VECTOR::UIRectComponent(startX - 110, startY + 120, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
             m_UIRegistry.AddComponent(fsWin, VECTOR::UITextComponent("Windowed", 24, glm::vec4(1.0f)));
             auto& fswText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(fsWin);
-            fswText.offsetX = (btnWidth / 2) - (std::string("Windowed").length() * 6);
+            fswText.offsetX = (btnWidth / 2) - (static_cast<int>(std::string("Windowed").length()) * 6);
             fswText.offsetY = (btnHeight / 2) - 12;
             m_UIRegistry.AddComponent(fsWin, VECTOR::UIButtonComponent(
                 glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
@@ -205,7 +205,7 @@ namespace Game {
             m_UIRegistry.AddComponent(fsB, VECTOR::UIRectComponent(startX + 110, startY + 120, btnWidth, btnHeight, glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
             m_UIRegistry.AddComponent(fsB, VECTOR::UITextComponent("Borderless", 24, glm::vec4(1.0f)));
             auto& fsbText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(fsB);
-            fsbText.offsetX = (btnWidth / 2) - (std::string("Borderless").length() * 6);
+            fsbText.offsetX = (btnWidth / 2) - (static_cast<int>(std::string("Borderless").length()) * 6);
             fsbText.offsetY = (btnHeight / 2) - 12;
             m_UIRegistry.AddComponent(fsB, VECTOR::UIButtonComponent(
                 glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
@@ -218,7 +218,7 @@ namespace Game {
             std::string ssaoTextStr = ssaoOn ? "SSAO: ON" : "SSAO: OFF";
             m_UIRegistry.AddComponent(ssaoBtn, VECTOR::UITextComponent(ssaoTextStr, 24, glm::vec4(1.0f)));
             auto& ssaoText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(ssaoBtn);
-            ssaoText.offsetX = (btnWidth / 2) - (ssaoTextStr.length() * 6);
+            ssaoText.offsetX = (btnWidth / 2) - (static_cast<int>(ssaoTextStr.length()) * 6);
             ssaoText.offsetY = (btnHeight / 2) - 12;
             m_UIRegistry.AddComponent(ssaoBtn, VECTOR::UIButtonComponent(
                 glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
@@ -234,7 +234,7 @@ namespace Game {
             std::string taaTextStr = taaOn ? "TAA: ON" : "TAA: OFF";
             m_UIRegistry.AddComponent(taaBtn, VECTOR::UITextComponent(taaTextStr, 24, glm::vec4(1.0f)));
             auto& taaText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(taaBtn);
-            taaText.offsetX = (btnWidth / 2) - (taaTextStr.length() * 6);
+            taaText.offsetX = (btnWidth / 2) - (static_cast<int>(taaTextStr.length()) * 6);
             taaText.offsetY = (btnHeight / 2) - 12;
             m_UIRegistry.AddComponent(taaBtn, VECTOR::UIButtonComponent(
                 glm::vec4(50/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(100/255.0f, 100/255.0f, 100/255.0f, 1.0f),
@@ -248,7 +248,7 @@ namespace Game {
             m_UIRegistry.AddComponent(backBtn, VECTOR::UIRectComponent(startX, startY + 300, btnWidth, btnHeight, glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f)));
             m_UIRegistry.AddComponent(backBtn, VECTOR::UITextComponent("Back", 24, glm::vec4(1.0f)));
             auto& bText = m_UIRegistry.GetComponent<VECTOR::UITextComponent>(backBtn);
-            bText.offsetX = (btnWidth / 2) - (std::string("Back").length() * 6);
+            bText.offsetX = (btnWidth / 2) - (static_cast<int>(std::string("Back").length()) * 6);
             bText.offsetY = (btnHeight / 2) - 12;
             m_UIRegistry.AddComponent(backBtn, VECTOR::UIButtonComponent(
                 glm::vec4(100/255.0f, 50/255.0f, 50/255.0f, 1.0f), glm::vec4(200/255.0f, 100/255.0f, 100/255.0f, 1.0f),
@@ -301,13 +301,86 @@ namespace Game {
         m_PhysicsSystem->GetWorld()->addRigidBody(playerBody.get());
         m_Registry.AddComponent(m_Player, VECTOR::RigidBodyComponent(playerBody));
 
-        // Floor
-        CreateCube(glm::vec3(0, -1, 0), glm::vec3(50, 1, 50), 0.0f, "assets/materials/floor.vmat");
+        // Floor - Large testing area
+        CreateCube(glm::vec3(0, -1, 0), glm::vec3(200, 1, 200), 0.0f, "assets/materials/floor.vmat");
 
         // Targets with different weights
         CreateCube(glm::vec3(0, 1, -10), glm::vec3(2, 2, 2), 10.0f, "assets/materials/medium_target.vmat"); // Medium
         CreateCube(glm::vec3(5, 1, -10), glm::vec3(1, 1, 1), 1.0f, "assets/materials/light_target.vmat");  // Light
         CreateCube(glm::vec3(-5, 1, -10), glm::vec3(3, 3, 3), 100.0f, "assets/materials/heavy_target.vmat"); // Heavy
+
+        // Ramps
+        CreateCube(glm::vec3(-15, 1, 10), glm::vec3(10, 1, 10), 0.0f, "assets/materials/floor.vmat", false, glm::quat(glm::vec3(glm::radians(15.0f), 0.0f, 0.0f)));
+        CreateCube(glm::vec3(15, 2, 10), glm::vec3(10, 1, 15), 0.0f, "assets/materials/floor.vmat", false, glm::quat(glm::vec3(glm::radians(-20.0f), 0.0f, 0.0f)));
+        CreateCube(glm::vec3(0, 3, 25), glm::vec3(15, 1, 10), 0.0f, "assets/materials/floor.vmat", false, glm::quat(glm::vec3(0.0f, 0.0f, glm::radians(25.0f))));
+
+        // Generate a cylinder mesh for circular poles
+        std::vector<VECTOR::Vertex> cylVerts;
+        std::vector<unsigned int> cylInds;
+        float radius = 1.0f;
+        float height = 10.0f;
+        int segments = 16;
+        float halfHeight = height / 2.0f;
+        float angleStep = 2.0f * 3.14159265359f / segments;
+        
+        VECTOR::Vertex topC; topC.Position = glm::vec3(0, halfHeight, 0); topC.Normal = glm::vec3(0, 1, 0); topC.TexCoords = glm::vec2(0.5f);
+        VECTOR::Vertex botC; botC.Position = glm::vec3(0, -halfHeight, 0); botC.Normal = glm::vec3(0, -1, 0); botC.TexCoords = glm::vec2(0.5f);
+        cylVerts.push_back(topC); cylVerts.push_back(botC);
+        int topStart = 2;
+        for (int i = 0; i < segments; i++) {
+            float angle = i * angleStep; float x = cos(angle) * radius; float z = sin(angle) * radius;
+            VECTOR::Vertex v; v.Position = glm::vec3(x, halfHeight, z); v.Normal = glm::vec3(0, 1, 0); v.TexCoords = glm::vec2(cos(angle)*0.5f+0.5f, sin(angle)*0.5f+0.5f);
+            cylVerts.push_back(v);
+        }
+        int botStart = (int)cylVerts.size();
+        for (int i = 0; i < segments; i++) {
+            float angle = i * angleStep; float x = cos(angle) * radius; float z = sin(angle) * radius;
+            VECTOR::Vertex v; v.Position = glm::vec3(x, -halfHeight, z); v.Normal = glm::vec3(0, -1, 0); v.TexCoords = glm::vec2(cos(angle)*0.5f+0.5f, sin(angle)*0.5f+0.5f);
+            cylVerts.push_back(v);
+        }
+        int wallStart = (int)cylVerts.size();
+        for (int i = 0; i <= segments; i++) {
+            float angle = i * angleStep; float x = cos(angle) * radius; float z = sin(angle) * radius;
+            VECTOR::Vertex vTop; vTop.Position = glm::vec3(x, halfHeight, z); vTop.Normal = glm::normalize(glm::vec3(x, 0, z)); vTop.TexCoords = glm::vec2(float(i)/segments, 1.0f);
+            VECTOR::Vertex vBot; vBot.Position = glm::vec3(x, -halfHeight, z); vBot.Normal = vTop.Normal; vBot.TexCoords = glm::vec2(float(i)/segments, 0.0f);
+            cylVerts.push_back(vTop); cylVerts.push_back(vBot);
+        }
+        for (int i = 0; i < segments; i++) {
+            cylInds.push_back(0); cylInds.push_back(topStart + i); cylInds.push_back(topStart + (i + 1) % segments);
+            cylInds.push_back(1); cylInds.push_back(botStart + (i + 1) % segments); cylInds.push_back(botStart + i);
+            int base = wallStart + i * 2;
+            cylInds.push_back(base); cylInds.push_back(base + 1); cylInds.push_back(base + 2);
+            cylInds.push_back(base + 1); cylInds.push_back(base + 3); cylInds.push_back(base + 2);
+        }
+        auto cylMesh = VECTOR::Mesh::Create(cylVerts, cylInds);
+
+        auto createPole = [&](const glm::vec3& pos) {
+            VECTOR::Entity entity = m_Registry.CreateEntity();
+            VECTOR::TransformComponent t; t.position = pos; t.scale = glm::vec3(1.0f); m_Registry.AddComponent(entity, t);
+            auto mat = VECTOR::ResourceManager::Get().LoadMaterial("assets/materials/floor.vmat", "assets/materials/floor.vmat");
+            m_Registry.AddComponent(entity, VECTOR::RenderComponent(mat));
+            VECTOR::MeshComponent m; m.mesh = cylMesh; m_Registry.AddComponent(entity, m);
+            btCollisionShape* colShape = new btCylinderShape(btVector3(radius, halfHeight, radius));
+            btTransform startTransform; startTransform.setIdentity(); startTransform.setOrigin(btVector3(pos.x, pos.y, pos.z));
+            btDefaultMotionState* myMotionState = new btDefaultMotionState(startTransform);
+            btRigidBody::btRigidBodyConstructionInfo rbInfo(0.0f, myMotionState, colShape, btVector3(0,0,0));
+            btRigidBody* body = new btRigidBody(rbInfo);
+            body->setFriction(0.8f);
+            auto deleter = [world = m_PhysicsSystem->GetWorld()](btRigidBody* rb) {
+                if (world && rb) world->removeRigidBody(rb);
+                if (rb) { if (rb->getMotionState()) delete rb->getMotionState(); if (rb->getCollisionShape()) delete rb->getCollisionShape(); delete rb; }
+            };
+            m_Registry.AddComponent(entity, VECTOR::RigidBodyComponent{std::shared_ptr<btRigidBody>(body, deleter)});
+            m_PhysicsSystem->GetWorld()->addRigidBody(body);
+        };
+
+        // Circular poles
+        createPole(glm::vec3(10, 4.0, -15));
+        createPole(glm::vec3(15, 4.0, -15));
+        createPole(glm::vec3(20, 4.0, -15));
+        createPole(glm::vec3(-10, 4.0, -15));
+        createPole(glm::vec3(-15, 4.0, -15));
+
 
         // Load Skybox
         std::vector<std::string> skyboxFaces = {
@@ -341,11 +414,12 @@ namespace Game {
         
     }
 
-    void GameplayScene::CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy) {
+    void GameplayScene::CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy, const glm::quat& rotation) {
         VECTOR::Entity entity = m_Registry.CreateEntity();
         VECTOR::TransformComponent t;
         t.position = position;
         t.scale = scale;
+        t.rotation = rotation;
         m_Registry.AddComponent(entity, t);
 
         auto mat = VECTOR::ResourceManager::Get().LoadMaterial(materialPath, materialPath);
@@ -367,6 +441,7 @@ namespace Game {
         btTransform startTransform;
         startTransform.setIdentity();
         startTransform.setOrigin(btVector3(position.x, position.y, position.z));
+        startTransform.setRotation(btQuaternion(rotation.x, rotation.y, rotation.z, rotation.w));
 
         btVector3 localInertia(0, 0, 0);
         if (mass > 0.0f) colShape->calculateLocalInertia(mass, localInertia);
@@ -595,7 +670,13 @@ namespace Game {
             if (m.mesh) {
                 VECTOR::AABB transformedAABB = m.mesh->GetAABB();
                 transformedAABB.center = glm::vec3(model * glm::vec4(transformedAABB.center, 1.0f));
-                transformedAABB.extents = transformedAABB.extents * t.scale;
+                
+                glm::mat3 absModel(
+                    glm::abs(model[0][0]), glm::abs(model[0][1]), glm::abs(model[0][2]),
+                    glm::abs(model[1][0]), glm::abs(model[1][1]), glm::abs(model[1][2]),
+                    glm::abs(model[2][0]), glm::abs(model[2][1]), glm::abs(model[2][2])
+                );
+                transformedAABB.extents = absModel * m.mesh->GetAABB().extents;
 
                 if (!VECTOR::IsOnFrustum(cameraFrustum, transformedAABB)) {
                     return; // Skip rendering
@@ -653,6 +734,14 @@ namespace Game {
         renderer->BeginUI();
         // Crosshair
         renderer->DrawUIRect(m_Width / 2 - 2, m_Height / 2 - 2, 4, 4, glm::vec4(1.0f, 1.0f, 1.0f, 200/255.0f));
+        
+        // Red Health Bar Capsule on Top Left
+        ImGui::GetBackgroundDrawList()->AddRectFilled(
+            ImVec2(20.0f, 20.0f),
+            ImVec2(220.0f, 50.0f),
+            ImColor(0.8f, 0.1f, 0.1f, 1.0f),
+            15.0f // Rounding for capsule shape (half height)
+        );
 
         // Raw text debug info has been migrated to the Dear ImGui Debugger window.
 

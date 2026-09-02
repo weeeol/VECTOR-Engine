@@ -136,7 +136,7 @@ float ShadowCalculation(float4 fragPosLightSpace, float3 normal, float3 lightDir
     Texture2D shadowMap = ResourceDescriptorHeap[pfd.shadowMapIndex];
     
     float currentDepth = projCoords.z;
-    float bias = max(0.005f * (1.0f - dot(normal, lightDir)), 0.001f);
+    float bias = max(0.0005f * (1.0f - dot(normal, lightDir)), 0.0001f);
     
     float shadow = 0.0f;
     float2 texelSize = 1.0f / 2048.0f; 
@@ -326,7 +326,8 @@ float4 PSMain(VSOutput input) : SV_TARGET {
         float2 envBRDF = float2(1.0f, 0.0f); 
         float3 specularIBL = prefilteredColor * (F_ibl * envBRDF.x + envBRDF.y);
         
-        ambient = (kD_ibl * diffuseIBL + specularIBL) * ao * ssao;
+        float iblIntensity = 0.3f;
+        ambient = (kD_ibl * diffuseIBL + specularIBL) * ao * ssao * iblIntensity;
     }
     
     float3 color = ambient + Lo;

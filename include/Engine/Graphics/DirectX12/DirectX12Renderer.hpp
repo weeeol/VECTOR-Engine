@@ -136,15 +136,14 @@ namespace VECTOR {
         struct ObjectData {
             std::unique_ptr<UniformBuffer> ubo;
         };
-
-        std::vector<ObjectData> m_ObjectDataPool;
-        size_t m_ObjectDataIndex = 0;
+        std::vector<ObjectData> m_ObjectDataPool[s_FrameCount];
+        size_t m_ObjectDataIndex[s_FrameCount] = {0};
         
         struct MaterialDataBlock {
             std::unique_ptr<UniformBuffer> ubo;
         };
-        std::vector<MaterialDataBlock> m_MaterialDataPool;
-        size_t m_MaterialDataIndex = 0;
+        std::vector<MaterialDataBlock> m_MaterialDataPool[s_FrameCount];
+        size_t m_MaterialDataIndex[s_FrameCount] = {0};
 
         std::vector<std::unique_ptr<UniformBuffer>> m_PerFrameUBOs;
         std::vector<std::unique_ptr<UniformBuffer>> m_LightUBOs;

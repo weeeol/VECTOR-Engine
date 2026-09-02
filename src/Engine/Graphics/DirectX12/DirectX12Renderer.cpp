@@ -138,9 +138,10 @@ namespace VECTOR {
         m_PerFrameUBOs.clear();
         m_LightUBOs.clear();
         m_DummyObjectUBO.reset();
-        m_MaterialDataPool.clear();
-        m_ObjectDataPool.clear();
-        
+        for (int i = 0; i < s_FrameCount; ++i) {
+            m_MaterialDataPool[i].clear();
+            m_ObjectDataPool[i].clear();
+        }
         m_Pipeline.reset();
         m_WireframePipeline.reset();
         m_SkyboxPipeline.reset();
@@ -221,8 +222,8 @@ namespace VECTOR {
             m_CommandList->Reset(m_CommandAllocators[m_FrameIndex].Get(), nullptr);
             TransitionResource(m_CommandList, backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-            m_ObjectDataIndex = 0;
-            m_MaterialDataIndex = 0;
+            m_ObjectDataIndex[m_FrameIndex] = 0;
+            m_MaterialDataIndex[m_FrameIndex] = 0;
 
             m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
@@ -516,10 +517,10 @@ namespace VECTOR {
     }
 
     void DirectX12Renderer::BindObjectAndMaterial(const RenderCommand& cmd, bool bindMaterial) {
-        if (m_ObjectDataIndex >= m_ObjectDataPool.size()) {
+        if (m_ObjectDataIndex[m_FrameIndex] >= m_ObjectDataPool[m_FrameIndex].size()) {
             ObjectData data;
             data.ubo = std::make_unique<DirectX12UniformBuffer>(static_cast<uint32_t>(sizeof(glm::mat4) * 101), 2);
-            m_ObjectDataPool.push_back(std::move(data));
+            m_ObjectDataPool[m_FrameIndex].push_back(std::move(data));
         }
         
         struct PerObjectData {
@@ -540,16 +541,16 @@ namespace VECTOR {
             }
         }
         
-        m_ObjectDataPool[m_ObjectDataIndex].ubo->SetData(&data, sizeof(PerObjectData));
-        D3D12_GPU_VIRTUAL_ADDRESS objectDataAddress = static_cast<DirectX12UniformBuffer*>(m_ObjectDataPool[m_ObjectDataIndex].ubo.get())->GetGPUVirtualAddress();
+        m_ObjectDataPool[m_FrameIndex][m_ObjectDataIndex[m_FrameIndex]].ubo->SetData(&data, sizeof(PerObjectData));
+        D3D12_GPU_VIRTUAL_ADDRESS objectDataAddress = static_cast<DirectX12UniformBuffer*>(m_ObjectDataPool[m_FrameIndex][m_ObjectDataIndex[m_FrameIndex]].ubo.get())->GetGPUVirtualAddress();
         m_CommandList->SetGraphicsRootConstantBufferView(2, objectDataAddress);
-        m_ObjectDataIndex++;
+        m_ObjectDataIndex[m_FrameIndex]++;
 
         if (bindMaterial && cmd.material) {
-            if (m_MaterialDataIndex >= m_MaterialDataPool.size()) {
+            if (m_MaterialDataIndex[m_FrameIndex] >= m_MaterialDataPool[m_FrameIndex].size()) {
                 MaterialDataBlock matBlock;
                 matBlock.ubo = std::make_unique<DirectX12UniformBuffer>(static_cast<uint32_t>(sizeof(float) * 16), 2);
-                m_MaterialDataPool.push_back(std::move(matBlock));
+                m_MaterialDataPool[m_FrameIndex].push_back(std::move(matBlock));
             }
 
             struct MaterialData {
@@ -586,10 +587,10 @@ namespace VECTOR {
             matData.hasAOMap = cmd.material->aoTexture ? 1 : 0;
             matData.aoMapIndex = cmd.material->aoTexture ? static_cast<DirectX12Texture2D*>(cmd.material->aoTexture.get())->GetDescriptorIndex() : -1;
 
-            m_MaterialDataPool[m_MaterialDataIndex].ubo->SetData(&matData, sizeof(MaterialData));
-            D3D12_GPU_VIRTUAL_ADDRESS materialDataAddress = static_cast<DirectX12UniformBuffer*>(m_MaterialDataPool[m_MaterialDataIndex].ubo.get())->GetGPUVirtualAddress();
+            m_MaterialDataPool[m_FrameIndex][m_MaterialDataIndex[m_FrameIndex]].ubo->SetData(&matData, sizeof(MaterialData));
+            D3D12_GPU_VIRTUAL_ADDRESS materialDataAddress = static_cast<DirectX12UniformBuffer*>(m_MaterialDataPool[m_FrameIndex][m_MaterialDataIndex[m_FrameIndex]].ubo.get())->GetGPUVirtualAddress();
             m_CommandList->SetGraphicsRootConstantBufferView(3, materialDataAddress);
-            m_MaterialDataIndex++;
+            m_MaterialDataIndex[m_FrameIndex]++;
         }
     }
 
@@ -748,10 +749,10 @@ namespace VECTOR {
         if (m_CurrentSkybox && m_SkyboxPipeline) {
             m_CommandList->SetPipelineState(m_SkyboxPipeline->GetPipelineState());
             
-            if (m_MaterialDataIndex >= m_MaterialDataPool.size()) {
-                MaterialDataBlock data;
-                data.ubo = std::make_unique<DirectX12UniformBuffer>(static_cast<uint32_t>(sizeof(float) * 16), 2);
-                m_MaterialDataPool.push_back(std::move(data));
+            if (m_MaterialDataIndex[m_FrameIndex] >= m_MaterialDataPool[m_FrameIndex].size()) {
+                MaterialDataBlock matBlock;
+                matBlock.ubo = std::make_unique<DirectX12UniformBuffer>(static_cast<uint32_t>(sizeof(float) * 16), 2);
+                m_MaterialDataPool[m_FrameIndex].push_back(std::move(matBlock));
             }
 
             struct MaterialData {
@@ -776,9 +777,9 @@ namespace VECTOR {
             matData.hasAlbedoMap = 1;
             matData.albedoMapIndex = m_CurrentSkybox->GetDescriptorIndex();
 
-            m_MaterialDataPool[m_MaterialDataIndex].ubo->SetData(&matData, sizeof(MaterialData), 0);
-            D3D12_GPU_VIRTUAL_ADDRESS skyboxMatAddress = static_cast<DirectX12UniformBuffer*>(m_MaterialDataPool[m_MaterialDataIndex].ubo.get())->GetGPUVirtualAddress();
-            m_MaterialDataIndex++;
+            m_MaterialDataPool[m_FrameIndex][m_MaterialDataIndex[m_FrameIndex]].ubo->SetData(&matData, sizeof(MaterialData), 0);
+            D3D12_GPU_VIRTUAL_ADDRESS skyboxMatAddress = static_cast<DirectX12UniformBuffer*>(m_MaterialDataPool[m_FrameIndex][m_MaterialDataIndex[m_FrameIndex]].ubo.get())->GetGPUVirtualAddress();
+            m_MaterialDataIndex[m_FrameIndex]++;
 
             m_CommandList->SetGraphicsRootConstantBufferView(3, skyboxMatAddress);
             m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -786,8 +787,6 @@ namespace VECTOR {
         }
 
         m_RenderQueue.clear();
-        m_ObjectDataIndex = 0;
-        m_MaterialDataIndex = 0;
         m_LightData.numPointLights = 0;
         m_CurrentSkybox = nullptr;
     }

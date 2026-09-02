@@ -9,6 +9,7 @@
 #include "Game/Systems/ShootingSystem.hpp"
 #include <memory>
 #include <vector>
+#include <glm/gtc/quaternion.hpp>
 
 namespace VECTOR {
     class InputManager;
@@ -30,7 +31,7 @@ namespace Game {
 
     private:
         void GenerateArena();
-        void CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy = false);
+        void CreateCube(const glm::vec3& position, const glm::vec3& scale, float mass, const std::string& materialPath, bool isEnemy = false, const glm::quat& rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
         void SpawnParticles(const glm::vec3& position);
         void CreateUI();
         void ClearUI();

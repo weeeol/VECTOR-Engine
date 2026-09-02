@@ -31,7 +31,7 @@ namespace VECTOR {
 
         Bone* FindBone(const std::string& name);
 
-        inline float GetTicksPerSecond() const { return m_TicksPerSecond; }
+        inline float GetTicksPerSecond() const { return static_cast<float>(m_TicksPerSecond); }
         inline float GetDuration() const { return m_Duration; }
         inline const AssimpNodeData& GetRootNode() const { return m_RootNode; }
         inline const std::map<std::string, BoneInfo>& GetBoneIDMap() const { return m_BoneInfoMap; }
